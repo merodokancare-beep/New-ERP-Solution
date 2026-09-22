@@ -1,0 +1,104 @@
+@model IEnumerable<SDK.ERP.Domain.Entities.Accounting.AccountGroup>
+@{
+    ViewData["Title"] = "Financial Accounting & General Ledger";
+    ViewData["ActiveMenu"] = "Accounts";
+    var groups = Model ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Accounting.AccountGroup>();
+    var journalEntries = ViewBag.JournalEntries as IEnumerable<SDK.ERP.Domain.Entities.Accounting.JournalEntry> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Accounting.JournalEntry>();
+}
+
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h3 style="font-weight: 700; color: var(--erp-primary); margin-bottom: 4px;">General Ledger &amp; Double-Entry Accounting</h3>
+        <p style="color: var(--erp-text-muted); margin: 0; font-size: 13.5px;">Automated Balanced Journal Vouchers &bull; Real-time Trial Balance &bull; Chart of Accounts</p>
+    </div>
+    <button class="btn btn-primary btn-sm px-3" style="background: var(--erp-primary);"><i class="fa-solid fa-plus me-1"></i> New Journal Voucher (JV)</button>
+</div>
+
+<div class="row g-4">
+    <!-- Chart of Account Groups -->
+    <div class="col-md-6">
+        <div class="erp-card">
+            <div class="erp-card-header"><h5 class="erp-card-title"><i class="fa-solid fa-sitemap me-2"></i>Chart of Account Groups</h5></div>
+            <div class="erp-card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0" style="font-size: 13px;">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-4">Group Code</th>
+                                <th>Group Name</th>
+                                <th>Category</th>
+                                <th class="text-end pe-4">Accounts</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (groups.Any())
+                            {
+                                @foreach (var g in groups)
+                                {
+                                    <tr>
+                                        <td class="ps-4 fw-bold">@g.GroupCode</td>
+                                        <td>@g.GroupName</td>
+                                        <td><span class="badge bg-light text-dark border">@g.AccountCategory</span></td>
+                                        <td class="text-end pe-4">@g.Accounts.Count()</td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="4" class="text-center py-4 text-muted">No account groups configured in database.</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Journal Vouchers -->
+    <div class="col-md-6">
+        <div class="erp-card">
+            <div class="erp-card-header"><h5 class="erp-card-title"><i class="fa-solid fa-book-journal-whills me-2"></i>Recent Posted Journal Vouchers</h5></div>
+            <div class="erp-card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0" style="font-size: 13px;">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-4">Voucher No</th>
+                                <th>Date</th>
+                                <th>Type</th>
+                                <th class="text-end">Debit (&#8377;)</th>
+                                <th class="text-end pe-4">Credit (&#8377;)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (journalEntries.Any())
+                            {
+                                @foreach (var jv in journalEntries)
+                                {
+                                    <tr>
+                                        <td class="ps-4 fw-bold text-primary">@jv.VoucherNo</td>
+                                        <td>@jv.VoucherDate.ToString("dd MMM yyyy")</td>
+                                        <td><span class="badge bg-primary-subtle text-primary">@jv.VoucherType</span></td>
+                                        <td class="text-end fw-bold">&#8377; @jv.TotalDebit.ToString("N2")</td>
+                                        <td class="text-end fw-bold pe-4">&#8377; @jv.TotalCredit.ToString("N2")</td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="5" class="text-center py-5 text-muted">
+                                        <i class="fa-solid fa-book-open mb-2" style="font-size: 28px; color: #CBD5E1;"></i>
+                                        <div>No journal vouchers posted in the database yet.</div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

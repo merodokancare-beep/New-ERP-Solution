@@ -1,0 +1,10 @@
+namespace SDK.ERP.SecurityTests;
+
+public class UnitTest1
+{
+    [Fact]
+    public void Test1()
+    {
+
+    }
+}

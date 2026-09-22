@@ -1,0 +1,65 @@
+@model IEnumerable<SDK.ERP.Domain.Entities.Payroll.Employee>
+@{
+    ViewData["Title"] = "Payroll & Employee Operations";
+    ViewData["ActiveMenu"] = "Payroll";
+    var empList = Model ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Payroll.Employee>();
+}
+
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h3 style="font-weight: 700; color: var(--erp-primary); margin-bottom: 4px;">Payroll &amp; Employee Operations</h3>
+        <p style="color: var(--erp-text-muted); margin: 0; font-size: 13.5px;">Monthly Salary Computations &bull; Advance Recoveries &bull; QuestPDF Payslips &bull; Leave Quotas</p>
+    </div>
+    <button class="btn btn-primary btn-sm px-3" style="background: var(--erp-primary);"><i class="fa-solid fa-calculator me-1"></i> Execute Monthly Payroll</button>
+</div>
+
+<div class="erp-card">
+    <div class="erp-card-header d-flex justify-content-between align-items-center">
+        <h5 class="erp-card-title"><i class="fa-solid fa-users-gear me-2"></i>Staff Payroll Register (@empList.Count() Registered)</h5>
+        <span class="badge bg-primary">Active Financial Year</span>
+    </div>
+    <div class="erp-card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0" style="font-size: 13.5px;">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-4">Emp Code</th>
+                        <th>Full Name</th>
+                        <th>Designation</th>
+                        <th>Department</th>
+                        <th>Status</th>
+                        <th class="text-end pe-4">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (empList.Any())
+                    {
+                        @foreach (var emp in empList)
+                        {
+                            <tr>
+                                <td class="ps-4 fw-bold text-primary">@emp.EmployeeCode</td>
+                                <td><strong>@emp.FullName</strong></td>
+                                <td>@emp.DesignationTitle</td>
+                                <td>@emp.DepartmentName</td>
+                                <td><span class="badge @(emp.IsActive ? "bg-success" : "bg-secondary")">@(emp.IsActive ? "ACTIVE" : "INACTIVE")</span></td>
+                                <td class="text-end pe-4">
+                                    <button class="btn btn-sm btn-outline-primary"><i class="fa-solid fa-file-invoice me-1"></i> Payslip</button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="6" class="text-center py-5 text-muted">
+                                <i class="fa-solid fa-users mb-2" style="font-size: 32px; color: #CBD5E1;"></i>
+                                <h6 class="fw-bold text-secondary mb-1">No Employee Records Found</h6>
+                                <p class="mb-0" style="font-size: 12.5px;">No staff records have been registered in the database yet.</p>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

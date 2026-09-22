@@ -1,0 +1,485 @@
+[Normal] SDK SOLUTIONS
+ERP SYSTEM
+[Normal] Complete Software Requirements Specification
+& Functional System Design
+[Heading 1] Document Control
+[Heading 1] 1. Purpose
+[Normal] This document defines the functional structure, navigation, workflows, controls, reporting requirements and implementation guidance for the SDK Solutions ERP. It is intended to serve as the master functional baseline for UI/UX design, backend development, database design, testing and future enhancement.
+[Heading 1] 2. Design Objectives
+[List Bullet] Simple top-level navigation with grouped business functions.
+[List Bullet] Complete end-to-end transaction flows rather than isolated menus.
+[List Bullet] A project-centric operating model connecting clients, projects, sales, procurement, delivery, expenses and collections.
+[List Bullet] Scalability for future modules without redesigning the core architecture.
+[List Bullet] Strong financial controls, auditability and approval workflows.
+[List Bullet] Centralized master data to avoid duplicate records.
+[List Bullet] Clear separation between internal office inventory and fixed/durable assets.
+[Heading 1] 3. Scope
+[Normal] The ERP covers management dashboards, centralized masters, project management, sales and billing, procurement, internal office inventory, accounts and payments, GST/tax, cash and banking, payroll/employees, reports/analytics, administration, assets and support.
+[Normal] The Office Inventory module is specifically for items purchased for internal organizational use. It is not a customer-sales inventory or commercial warehouse management system.
+[Heading 1] 4. Recommended Main ERP Modules
+[Heading 1] 5. Final Sidebar Navigation
+[List Bullet] Dashboard
+[List Bullet] Masters & Configuration
+[List Bullet] Projects
+[List Bullet] Sales & Billing
+[List Bullet] Procurement & Office Inventory
+[List Bullet] Accounts & Payments
+[List Bullet] GST & Tax
+[List Bullet] Cash & Bank
+[List Bullet] Payroll & Employees
+[List Bullet] Reports & Analytics
+[List Bullet] Administration & Support
+[Heading 1] 6. Masters & Configuration
+[Normal] A single master record should be reused throughout transactions. Example: Client → Project → Sales Invoice → Payment Received → Client Ledger → Receivable Ageing.
+[Heading 1] 7. Projects
+[Heading 2] 7.1 Project Menu
+[List Bullet] Project List
+[List Bullet] Project Dashboard
+[List Bullet] Miscellaneous Projects
+[List Bullet] Pipeline Projects
+[List Bullet] Delivery Challans
+[List Bullet] Reference Numbers
+[List Bullet] Closed Projects
+[Heading 2] 7.2 Project Detail
+[Heading 2] 7.3 Project Tabs
+[List Bullet] Overview
+[List Bullet] Basic Details
+[List Bullet] PO / Work Order
+[List Bullet] Sales & Invoice
+[List Bullet] Payment Received
+[List Bullet] Procurement
+[List Bullet] Delivery
+[List Bullet] Expenses
+[List Bullet] Documents
+[List Bullet] Project P&L
+[List Bullet] Activity / Audit Trail
+[Heading 2] 7.4 Project Lifecycle
+[Normal] Open / Pipeline → Active → On Hold (if required) → Completed → Closed
+[Heading 2] 7.5 Project Closure Controls
+[List Bullet] All deliveries completed.
+[List Bullet] All required invoices generated.
+[List Bullet] Outstanding amounts checked.
+[List Bullet] Vendor payments/payables checked.
+[List Bullet] Project expenses entered.
+[List Bullet] Final project P&L generated.
+[List Bullet] Closed projects remain accessible for reporting and audit.
+[List Bullet] Financial transactions cannot be directly edited after closure without an authorized Reopen Project permission.
+[Heading 1] 8. Sales & Billing
+[List Bullet] Quotation / Proforma Invoice
+[List Bullet] Sales Order
+[List Bullet] Sales Invoice
+[List Bullet] Delivery Challan
+[List Bullet] Invoices
+[List Bullet] Credit / Debit Notes
+[List Bullet] Payment Received
+[List Bullet] Project Payment Received
+[List Bullet] Project Payment Overview
+[List Bullet] Receivables
+[List Bullet] Receivable Ageing
+[List Bullet] Sales Overview / Client-wise Sales
+[Normal] Primary flow: Client → Project → Sales Order/Invoice → Delivery → Payment Received → Payment Allocation → Receipt → Client Ledger → Receivable Ageing.
+[Heading 2] 8.1 Customer Payment Allocation
+[Normal] A receipt must support allocation across multiple invoices. For example, a customer payment of ₹10 lakh may be allocated against INV-001 ₹4 lakh, INV-002 ₹3 lakh and INV-003 ₹3 lakh, leaving ₹2 lakh outstanding on INV-003.
+[Heading 2] 8.2 Invoice Status
+[Normal] Draft → Approved → Sent → Partially Paid → Paid / Overdue → Cancelled
+[Heading 1] 9. Procurement & Office Inventory
+[Heading 2] 9.1 Procurement
+[List Bullet] Purchase Requisition
+[List Bullet] Purchase Order
+[List Bullet] GRN / Goods Receipt
+[List Bullet] Purchase Bill
+[List Bullet] Vendor Payment
+[Normal] Recommended procurement flow: Purchase Requisition → Approval → Purchase Order → GRN/Delivery → Purchase Bill → Payable → Payment.
+[Heading 2] 9.2 Office Inventory Scope
+[Normal] Inventory is limited to in-house items purchased for office/organizational use, such as stationery, office consumables, supplies and similar items. It does not represent stock held for customer sales.
+[List Bullet] Item Master
+[List Bullet] Item Categories
+[List Bullet] Item Types
+[List Bullet] Unit Master
+[List Bullet] Stock In
+[List Bullet] Stock Out / Issue
+[List Bullet] Stock Register
+[List Bullet] Current Stock
+[List Bullet] Low Stock
+[List Bullet] Stock Adjustment
+[List Bullet] Stock Transfer where multiple office locations exist
+[List Bullet] Item-wise History
+[Heading 2] 9.3 Internal Stock Issue
+[Heading 2] 9.4 Durable Items
+[Normal] Durable equipment such as laptops, desktops, printers, monitors, furniture and similar assets should be managed through Asset Management rather than treated as ordinary consumable office inventory.
+[Heading 2] 9.5 Stock Flow
+[Normal] Purchase Order → GRN → Stock In → Purchase Bill → Payable → Payment; Stock In → Internal Issue/Stock Out → Employee/Department.
+[Heading 1] 10. Accounts & Payments
+[Heading 2] 10.1 Accounts
+[List Bullet] Chart of Accounts
+[List Bullet] Account Groups
+[List Bullet] General Ledger
+[List Bullet] Client Ledger
+[List Bullet] Vendor Ledger
+[List Bullet] Expense Ledger
+[List Bullet] Journal / Journal Voucher
+[List Bullet] Receivables
+[List Bullet] Payables
+[List Bullet] Advances
+[List Bullet] Opening Balances
+[List Bullet] Trial Balance
+[List Bullet] Profit & Loss
+[List Bullet] Balance Sheet
+[List Bullet] Cash Flow
+[List Bullet] Financial Year Closing / Period Lock
+[Heading 2] 10.2 Payments
+[List Bullet] Procurement Payments
+[List Bullet] Reimbursements
+[List Bullet] Direct Payments
+[List Bullet] Refunds
+[List Bullet] Customer Receipts
+[List Bullet] Advance Payments
+[List Bullet] Petty Cash
+[List Bullet] Payment Approval
+[List Bullet] Payment Allocation
+[Heading 2] 10.3 Common Payment Engine
+[Normal] Purchase Bill → Vendor Payable → Payment Request → Approval → Payment → Bank/Cash → Vendor Ledger.
+[Normal] Expense → Payment Request → Approval → Bank/Cash. Employee Reimbursement → Approval → Payment → Bank/Cash. Customer Invoice → Receivable → Payment Received → Allocation → Bank/Cash → Customer Ledger.
+[Heading 2] 10.4 Accounting Posting Principle
+[Normal] The accounting engine should automatically generate balanced debit/credit entries from posted transactions. Financial transactions should not be deleted; corrections should use cancellation, reversal or adjustment mechanisms subject to permissions.
+[Heading 1] 11. GST & Tax
+[List Bullet] GST Dashboard
+[List Bullet] Sales GST
+[List Bullet] Purchase GST
+[List Bullet] GSTR-1
+[List Bullet] GSTR-3B
+[List Bullet] ITC / GSTR-2B
+[List Bullet] GST Reconciliation
+[List Bullet] GST Reports
+[List Bullet] CGST / SGST / IGST where applicable
+[List Bullet] GSTIN
+[List Bullet] HSN/SAC
+[List Bullet] Tax Rate Master
+[List Bullet] Place of Supply
+[List Bullet] Reverse Charge
+[List Bullet] Exempt/Nil-rated/Zero-rated transactions
+[List Bullet] Credit/Debit Notes
+[List Bullet] Tax-inclusive/exclusive pricing
+[List Bullet] E-Invoice readiness
+[List Bullet] E-way bill readiness
+[List Bullet] GST reconciliation and exception reporting
+[Normal] Conceptual sales flow: Sales Invoice → Output GST → GSTR-1 → GSTR-3B. Purchase flow: Purchase Bill → Input GST → GSTR-2B → ITC Reconciliation → Net GST Liability.
+[Normal] Compliance integrations and return formats should be implemented according to the applicable current Indian GST requirements at the time of deployment.
+[Heading 1] 12. Cash & Bank
+[List Bullet] Bank Accounts
+[List Bullet] Bank Transactions
+[List Bullet] Bank Transfer
+[List Bullet] Cash Book
+[List Bullet] Petty Cash
+[List Bullet] Expenses
+[List Bullet] Subscriptions
+[List Bullet] Security Deposit
+[List Bullet] Bank Reconciliation
+[Heading 1] 13. Payroll & Employees
+[List Bullet] Employees
+[List Bullet] Employee Profile
+[List Bullet] Reporting Manager
+[List Bullet] Salary Structure
+[List Bullet] Employee Salary Sheet
+[List Bullet] Advance Salary
+[List Bullet] Salary Certificate
+[List Bullet] Leave Management
+[List Bullet] Holiday List
+[List Bullet] Payroll Reports
+[Normal] Employee-related master definitions remain under Masters & Configuration, while employee transactions remain under Payroll & Employees.
+[Heading 1] 14. Reports & Analytics
+[Heading 2] 14.1 Financial Reports
+[List Bullet] Profit & Loss
+[List Bullet] Balance Sheet (planned/future provision if not initially implemented)
+[List Bullet] Cash Flow
+[List Bullet] Expense Report
+[List Bullet] Income Report
+[List Bullet] Trial Balance
+[List Bullet] General Ledger
+[Heading 2] 14.2 Sales Reports
+[List Bullet] Sales Report
+[List Bullet] Client-wise Sales
+[List Bullet] Invoice Report
+[List Bullet] Collection Report
+[List Bullet] Receivable Ageing
+[Heading 2] 14.3 Purchase Reports
+[List Bullet] Purchase Report
+[List Bullet] Vendor-wise Purchase
+[List Bullet] Payable Ageing
+[List Bullet] Purchase Order Report
+[Heading 2] 14.4 Project Reports
+[List Bullet] Project P&L
+[List Bullet] Budget vs Actual
+[List Bullet] Project Expense
+[List Bullet] Project Revenue
+[List Bullet] Project Outstanding
+[List Bullet] Project Closure Report
+[Heading 2] 14.5 GST Reports
+[List Bullet] GST Summary
+[List Bullet] GSTR-1
+[List Bullet] GSTR-3B
+[List Bullet] ITC
+[List Bullet] GSTR-2B Reconciliation
+[Heading 2] 14.6 Office Inventory Reports
+[List Bullet] Stock Register
+[List Bullet] Stock In
+[List Bullet] Stock Out / Issue
+[List Bullet] Current Stock
+[List Bullet] Item-wise Stock
+[List Bullet] Low Stock
+[List Bullet] Issue History
+[Heading 2] 14.7 Audit Reports
+[List Bullet] Audit Trail
+[List Bullet] User Activity
+[List Bullet] Approval History
+[List Bullet] Transaction History
+[Heading 1] 15. Administration & Support
+[List Bullet] Asset Management: Asset Register, Asset Allocation, Asset Maintenance, Asset Disposal
+[List Bullet] User & Access Management: Users, Roles, Permissions, Reporting Manager
+[List Bullet] Support: Support Logs, Issue Monitoring, Support Reports
+[List Bullet] Audit Trail
+[Heading 1] 16. Approval Workflow
+[Normal] Approval should be implemented as a reusable engine rather than separate hard-coded approval mechanisms.
+[Normal] Transaction → Approval Rule → Approver(s) → Approved / Rejected → Posted/Processed
+[List Bullet] Purchase approval
+[List Bullet] Payment approval
+[List Bullet] Expense approval
+[List Bullet] Reimbursement approval
+[List Bullet] Refund approval
+[List Bullet] Project approval
+[List Bullet] Sales discount approval
+[List Bullet] Other configurable approvals
+[Heading 2] 16.1 Permission Types
+[List Bullet] View
+[List Bullet] Create
+[List Bullet] Edit
+[List Bullet] Delete (where business-safe)
+[List Bullet] Approve
+[List Bullet] Reject
+[List Bullet] Cancel
+[List Bullet] Print
+[List Bullet] Export
+[List Bullet] Import
+[List Bullet] Post
+[List Bullet] Reverse
+[List Bullet] Reopen
+[List Bullet] Close
+[Normal] Permissions should be assignable by Module → Submodule → Action.
+[Heading 1] 17. Audit & Control Requirements
+[List Bullet] Record created by, created date/time, modified by and modified date/time.
+[List Bullet] Record approval and rejection history.
+[List Bullet] Record cancellation and reason.
+[List Bullet] Record reversal/adjustment and reason.
+[List Bullet] Record reopen actions and authorization.
+[List Bullet] Maintain transaction history and user activity.
+[List Bullet] Do not allow silent deletion of posted financial transactions.
+[List Bullet] Closed project financial transactions require authorized reopening.
+[Heading 1] 18. Document Management
+[List Bullet] Store project, PO, Work Order, quotation, invoice, GRN, delivery, payment proof, GST and other supporting documents.
+[List Bullet] Link documents to the relevant transaction/project/entity.
+[List Bullet] Capture document type, reference ID, uploaded by, upload date and version.
+[List Bullet] Apply appropriate access permissions and retention rules.
+[Heading 1] 19. Notifications
+[List Bullet] Pending approvals
+[List Bullet] Invoice overdue
+[List Bullet] Payment received
+[List Bullet] Purchase pending
+[List Bullet] Low office stock
+[List Bullet] Project deadline alerts
+[List Bullet] GST reconciliation exceptions
+[List Bullet] Payroll pending
+[List Bullet] System/backup alerts
+[Heading 1] 20. Complete ERP Business Flow
+[Normal] The ERP should be designed around linked transactions, not isolated menus.
+[Normal] Master Data → Client / Vendor / Item → Project / Procurement / Office Inventory → Sales / Purchase → Delivery / GRN → Invoice / Purchase Bill → Receipt / Payment → Ledgers → GST → Cash/Bank → Project P&L → Management Reports.
+[Heading 1] 21. Primary Project-to-Accounting Flow
+[List Number] Register Client.
+[List Number] Create Project.
+[List Number] Enter PO / Work Order.
+[List Number] Create Sales Order / Invoice as applicable.
+[List Number] Raise Purchase Requisition / Purchase Order.
+[List Number] Receive goods and record GRN / Stock In.
+[List Number] Record project delivery.
+[List Number] Record Purchase Bill.
+[List Number] Record project expenses.
+[List Number] Receive customer payment and allocate it to invoices.
+[List Number] Process vendor payment.
+[List Number] Calculate/post GST transactions.
+[List Number] Perform GST reconciliation.
+[List Number] Generate Project P&L.
+[List Number] Close project after all closure checks.
+[List Number] Generate final project and financial reports.
+[Heading 1] 22. Standard Status System
+[Heading 1] 23. Database Design – Recommended Major Entities
+[Normal] The final physical schema, keys, indexes, constraints and normalization should be produced as a separate ERD/database specification before production coding.
+[Heading 1] 24. Technical Architecture Requirements
+[Normal] Recommended logical architecture:
+[Normal] Frontend/UI → API/Application Layer → Business Services → Data Access/ORM → Database
+[List Bullet] Business rules must reside in the application/service layer rather than directly in UI code.
+[List Bullet] Use transaction boundaries for financial postings and inventory movements.
+[List Bullet] Use database constraints and application validation together.
+[List Bullet] Provide centralized authentication and role-based authorization.
+[List Bullet] Keep audit logging consistent across modules.
+[List Bullet] Design APIs so future mobile/integration clients can reuse the business layer.
+[Heading 1] 25. Security Requirements
+[List Bullet] Secure authentication and session management.
+[List Bullet] Role-based access control.
+[List Bullet] Least-privilege permissions.
+[List Bullet] Server-side validation for all critical transactions.
+[List Bullet] Protection against SQL injection, XSS, CSRF and unauthorized direct object access.
+[List Bullet] Secure password storage using modern password hashing.
+[List Bullet] Encrypted transport using HTTPS in production.
+[List Bullet] Secrets and database credentials must not be stored in source code.
+[List Bullet] Audit sensitive administrative and financial operations.
+[List Bullet] Regular dependency and security review before production release.
+[Heading 1] 26. Backup & Recovery
+[List Bullet] Automated database backup.
+[List Bullet] Full backup schedule.
+[List Bullet] Differential and/or transaction-log backup where supported by the selected database/recovery model.
+[List Bullet] Retention policy.
+[List Bullet] Backup integrity verification.
+[List Bullet] Off-server backup copy.
+[List Bullet] Documented restore procedure.
+[List Bullet] Periodic restore testing.
+[List Bullet] Disaster recovery plan and recovery objectives.
+[Heading 1] 27. Non-Functional Requirements
+[Heading 1] 28. Future Expansion Provisions
+[List Bullet] Multi-company and multi-branch support.
+[List Bullet] Additional warehouses/locations if the business model expands.
+[List Bullet] Advanced asset management.
+[List Bullet] Mobile application/API consumers.
+[List Bullet] Email/SMS/notification integrations.
+[List Bullet] GST/e-invoice/e-way bill integrations subject to applicable requirements.
+[List Bullet] Bank/payment integrations.
+[List Bullet] Advanced project task/milestone management.
+[List Bullet] Business intelligence dashboards.
+[List Bullet] Additional HR/payroll compliance modules.
+[Heading 1] 29. Developer Implementation Rules
+[List Number] Do not duplicate Client, Vendor, Employee, Item or Bank master records for individual modules.
+[List Number] Do not implement financial modules as disconnected CRUD screens.
+[List Number] Every posted transaction must have a traceable business reference.
+[List Number] Financial transactions must balance and use controlled reversal/cancellation rather than deletion.
+[List Number] Inventory movements must be generated from authorized business transactions or controlled adjustments.
+[List Number] Office Inventory must remain separate in scope from customer-sales inventory.
+[List Number] Durable equipment should flow to Asset Management.
+[List Number] Approvals must be permission-aware and auditable.
+[List Number] Project profitability must be derived from linked revenue and cost transactions.
+[List Number] Closed projects must be protected from unauthorized financial editing.
+[List Number] Reports must respect company/branch/user permissions.
+[List Number] Business rules should be centralized so UI, API and future integrations behave consistently.
+[Heading 1] 30. UAT / Acceptance Checklist
+[List Bullet] All 11 top-level modules are accessible according to permissions.
+[List Bullet] Client/Vendor/Item master records are reusable across transactions.
+[List Bullet] Project can be created, billed, costed, delivered, collected and closed.
+[List Bullet] Sales invoice correctly updates receivables and accounting.
+[List Bullet] Customer receipt can be allocated across multiple invoices.
+[List Bullet] Purchase flow supports requisition, PO, GRN, bill, payable and payment.
+[List Bullet] Office inventory correctly records internal stock in/out and current balance.
+[List Bullet] Durable assets can be registered and allocated separately.
+[List Bullet] GST calculations and reconciliation workflows operate as specified.
+[List Bullet] Bank/cash transactions and reconciliation are auditable.
+[List Bullet] Payroll transactions are permission-controlled.
+[List Bullet] Reports reconcile with underlying posted transactions.
+[List Bullet] Audit trail records critical actions.
+[List Bullet] Approval workflows prevent unauthorized posting.
+[List Bullet] Backup and restore procedures are tested.
+[List Bullet] Closed project restrictions work as specified.
+[List Bullet] Security and authorization tests pass before production.
+[Heading 1] 31. Final Architecture Summary
+[Normal] The recommended ERP is a project-centric business management system with a connected chain rather than a collection of independent menus.
+[Normal] Core revenue chain: Client → Project → Sales → Invoice → Collection.
+[Normal] Core cost chain: Project → Procurement → Office/Project-related consumption → Delivery → Expense → Vendor Payment.
+[Normal] Financial integration: Sales/Purchase/Expenses/Payments → GST & Tax → Accounts → Cash/Bank → Project P&L → Management Reports.
+[Normal] The design deliberately keeps Office Inventory lightweight because its purpose is internal office stock. Commercial warehouse, batch, serial and customer-sales inventory functionality should not be introduced unless the business scope later requires it.
+[Heading 1] 32. Conclusion
+[Normal] This specification provides the functional baseline for designing and developing the SDK Solutions ERP. The supplied ERP structure is retained while clarifying the transaction relationships, financial controls, office-inventory scope, approval framework, audit requirements, technical architecture and implementation boundaries.
+[Normal] Before production development begins, this document should be followed by detailed UI screen specifications, an ERD/database schema, API specification, accounting posting matrix, GST technical specification, report layouts and a complete UAT test plan.
+[TABLE ROW] Document Item | Details
+[TABLE ROW] Document Type | Developer-Ready ERP SRS & Functional Specification
+[TABLE ROW] Organization | SDK Solutions
+[TABLE ROW] Version | 1.0 – Final Functional Baseline
+[TABLE ROW] Date | September 2026
+[TABLE ROW] Primary Business Model | Project-centric procurement, billing, accounting and office operations
+[TABLE ROW] Inventory Scope | Internal office-use inventory only
+[TABLE ROW] Version | Date | Description
+[TABLE ROW] 1.0 | September 2026 | Consolidated and reviewed ERP functional specification based on the supplied ERP structure and subsequent clarification regarding internal office inventory.
+[TABLE ROW] No. | Module | Purpose
+[TABLE ROW] 1 | Dashboard | Management overview and KPIs
+[TABLE ROW] 2 | Masters & Configuration | Centralized master and configuration data
+[TABLE ROW] 3 | Projects | Project lifecycle and monitoring
+[TABLE ROW] 4 | Sales & Billing | Quotations, invoices, collections and client sales
+[TABLE ROW] 5 | Procurement & Office Inventory | Purchasing and internal office stock
+[TABLE ROW] 6 | Accounts & Payments | Expenses, ledgers, payables, receivables and payments
+[TABLE ROW] 7 | GST & Tax | GST, ITC and reconciliation
+[TABLE ROW] 8 | Cash & Bank | Bank, cash and financial movements
+[TABLE ROW] 9 | Payroll & Employees | Employee and salary transactions
+[TABLE ROW] 10 | Reports & Analytics | Financial, project and operational reporting
+[TABLE ROW] 11 | Administration & Support | Assets, users, permissions, support and audit
+[TABLE ROW] Master Area | Functions
+[TABLE ROW] Organisation | Company profile, GSTIN, PAN, addresses
+[TABLE ROW] Financial | Financial year, reference numbering, expense types and heads
+[TABLE ROW] Client | Client registration and details
+[TABLE ROW] Vendor | Vendor registration and details
+[TABLE ROW] Bank | Bank, account, IFSC, branch and account type
+[TABLE ROW] Item | Items, categories, types, units and brands
+[TABLE ROW] HR | Department, designation, education level, employee type and reporting manager
+[TABLE ROW] Leave & Holiday | Holiday master, leave types and holiday lists
+[TABLE ROW] Location | State/location master
+[TABLE ROW] Other | Course and other organization-specific masters
+[TABLE ROW] Security | Roles and user permissions
+[TABLE ROW] Information | Required Details
+[TABLE ROW] Project identity | Project name, project code
+[TABLE ROW] Client | Linked client master
+[TABLE ROW] Contract | PO / Work Order
+[TABLE ROW] Commercials | Contract value, amount invoiced, amount received, outstanding
+[TABLE ROW] Dates | Start date, expected completion
+[TABLE ROW] Responsibility | Project Manager
+[TABLE ROW] Status | Pipeline, Active, On Hold, Completed, Closed
+[TABLE ROW] Cost | Procurement, expenses
+[TABLE ROW] Profitability | Project P&L and margin
+[TABLE ROW] Field | Example
+[TABLE ROW] Item | A4 Paper
+[TABLE ROW] Quantity | 2 boxes
+[TABLE ROW] Issued To | Accounts Department
+[TABLE ROW] Employee | Responsible employee, if applicable
+[TABLE ROW] Date | Issue date
+[TABLE ROW] Purpose | Office use
+[TABLE ROW] Approved By | Authorized user
+[TABLE ROW] Remarks | Optional
+[TABLE ROW] Bank Master Field | Requirement
+[TABLE ROW] Bank Name | Required
+[TABLE ROW] Branch | Required where applicable
+[TABLE ROW] Account Name | Required
+[TABLE ROW] Account Number | Required
+[TABLE ROW] IFSC | Required where applicable
+[TABLE ROW] Account Type | Required
+[TABLE ROW] Opening Balance | Required
+[TABLE ROW] Current Balance | System calculated
+[TABLE ROW] Status | Active / Inactive
+[TABLE ROW] Transaction | Recommended Status
+[TABLE ROW] Project | Pipeline → Active → On Hold → Completed → Closed
+[TABLE ROW] Purchase Order | Draft → Approved → Ordered → Partially Received → Fully Received → Closed
+[TABLE ROW] Invoice | Draft → Approved → Sent → Partially Paid → Paid / Overdue → Cancelled
+[TABLE ROW] Payment | Draft → Pending Approval → Approved → Processed → Reconciled
+[TABLE ROW] GST | Pending → Prepared → Filed → Reconciled
+[TABLE ROW] Domain | Major Entities
+[TABLE ROW] Organization & Security | Company, Branch, User, Role, Permission, AuditLog
+[TABLE ROW] Masters | Client, Vendor, Employee, Bank, Item, Category, Unit, Tax, Location
+[TABLE ROW] Projects | Project, ProjectPO, ProjectExpense, ProjectDelivery, ProjectDocument
+[TABLE ROW] Sales | Quotation, SalesOrder, SalesInvoice, SalesInvoiceItem, Receipt, PaymentAllocation
+[TABLE ROW] Procurement | PurchaseRequisition, PurchaseOrder, GRN, PurchaseBill, PurchaseBillItem, VendorPayment
+[TABLE ROW] Office Inventory | StockTransaction, StockIssue, StockAdjustment, StockTransfer
+[TABLE ROW] Finance | AccountGroup, Account, Journal, JournalEntry, Receivable, Payable, Advance
+[TABLE ROW] GST | GSTTransaction, GSTReconciliation
+[TABLE ROW] Payroll | SalaryStructure, SalarySheet, Leave, Holiday
+[TABLE ROW] Administration | Asset, AssetAllocation, AssetMaintenance, SupportTicket, Notification, Document
+[TABLE ROW] Area | Requirement
+[TABLE ROW] Performance | Common screens and reports should load within an acceptable business-operational time under expected load.
+[TABLE ROW] Scalability | Architecture must permit additional modules, users, branches and integrations.
+[TABLE ROW] Reliability | Financial posting must be atomic and recoverable.
+[TABLE ROW] Auditability | Critical transactions must have traceable history.
+[TABLE ROW] Usability | Consistent navigation, terminology, statuses and validation.
+[TABLE ROW] Security | RBAC, secure authentication, server-side authorization and audit.
+[TABLE ROW] Maintainability | Modular services, documented APIs and coding standards.
+[TABLE ROW] Backup | Automated and tested recovery process.
+[TABLE ROW] Reporting | Filterable, exportable and permission-aware reports.

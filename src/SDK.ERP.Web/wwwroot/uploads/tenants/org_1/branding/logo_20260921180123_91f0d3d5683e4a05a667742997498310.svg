@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000">
+  <title>The Local Café - Vector Logo</title>
+  <desc>Gold circular cafe logo with two steaming coffee cups and the words THE LOCAL CAFÉ.</desc>
+
+  <!-- Main gold badge -->
+  <circle cx="500" cy="500" r="455" fill="#C7A45E"/>
+
+  <!-- Steam -->
+  <g fill="none" stroke="#FFFDF7" stroke-width="10" stroke-linecap="round">
+    <path d="M405 292 C365 255 395 222 378 187 C365 160 389 140 407 122"/>
+    <path d="M520 262 C488 228 522 194 505 158 C493 132 516 108 535 91"/>
+  </g>
+
+  <!-- Left coffee cup -->
+  <g fill="#FFFDF7" stroke="#FFFDF7" stroke-linejoin="round">
+    <path d="M310 318 L456 345 L444 406 C437 445 400 466 362 459 C326 452 301 424 303 387 Z"/>
+    <path d="M310 318 Q294 300 277 309 Q267 317 275 330 Q285 345 306 345" fill="none" stroke-width="9"/>
+    <path d="M441 350 Q475 346 482 364 Q488 382 464 395 Q447 405 437 402" fill="none" stroke-width="9"/>
+    <path d="M294 425 Q362 466 454 428 Q474 436 475 449 Q403 494 319 458 Q293 447 294 425 Z"/>
+    <ellipse cx="384" cy="376" rx="13" ry="22" transform="rotate(-28 384 376)" fill="#C7A45E" stroke="none"/>
+  </g>
+
+  <!-- Right coffee cup -->
+  <g fill="#FFFDF7" stroke="#FFFDF7" stroke-linejoin="round">
+    <path d="M510 270 L655 246 L667 307 C674 345 651 377 615 384 C578 391 545 370 538 334 Z"/>
+    <path d="M650 254 Q673 229 690 241 Q701 250 692 264 Q683 278 661 279" fill="none" stroke-width="9"/>
+    <path d="M661 307 Q694 301 701 318 Q708 336 686 350 Q669 360 657 356" fill="none" stroke-width="9"/>
+    <path d="M527 348 Q593 386 676 341 Q696 349 696 362 Q631 409 550 379 Q526 369 527 348 Z"/>
+    <ellipse cx="604" cy="311" rx="13" ry="22" transform="rotate(28 604 311)" fill="#C7A45E" stroke="none"/>
+  </g>
+
+  <!-- Divider and title -->
+  <g fill="#FFFDF7" stroke="#FFFDF7">
+    <rect x="140" y="522" width="250" height="5" rx="2.5" stroke="none"/>
+    <rect x="610" y="522" width="250" height="5" rx="2.5" stroke="none"/>
+    <rect x="150" y="663" width="700" height="5" rx="2.5" stroke="none"/>
+  </g>
+
+  <text x="500" y="560"
+        text-anchor="middle"
+        fill="#FFFDF7"
+        font-family="Georgia, 'Times New Roman', serif"
+        font-size="62"
+        letter-spacing="18">THE</text>
+
+  <text x="500" y="645"
+        text-anchor="middle"
+        fill="#FFFDF7"
+        font-family="Georgia, 'Times New Roman', serif"
+        font-size="60"
+        letter-spacing="13">LOCAL CAFÉ</text>
+</svg>

@@ -1,0 +1,491 @@
+@model SDK.ERP.Application.ViewModels.DashboardViewModel
+@{
+    ViewData["Title"] = "Executive Dashboard";
+    ViewData["ActiveMenu"] = "Dashboard";
+}
+
+<!-- Dashboard Header & Real Metadata -->
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <div>
+        <div class="d-flex align-items-center gap-2">
+            <span style="font-size: 18px; color: #0284C7;"><i class="fa-solid fa-scale-balanced"></i></span>
+            <h4 class="m-0 fw-bold" style="color: #0F172A; font-size: 20px;">Executive Dashboard</h4>
+        </div>
+        <small class="text-muted" style="font-size: 11.5px;">
+            <i class="fa-regular fa-clock me-1"></i>Last Synced: @Model.LastUpdated.ToString("dd MMM yyyy hh:mm tt")
+        </small>
+    </div>
+
+    <!-- Top Action Buttons -->
+    <div class="d-flex align-items-center gap-2">
+        <div class="dropdown">
+            <button class="btn btn-white border btn-sm px-3 dropdown-toggle fw-semibold text-secondary shadow-sm" type="button" data-bs-toggle="dropdown" style="border-radius: 8px; font-size: 12.5px;">
+                <i class="fa-regular fa-calendar me-1"></i> @Model.DateRangeDisplay
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="font-size: 13px;">
+                <li><a class="dropdown-item" asp-action="Index">All Time</a></li>
+                <li><a class="dropdown-item" asp-action="Index" asp-route-fromDate="@DateTime.Today.AddDays(-30).ToString("yyyy-MM-dd")" asp-route-toDate="@DateTime.Today.ToString("yyyy-MM-dd")">Last 30 Days</a></li>
+                <li><a class="dropdown-item" asp-action="Index" asp-route-fromDate="@DateTime.Today.AddMonths(-3).ToString("yyyy-MM-dd")" asp-route-toDate="@DateTime.Today.ToString("yyyy-MM-dd")">Last Quarter</a></li>
+                <li><a class="dropdown-item" asp-action="Index" asp-route-fromDate="@(new DateTime(DateTime.Today.Year, 4, 1).ToString("yyyy-MM-dd"))" asp-route-toDate="@DateTime.Today.ToString("yyyy-MM-dd")">Current Financial Year</a></li>
+            </ul>
+        </div>
+
+        <button class="btn-download-report shadow-sm" onclick="window.print()">
+            <i class="fa-solid fa-cloud-arrow-down"></i> Export Summary
+        </button>
+    </div>
+</div>
+
+<!-- Date Filter & Quick Summary Bar -->
+<form method="get" asp-action="Index" class="dashboard-filter-bar mb-3">
+    <div class="date-filter-group">
+        <span class="label"><i class="fa-solid fa-filter me-1 text-primary"></i>Filter Period:</span>
+        <div class="date-input-chip">
+            <i class="fa-regular fa-calendar-days text-muted"></i>
+            <input type="date" name="fromDate" value="@(Model.FromDate?.ToString("yyyy-MM-dd"))" class="border-0 bg-transparent" style="font-size: 12px; outline: none;" />
+        </div>
+        <span class="text-muted" style="font-size: 12px;">to</span>
+        <div class="date-input-chip">
+            <i class="fa-regular fa-calendar-days text-muted"></i>
+            <input type="date" name="toDate" value="@(Model.ToDate?.ToString("yyyy-MM-dd"))" class="border-0 bg-transparent" style="font-size: 12px; outline: none;" />
+        </div>
+        <button type="submit" class="btn-apply-filter shadow-sm"><i class="fa-solid fa-check me-1"></i>Apply</button>
+        <a asp-action="Index" class="btn-reset-filter text-decoration-none d-flex align-items-center justify-content-center" title="Reset Filters"><i class="fa-solid fa-arrow-rotate-right"></i></a>
+    </div>
+
+    <!-- Summary KPI Chips (Dynamic) -->
+    <div class="summary-chips-group">
+        <div class="summary-chip blue shadow-sm">
+            <i class="fa-solid fa-chart-line"></i>
+            <span>Total Sales: <strong>&#8377; @Model.TotalSalesAmount.ToString("N2")</strong></span>
+        </div>
+        <div class="summary-chip green shadow-sm">
+            <i class="fa-solid fa-percent"></i>
+            <span>Active Projects: <strong>@Model.ActiveProjectsCount</strong></span>
+        </div>
+        <div class="summary-chip amber shadow-sm">
+            <i class="fa-regular fa-bell"></i>
+            <span>Pending Approvals: <strong>@Model.PendingApprovalsCount</strong></span>
+        </div>
+    </div>
+</form>
+
+<!-- 4 Main Metric Cards (Real Dynamic Data) -->
+<div class="metrics-row mb-4">
+    <!-- Card 1: Invoices -->
+    <div class="metric-stat-card">
+        <div class="metric-card-top">
+            <div class="metric-icon-box blue shadow-sm">
+                <i class="fa-regular fa-file-lines"></i>
+            </div>
+            <span class="metric-tag">@Model.TotalInvoicesCount Recorded</span>
+        </div>
+        <div class="metric-label">TOTAL INVOICES GENERATED</div>
+        <div class="metric-number">&#8377; @Model.TotalInvoicesAmount.ToString("N2")</div>
+        <div class="metric-card-footer">
+            <a asp-controller="Sales" asp-action="Index" class="metric-link blue">
+                View Invoices <i class="fa-solid fa-arrow-right"></i>
+            </a>
+        </div>
+    </div>
+
+    <!-- Card 2: Purchase Orders -->
+    <div class="metric-stat-card">
+        <div class="metric-card-top">
+            <div class="metric-icon-box green shadow-sm">
+                <i class="fa-solid fa-cart-shopping"></i>
+            </div>
+            <span class="metric-tag">@Model.TotalPurchaseOrdersCount Recorded</span>
+        </div>
+        <div class="metric-label">TOTAL PURCHASE ORDERS</div>
+        <div class="metric-number">&#8377; @Model.TotalPurchaseOrdersAmount.ToString("N2")</div>
+        <div class="metric-card-footer">
+            <a asp-controller="Procurement" asp-action="Index" class="metric-link green">
+                View Purchase Orders <i class="fa-solid fa-arrow-right"></i>
+            </a>
+        </div>
+    </div>
+
+    <!-- Card 3: Payables -->
+    <div class="metric-stat-card">
+        <div class="metric-card-top">
+            <div class="metric-icon-box amber shadow-sm">
+                <i class="fa-solid fa-indian-rupee-sign"></i>
+            </div>
+            <span class="metric-tag outstanding">@Model.UnpaidBillsCount Unpaid Bills</span>
+        </div>
+        <div class="metric-label">TOTAL PAYABLE TO VENDORS</div>
+        <div class="metric-number">&#8377; @Model.TotalPayableToVendors.ToString("N2")</div>
+        <div class="metric-card-footer">
+            <a asp-controller="Procurement" asp-action="Index" class="metric-link amber">
+                View Payables <i class="fa-solid fa-arrow-right"></i>
+            </a>
+        </div>
+    </div>
+
+    <!-- Card 4: Receivables -->
+    <div class="metric-stat-card">
+        <div class="metric-card-top">
+            <div class="metric-icon-box purple shadow-sm">
+                <i class="fa-solid fa-id-card-clip"></i>
+            </div>
+            <span class="metric-tag outstanding">@Model.UnpaidInvoicesCount Pending Invoices</span>
+        </div>
+        <div class="metric-label">TOTAL RECEIVABLE FROM CLIENTS</div>
+        <div class="metric-number">&#8377; @Model.TotalReceivableFromClients.ToString("N2")</div>
+        <div class="metric-card-footer">
+            <a asp-controller="Sales" asp-action="AllocatePayment" class="metric-link purple">
+                Allocate Receipts <i class="fa-solid fa-arrow-right"></i>
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Primary Visual Widgets Grid (Dynamic GST Reporting) -->
+<div class="widgets-grid-2 mb-4">
+    <!-- Widget 1: GST Details - Annual Summary -->
+    <div class="dashboard-widget-card">
+        <div class="widget-card-header">
+            <h6 class="widget-title">
+                <i class="fa-solid fa-earth-americas text-primary"></i>
+                GST Details - Tax Breakdown <small class="text-muted fw-normal" style="font-size: 11.5px;">(Dynamic Ledger Data)</small>
+            </h6>
+        </div>
+        <div class="widget-card-body">
+            @if (Model.TotalGstAmount > 0)
+            {
+                <div class="row align-items-center">
+                    <div class="col-md-5 text-center">
+                        <div class="donut-chart-circle mx-auto shadow-sm">
+                            <div class="donut-chart-inner">
+                                <small>TOTAL GST</small>
+                                <span>&#8377; @Model.TotalGstAmount.ToString("N0")</span>
+                            </div>
+                        </div>
+                        <div class="donut-legend">
+                            <span><span class="legend-dot blue"></span>CGST</span>
+                            <span><span class="legend-dot green"></span>SGST</span>
+                            <span><span class="legend-dot amber"></span>IGST</span>
+                        </div>
+                    </div>
+
+                    <div class="col-md-7">
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0" style="font-size: 12px;">
+                                <thead class="table-light">
+                                    <tr style="color: #64748B; font-size: 10.5px;">
+                                        <th>GST TYPE</th>
+                                        <th class="text-end">TAXABLE (&#8377;)</th>
+                                        <th class="text-end">TAX (&#8377;)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td class="fw-bold"><span class="legend-dot blue"></span>CGST</td>
+                                        <td class="text-end">@Model.CgstTaxable.ToString("N2")</td>
+                                        <td class="text-end text-primary fw-semibold">@Model.CgstAmount.ToString("N2")</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="fw-bold"><span class="legend-dot green"></span>SGST</td>
+                                        <td class="text-end">@Model.SgstTaxable.ToString("N2")</td>
+                                        <td class="text-end text-success fw-semibold">@Model.SgstAmount.ToString("N2")</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="fw-bold"><span class="legend-dot amber"></span>IGST</td>
+                                        <td class="text-end">@Model.IgstTaxable.ToString("N2")</td>
+                                        <td class="text-end text-warning fw-semibold">@Model.IgstAmount.ToString("N2")</td>
+                                    </tr>
+                                    <tr class="table-light fw-bold">
+                                        <td>Total</td>
+                                        <td class="text-end">@Model.TotalTaxableValue.ToString("N2")</td>
+                                        <td class="text-end text-danger">&#8377; @Model.TotalGstAmount.ToString("N2")</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="text-center py-4 text-muted">
+                    <i class="fa-solid fa-file-invoice mb-2" style="font-size: 32px; color: #CBD5E1;"></i>
+                    <p class="m-0 fw-semibold text-secondary" style="font-size: 13px;">No GST Transactions Recorded</p>
+                    <small style="font-size: 11.5px;">Tax transactions will automatically calculate when Sales &amp; Purchase invoices are posted.</small>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Widget 2: GST Details - Monthly Summary -->
+    <div class="dashboard-widget-card">
+        <div class="widget-card-header">
+            <h6 class="widget-title">
+                <i class="fa-regular fa-calendar-check text-success"></i>
+                GST Details - Monthly Ledger <small class="text-muted fw-normal" style="font-size: 11.5px;">(GSTR-3B vs GSTR-2B)</small>
+            </h6>
+            <a asp-controller="Gst" asp-action="Index" class="btn btn-light btn-sm py-0 px-2 border" style="font-size: 11.5px;">
+                GST Desk
+            </a>
+        </div>
+        <div class="widget-card-body p-0">
+            <div class="table-responsive" style="max-height: 230px; overflow-y: auto;">
+                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 12px;">
+                    <thead class="table-light sticky-top">
+                        <tr style="color: #64748B; font-size: 10.5px;">
+                            <th class="ps-3">PERIOD</th>
+                            <th class="text-end">OUTPUT TAX (&#8377;)</th>
+                            <th class="text-end">INPUT TAX (&#8377;)</th>
+                            <th class="text-end pe-3">NET GST PAYABLE (&#8377;)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.MonthlyGstSummaries.Any())
+                        {
+                            @foreach (var item in Model.MonthlyGstSummaries)
+                            {
+                                <tr>
+                                    <td class="ps-3 fw-bold">@item.MonthName</td>
+                                    <td class="text-end">@item.OutputTax.ToString("N2")</td>
+                                    <td class="text-end text-success">@item.InputTax.ToString("N2")</td>
+                                    <td class="text-end pe-3 fw-bold @(item.NetGstPayable > 0 ? "text-danger" : "text-muted")">
+                                        @item.NetGstPayable.ToString("N2")
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="4" class="text-center py-4 text-muted">
+                                    <i class="fa-solid fa-calendar-xmark mb-1" style="font-size: 24px; color: #CBD5E1;"></i>
+                                    <div style="font-size: 12.5px;">No monthly GST filings recorded yet.</div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- EXTENSIBLE MODULAR WIDGET ARCHITECTURE (ALL 10 FUTURE PROVISIONS READY) -->
+<!-- ========================================================================= -->
+<div class="extensible-widgets-section">
+    <div class="section-header-pill">
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-purple text-white p-2" style="background: var(--erp-purple);"><i class="fa-solid fa-cubes"></i></span>
+            <h5 class="m-0">Extensible Modular Widget Ecosystem <small class="text-muted fw-normal fs-6">&bull; 10 Future Provision Modules</small></h5>
+        </div>
+
+        <!-- Widget Toggle Tabs -->
+        <ul class="nav nav-pills gap-1" id="widgetPills" role="tablist">
+            <li class="nav-item">
+                <button class="nav-link active py-1 px-3 fw-semibold" style="font-size: 12px; border-radius: 20px;" data-bs-toggle="pill" data-bs-target="#w-finance"><i class="fa-solid fa-chart-pie me-1"></i> Financial &amp; Projects</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link py-1 px-3 fw-semibold" style="font-size: 12px; border-radius: 20px;" data-bs-toggle="pill" data-bs-target="#w-sales-ar"><i class="fa-solid fa-receipt me-1"></i> Sales &amp; Receivables</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link py-1 px-3 fw-semibold" style="font-size: 12px; border-radius: 20px;" data-bs-toggle="pill" data-bs-target="#w-cash-stock"><i class="fa-solid fa-boxes-stacked me-1"></i> Cash Flow &amp; Stock</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link py-1 px-3 fw-semibold" style="font-size: 12px; border-radius: 20px;" data-bs-toggle="pill" data-bs-target="#w-payroll-alerts"><i class="fa-solid fa-bell me-1"></i> Payroll &amp; Alerts</button>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Extensible Widget Panes -->
+    <div class="tab-content" id="widgetPillsContent">
+        <!-- 1. Financial & Project KPIs Widget -->
+        <div class="tab-pane fade show active" id="w-finance" role="tabpanel">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="dashboard-widget-card h-100">
+                        <div class="widget-card-header">
+                            <h6 class="widget-title"><i class="fa-solid fa-vault text-primary"></i> 1. Financial Performance KPIs</h6>
+                            <span class="badge bg-light text-secondary border">Double-Entry Ledger</span>
+                        </div>
+                        <div class="widget-card-body">
+                            <div class="row g-3 text-center">
+                                <div class="col-4 border-end">
+                                    <small class="text-muted fw-semibold">TOTAL REVENUE</small>
+                                    <div class="fs-5 fw-bold text-primary">&#8377; @Model.TotalSalesAmount.ToString("N2")</div>
+                                    <small class="text-muted">Invoices Posted</small>
+                                </div>
+                                <div class="col-4 border-end">
+                                    <small class="text-muted fw-semibold">NET MARGIN</small>
+                                    <div class="fs-5 fw-bold @(Model.NetMarginPercentage >= 0 ? "text-success" : "text-danger")">@Model.NetMarginPercentage.ToString("0.0")%</div>
+                                    <small class="text-muted">P&amp;L Live</small>
+                                </div>
+                                <div class="col-4">
+                                    <small class="text-muted fw-semibold">ACTIVE PROJECTS</small>
+                                    <div class="fs-5 fw-bold text-info">@Model.ActiveProjectsCount</div>
+                                    <small class="text-muted">&#8377; @Model.TotalContractValue.ToString("N2")</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="dashboard-widget-card h-100">
+                        <div class="widget-card-header">
+                            <h6 class="widget-title"><i class="fa-solid fa-diagram-project text-warning"></i> 2. Project Operations &amp; Delivery KPIs</h6>
+                            <a asp-controller="Projects" asp-action="Index" class="btn btn-sm btn-light py-0 px-2 border">View All</a>
+                        </div>
+                        <div class="widget-card-body">
+                            <div class="d-flex justify-content-between mb-2" style="font-size: 13px;">
+                                <span>@Model.ActiveProjectsCount Active Project(s) in Progress</span>
+                                <span class="fw-bold text-success">&#8377; @Model.TotalContractValue.ToString("N2") Contract Value</span>
+                            </div>
+                            <div class="progress mb-3" style="height: 8px;">
+                                <div class="progress-bar bg-success" style="width: @(Model.ActiveProjectsCount > 0 ? "100" : "0")%"></div>
+                            </div>
+                            <div class="d-flex justify-content-between text-muted" style="font-size: 11.5px;">
+                                <span><i class="fa-solid fa-circle text-success me-1"></i>@Model.ActiveProjectsCount Active</span>
+                                <span><i class="fa-solid fa-circle text-info me-1"></i>11-Tab Workspaces Active</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Sales & Receivables Aging Widget -->
+        <div class="tab-pane fade" id="w-sales-ar" role="tabpanel">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="dashboard-widget-card h-100">
+                        <div class="widget-card-header">
+                            <h6 class="widget-title"><i class="fa-solid fa-clock-rotate-left text-danger"></i> 3. Receivables Aging Distribution</h6>
+                            <span class="badge bg-light text-secondary border">&#8377; @Model.TotalReceivableFromClients.ToString("N2") Total AR</span>
+                        </div>
+                        <div class="widget-card-body">
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered align-middle mb-0" style="font-size: 12.5px;">
+                                    <thead class="table-light">
+                                        <tr><th>Aging Bucket</th><th>Invoices</th><th>Outstanding Amount</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr><td>&lt; 30 Days</td><td>@Model.ArUnder30Count</td><td class="fw-bold text-success">&#8377; @Model.ArUnder30Days.ToString("N2")</td></tr>
+                                        <tr><td>31 - 60 Days</td><td>@Model.Ar31To60Count</td><td class="fw-bold text-primary">&#8377; @Model.Ar31To60Days.ToString("N2")</td></tr>
+                                        <tr><td>61 - 90 Days</td><td>@Model.Ar61To90Count</td><td class="fw-bold text-warning">&#8377; @Model.Ar61To90Days.ToString("N2")</td></tr>
+                                        <tr><td>&gt; 90 Days</td><td>@Model.ArAbove90Count</td><td class="fw-bold text-danger">&#8377; @Model.ArAbove90Days.ToString("N2")</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="dashboard-widget-card h-100">
+                        <div class="widget-card-header">
+                            <h6 class="widget-title"><i class="fa-solid fa-hand-holding-dollar text-primary"></i> 4. Vendor Payables &amp; MSME Compliance</h6>
+                            <span class="badge bg-light text-secondary border">&#8377; @Model.TotalPayableToVendors.ToString("N2") Due</span>
+                        </div>
+                        <div class="widget-card-body">
+                            <ul class="list-group list-group-flush" style="font-size: 13px;">
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div><strong>Micro &amp; Small MSME Vendors</strong><br><small class="text-muted">Strict 45-day statutory payment window</small></div>
+                                    <span class="fw-bold text-success">&#8377; @Model.MsmePayableAmount.ToString("N2")</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div><strong>General Hardware &amp; Utility Suppliers</strong><br><small class="text-muted">Standard commercial credit terms</small></div>
+                                    <span class="fw-bold text-primary">&#8377; @Model.GeneralPayableAmount.ToString("N2")</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Cash Flow & Stock Consumables Widget -->
+        <div class="tab-pane fade" id="w-cash-stock" role="tabpanel">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="dashboard-widget-card h-100">
+                        <div class="widget-card-header">
+                            <h6 class="widget-title"><i class="fa-solid fa-money-bill-trend-up text-success"></i> 5. Cash Flow &amp; Banking</h6>
+                            <a asp-controller="Banking" asp-action="Index" class="btn btn-sm btn-light py-0 px-2 border">Banking Desk</a>
+                        </div>
+                        <div class="widget-card-body">
+                            <div class="d-flex justify-content-around text-center mb-3">
+                                <div><small class="text-muted">MONTH INFLOWS</small><div class="fs-5 fw-bold text-success">+&#8377; @Model.MonthInflows.ToString("N2")</div></div>
+                                <div class="border-end"></div>
+                                <div><small class="text-muted">MONTH OUTFLOWS</small><div class="fs-5 fw-bold text-danger">-&#8377; @Model.MonthOutflows.ToString("N2")</div></div>
+                                <div class="border-end"></div>
+                                <div><small class="text-muted">NET LIQUIDITY</small><div class="fs-5 fw-bold text-primary">&#8377; @Model.NetLiquidity.ToString("N2")</div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="dashboard-widget-card h-100">
+                        <div class="widget-card-header">
+                            <h6 class="widget-title"><i class="fa-solid fa-boxes-packing text-info"></i> 6. Office Consumables &amp; Stock</h6>
+                            <a asp-controller="Procurement" asp-action="Inventory" class="btn btn-sm btn-light py-0 px-2 border">Inventory</a>
+                        </div>
+                        <div class="widget-card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <div>
+                                    <span class="fs-4 fw-bold text-primary">@Model.LowStockItemsCount</span>
+                                    <span class="text-muted ms-2" style="font-size: 13px;">Items Below Minimum Reorder Level</span>
+                                </div>
+                                <span class="badge @(Model.LowStockItemsCount > 0 ? "bg-danger" : "bg-success")">
+                                    @(Model.LowStockItemsCount > 0 ? "Reorder Triggered" : "Optimal Stock")
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. Payroll & Security Alerts Widget -->
+        <div class="tab-pane fade" id="w-payroll-alerts" role="tabpanel">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="dashboard-widget-card h-100">
+                        <div class="widget-card-header">
+                            <h6 class="widget-title"><i class="fa-solid fa-user-group text-purple"></i> 7. Payroll &amp; Workforce</h6>
+                            <a asp-controller="Payroll" asp-action="Index" class="btn btn-sm btn-light py-0 px-2 border">Payroll Run</a>
+                        </div>
+                        <div class="widget-card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <div><small class="text-muted">ACTIVE WORKFORCE</small><div class="fs-5 fw-bold text-primary">@Model.ActiveEmployeesCount Employees</div></div>
+                                <div><small class="text-muted">SALARY LIABILITY</small><div class="fs-5 fw-bold text-danger">&#8377; @Model.MonthlyPayrollOutflow.ToString("N2")</div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="dashboard-widget-card h-100">
+                        <div class="widget-card-header">
+                            <h6 class="widget-title"><i class="fa-solid fa-shield-halved text-danger"></i> 8. Governance &amp; Approval Alerts</h6>
+                            <span class="badge bg-light text-secondary border">Tamper-Evident</span>
+                        </div>
+                        <div class="widget-card-body">
+                            <div class="d-flex align-items-center justify-content-between p-2 rounded bg-light border">
+                                <div class="d-flex align-items-center gap-2">
+                                    <i class="fa-solid fa-user-check text-warning fs-5"></i>
+                                    <div>
+                                        <div class="fw-bold" style="font-size: 13px;">Multi-Level Approval Queue</div>
+                                        <small class="text-muted">@Model.PendingApprovalsCount transaction(s) awaiting managerial sign-off</small>
+                                    </div>
+                                </div>
+                                <a asp-controller="Admin" asp-action="Index" class="btn btn-sm btn-primary py-1 px-3">Review</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

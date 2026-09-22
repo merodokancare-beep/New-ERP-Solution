@@ -1,0 +1,376 @@
+@inject SDK.ERP.Application.Common.ICompanyContext CompanyContext
+@{
+    var activeMenu = ViewData["ActiveMenu"] as string ?? "Dashboard";
+    var currentCompany = await CompanyContext.GetCurrentCompanyAsync();
+    var currentUser = await CompanyContext.GetCurrentUserAsync();
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - @(currentCompany.CompanyName)</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+    <div class="app-container" id="appContainer">
+        <!-- Backdrop for mobile drawer -->
+        <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+        <!-- Sidebar Navigation (Master ERP Solution with Reference UI Styling) -->
+        <aside class="app-sidebar" id="appSidebar">
+            <div class="sidebar-brand">
+                <a asp-controller="Home" asp-action="Index" class="brand-logo-img text-decoration-none">
+                    @if (!string.IsNullOrEmpty(currentCompany.LogoUrl))
+                    {
+                        <img src="@currentCompany.LogoUrl" alt="@currentCompany.CompanyName" class="brand-custom-logo" style="max-height: 38px; max-width: 140px; object-fit: contain; border-radius: 4px;" />
+                    }
+                    else
+                    {
+                        <span class="logo-box">@(string.IsNullOrEmpty(currentCompany.BrandShortName) ? "ERP" : currentCompany.BrandShortName)</span>
+                        <span class="brand-text" style="font-size: 15px; color: #0284C7; font-weight: 800; letter-spacing: -0.5px;">
+                            @(string.IsNullOrEmpty(currentCompany.Tagline) ? "ENTERPRISE ERP" : currentCompany.Tagline)
+                        </span>
+                    }
+                </a>
+                <button class="sidebar-toggle-btn" id="sidebarToggleBtn" title="Toggle Navigation (Ctrl+B)"><i class="fa-solid fa-bars"></i></button>
+            </div>
+
+            <div class="sidebar-nav">
+                <!-- MAIN / EXECUTIVE -->
+                <div class="nav-section-title">CORE NAVIGATION</div>
+                <a class="nav-item-link @(activeMenu == "Dashboard" ? "active" : "")" asp-controller="Home" asp-action="Index" title="Executive Dashboard" data-bs-toggle="tooltip" data-bs-placement="right">
+                    <span class="nav-icon-badge blue"><i class="fa-solid fa-chart-pie"></i></span>
+                    <span class="flex-grow-1">Executive Dashboard</span>
+                </a>
+
+                <!-- MASTER DATA -->
+                <div class="nav-section-title">MASTER DATA</div>
+                <a class="nav-item-link @(activeMenu == "Masters" ? "active" : "")" asp-controller="Masters" asp-action="Index" title="Master Catalogs" data-bs-toggle="tooltip" data-bs-placement="right">
+                    <span class="nav-icon-badge blue"><i class="fa-solid fa-sliders"></i></span>
+                    <span class="flex-grow-1">Master Catalogs</span>
+                </a>
+
+                <!-- PROJECT MANAGEMENT -->
+                <div class="nav-section-title">OPERATIONS &amp; PROJECTS</div>
+                <a class="nav-item-link @(activeMenu == "Projects" ? "active" : "")" asp-controller="Projects" asp-action="Index" title="Project Management" data-bs-toggle="tooltip" data-bs-placement="right">
+                    <span class="nav-icon-badge orange"><i class="fa-solid fa-diagram-project"></i></span>
+                    <span class="flex-grow-1">Project Management</span>
+                </a>
+
+                <!-- SALES & BILLING -->
+                <div class="nav-section-title">SALES &amp; RECEIVABLES</div>
+                <a class="nav-item-link @(activeMenu == "Sales" ? "active" : "")" asp-controller="Sales" asp-action="Index" title="Sales & Tax Invoices" data-bs-toggle="tooltip" data-bs-placement="right">
+                    <span class="nav-icon-badge purple"><i class="fa-solid fa-file-invoice-dollar"></i></span>
+                    <span class="flex-grow-1">Sales &amp; Tax Invoices</span>
+                </a>
+                <a class="nav-item-link" asp-controller="Sales" asp-action="AllocatePayment" title="Receipts & Allocation" data-bs-toggle="tooltip" data-bs-placement="right">
+                    <span class="nav-icon-badge green"><i class="fa-solid fa-hand-holding-dollar"></i></span>
+                    <span class="flex-grow-1">Receipts &amp; Allocation</span>
+                </a>
+
+                <!-- PROCUREMENT & PAYABLES -->
+                <div class="nav-section-title">PROCUREMENT &amp; PAYABLES</div>
+                <a class="nav-item-link @(activeMenu == "Procurement" ? "active" : "")" asp-controller="Procurement" asp-action="Index" title="Procurement & POs" data-bs-toggle="tooltip" data-bs-placement="right">
+                    <span class="nav-icon-badge pink"><i class="fa-solid fa-cart-flatbed"></i></span>
+                    <span class="flex-grow-1">Procurement &amp; POs</span>
+                </a>
+                <a class="nav-item-link" asp-controller="Procurement" asp-action="Inventory" title="Office Inventory" data-bs-toggle="tooltip" data-bs-placement="right">
+                    <span class="nav-icon-badge teal"><i class="fa-solid fa-boxes-stacked"></i></span>
+                    <span class="flex-grow-1">Office Inventory</span>
+                </a>
+
+                <!-- FINANCIALS & TAX -->
+                <div class="nav-section-title">FINANCIALS &amp; TAXATION</div>
+                <a class="nav-item-link @(activeMenu == "Accounts" ? "active" : "")" asp-controller="Accounts" asp-action="Index" title="General Ledger & COA" data-bs-toggle="tooltip" data-bs-placement="right">
+                    <span class="nav-icon-badge teal"><i class="fa-solid fa-scale-unbalanced-flip"></i></span>
+                    <span class="flex-grow-1">General Ledger &amp; COA</span>
+                </a>
+                <a class="nav-item-link @(activeMenu == "Gst" ? "active" : "")" asp-controller="Gst" asp-action="Index" title="GST & Tax Compliance" data-bs-toggle="tooltip" data-bs-placement="right">
+                    <span class="nav-icon-badge blue"><i class="fa-solid fa-file-shield"></i></span>
+                    <span class="flex-grow-1">GST &amp; Tax Compliance</span>
+                </a>
+                <a class="nav-item-link @(activeMenu == "Banking" ? "active" : "")" asp-controller="Banking" asp-action="Index" title="Cash & Banking / BRS" data-bs-toggle="tooltip" data-bs-placement="right">
+                    <span class="nav-icon-badge gray"><i class="fa-solid fa-building-columns"></i></span>
+                    <span class="flex-grow-1">Cash &amp; Banking / BRS</span>
+                </a>
+
+                <!-- HR & ASSETS -->
+                <div class="nav-section-title">HUMAN RESOURCES &amp; ASSETS</div>
+                <a class="nav-item-link @(activeMenu == "Payroll" ? "active" : "")" asp-controller="Payroll" asp-action="Index" title="Payroll & HR" data-bs-toggle="tooltip" data-bs-placement="right">
+                    <span class="nav-icon-badge purple"><i class="fa-solid fa-users-gear"></i></span>
+                    <span class="flex-grow-1">Payroll &amp; HR</span>
+                </a>
+                <a class="nav-item-link @(activeMenu == "Assets" ? "active" : "")" asp-controller="Assets" asp-action="Index" title="Fixed Assets & Tickets" data-bs-toggle="tooltip" data-bs-placement="right">
+                    <span class="nav-icon-badge orange"><i class="fa-solid fa-laptop-code"></i></span>
+                    <span class="flex-grow-1">Fixed Assets &amp; Tickets</span>
+                </a>
+
+                <!-- REPORTS & SYSTEM ADMIN -->
+                <div class="nav-section-title">MIS &amp; GOVERNANCE</div>
+                <a class="nav-item-link @(activeMenu == "Reports" ? "active" : "")" asp-controller="Reports" asp-action="Index" title="Reports & Analytics" data-bs-toggle="tooltip" data-bs-placement="right">
+                    <span class="nav-icon-badge teal"><i class="fa-solid fa-chart-line"></i></span>
+                    <span class="flex-grow-1">Reports &amp; Analytics</span>
+                </a>
+                <a class="nav-item-link @(activeMenu == "Profile" ? "active" : "")" asp-controller="Profile" asp-action="Index" title="Organization &amp; Profile" data-bs-toggle="tooltip" data-bs-placement="right">
+                    <span class="nav-icon-badge blue"><i class="fa-solid fa-building-gear"></i></span>
+                    <span class="flex-grow-1">Organization Profile</span>
+                </a>
+                <a class="nav-item-link @(activeMenu == "Admin" ? "active" : "")" asp-controller="Admin" asp-action="Index" title="Admin, Audit & RBAC" data-bs-toggle="tooltip" data-bs-placement="right">
+                    <span class="nav-icon-badge pink"><i class="fa-solid fa-shield-halved"></i></span>
+                    <span class="flex-grow-1">Admin, Audit &amp; RBAC</span>
+                </a>
+            </div>
+        </aside>
+
+        <!-- Main Workspace -->
+        <div class="app-main">
+            <!-- Topbar Header (Matching Screenshot) -->
+            <header class="app-topbar">
+                <div class="topbar-left">
+                    <button class="sidebar-toggle-btn d-lg-none me-2" id="mobileSidebarToggleBtn" title="Toggle Navigation"><i class="fa-solid fa-bars"></i></button>
+
+                    <!-- Quick Add Dropdown Menu -->
+                    <div class="dropdown quick-add-wrapper">
+                        <button class="btn-add-quick dropdown-toggle" id="quickAddBtn" data-bs-toggle="dropdown" aria-expanded="false" title="Create New Transaction (Alt+N)">
+                            <i class="fa-solid fa-plus"></i>
+                        </button>
+                        <div class="dropdown-menu dropdown-menu-start quick-add-menu shadow-lg border-0 p-0" aria-labelledby="quickAddBtn">
+                            <!-- Header -->
+                            <div class="quick-add-header p-3 text-white">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div class="fw-bold" style="font-size: 14px;"><i class="fa-solid fa-bolt me-2"></i>Quick Create Transaction</div>
+                                    <span class="badge bg-white text-dark rounded-pill px-2 py-1" style="font-size: 10px;">Direct Actions</span>
+                                </div>
+                                <div class="text-white-50 mt-1" style="font-size: 11.5px;">Instantly launch creation workflows across ERP business modules</div>
+                            </div>
+
+                            <!-- Content Grid -->
+                            <div class="p-3">
+                                <div class="row g-3">
+                                    <!-- Column 1: Sales & Revenue -->
+                                    <div class="col-6 col-md-3">
+                                        <div class="quick-section-label">SALES &amp; REVENUE</div>
+                                        <a href="/Sales?action=create" class="quick-action-card" data-shortcut="invoice">
+                                            <div class="quick-icon-box purple"><i class="fa-solid fa-file-invoice-dollar"></i></div>
+                                            <div class="quick-action-text">
+                                                <span class="quick-action-title">Tax Invoice</span>
+                                                <span class="quick-action-desc">GST Sales Bill</span>
+                                            </div>
+                                        </a>
+                                        <a href="/Sales/AllocatePayment" class="quick-action-card" data-shortcut="receipt">
+                                            <div class="quick-icon-box green"><i class="fa-solid fa-hand-holding-dollar"></i></div>
+                                            <div class="quick-action-text">
+                                                <span class="quick-action-title">Payment Receipt</span>
+                                                <span class="quick-action-desc">Allocate to Invoices</span>
+                                            </div>
+                                        </a>
+                                    </div>
+
+                                    <!-- Column 2: Procurement & Inventory -->
+                                    <div class="col-6 col-md-3">
+                                        <div class="quick-section-label">PROCUREMENT &amp; STOCK</div>
+                                        <a href="/Procurement?action=create" class="quick-action-card" data-shortcut="po">
+                                            <div class="quick-icon-box pink"><i class="fa-solid fa-cart-flatbed"></i></div>
+                                            <div class="quick-action-text">
+                                                <span class="quick-action-title">Purchase Order</span>
+                                                <span class="quick-action-desc">Vendor Purchase PO</span>
+                                            </div>
+                                        </a>
+                                        <a href="/Procurement/Inventory" class="quick-action-card" data-shortcut="inventory">
+                                            <div class="quick-icon-box teal"><i class="fa-solid fa-boxes-stacked"></i></div>
+                                            <div class="quick-action-text">
+                                                <span class="quick-action-title">Inventory Entry</span>
+                                                <span class="quick-action-desc">Stock Inward / Item</span>
+                                            </div>
+                                        </a>
+                                    </div>
+
+                                    <!-- Column 3: Projects & Clients -->
+                                    <div class="col-6 col-md-3">
+                                        <div class="quick-section-label">PROJECTS &amp; CLIENTS</div>
+                                        <a href="/Projects?action=create" class="quick-action-card" data-shortcut="project">
+                                            <div class="quick-icon-box orange"><i class="fa-solid fa-diagram-project"></i></div>
+                                            <div class="quick-action-text">
+                                                <span class="quick-action-title">New Project</span>
+                                                <span class="quick-action-desc">Milestone &amp; Margin</span>
+                                            </div>
+                                        </a>
+                                        <a href="/Masters?tab=clients&action=create" class="quick-action-card" data-shortcut="client">
+                                            <div class="quick-icon-box blue"><i class="fa-solid fa-building-user"></i></div>
+                                            <div class="quick-action-text">
+                                                <span class="quick-action-title">Add Client</span>
+                                                <span class="quick-action-desc">Master with GSTIN</span>
+                                            </div>
+                                        </a>
+                                        <a href="/Masters?tab=vendors&action=create" class="quick-action-card" data-shortcut="vendor">
+                                            <div class="quick-icon-box pink"><i class="fa-solid fa-truck-ramp-box"></i></div>
+                                            <div class="quick-action-text">
+                                                <span class="quick-action-title">Add Vendor</span>
+                                                <span class="quick-action-desc">Supplier Profile</span>
+                                            </div>
+                                        </a>
+                                    </div>
+
+                                    <!-- Column 4: Financials & Banking -->
+                                    <div class="col-6 col-md-3">
+                                        <div class="quick-section-label">BANKING &amp; ACCOUNTS</div>
+                                        <a href="/Banking" class="quick-action-card" data-shortcut="banking">
+                                            <div class="quick-icon-box gray"><i class="fa-solid fa-building-columns"></i></div>
+                                            <div class="quick-action-text">
+                                                <span class="quick-action-title">Bank / Cheque</span>
+                                                <span class="quick-action-desc">BRS &amp; Clearance</span>
+                                            </div>
+                                        </a>
+                                        <a href="/Accounts" class="quick-action-card" data-shortcut="journal">
+                                            <div class="quick-icon-box teal"><i class="fa-solid fa-scale-unbalanced-flip"></i></div>
+                                            <div class="quick-action-text">
+                                                <span class="quick-action-title">Journal Voucher</span>
+                                                <span class="quick-action-desc">Ledger Debit/Credit</span>
+                                            </div>
+                                        </a>
+                                        <a href="/Masters?tab=items&action=create" class="quick-action-card" data-shortcut="item">
+                                            <div class="quick-icon-box amber"><i class="fa-solid fa-tag"></i></div>
+                                            <div class="quick-action-text">
+                                                <span class="quick-action-title">Catalog Item</span>
+                                                <span class="quick-action-desc">Product or Service</span>
+                                            </div>
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="quick-add-footer px-3 py-2 bg-light d-flex justify-content-between align-items-center border-top">
+                                <small class="text-muted"><i class="fa-regular fa-lightbulb me-1"></i>Shortcut: <kbd class="px-1 py-0 bg-white border text-dark">Alt</kbd> + <kbd class="px-1 py-0 bg-white border text-dark">N</kbd></small>
+                                <a href="/Masters" class="text-decoration-none fw-semibold" style="font-size: 11.5px; color: var(--erp-primary);">All Catalogs &rarr;</a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="topbar-search">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input type="text" id="globalSearchInput" placeholder="Search modules, projects, invoices... (Press /)" />
+                    </div>
+                </div>
+
+                <div class="topbar-right">
+                    <button class="icon-btn" id="notificationsBtn" title="Notifications">
+                        <i class="fa-regular fa-bell"></i>
+                        <span class="badge-count">5</span>
+                    </button>
+                    <button class="icon-btn" id="themeToggleBtn" title="Toggle Dark/Light Mode">
+                        <i class="fa-solid fa-moon"></i>
+                    </button>
+                    <div class="dropdown">
+                        <div class="user-profile-header dropdown-toggle" id="userProfileDropdown" data-bs-toggle="dropdown" aria-expanded="false" style="cursor: pointer;">
+                            <div class="user-profile-avatar">
+                                @if (!string.IsNullOrEmpty(currentUser.AvatarUrl))
+                                {
+                                    <img src="@currentUser.AvatarUrl" alt="Avatar" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 2px solid #0284C7;" />
+                                }
+                                else
+                                {
+                                    <i class="fa-solid fa-user-tie"></i>
+                                }
+                            </div>
+                            <div class="user-profile-info">
+                                <div class="user-profile-name">@(string.IsNullOrEmpty(currentUser.FullName) ? "Admin User" : currentUser.FullName)</div>
+                                <span class="user-profile-role">@(string.IsNullOrEmpty(currentUser.Designation) ? "Administrator" : currentUser.Designation)</span>
+                            </div>
+                        </div>
+                        <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 p-2 mt-2" aria-labelledby="userProfileDropdown" style="border-radius: 12px; min-width: 250px;">
+                            <li class="px-3 py-2 border-bottom mb-2 bg-light-subtle rounded">
+                                <div class="fw-bold text-dark" style="font-size: 13.5px;">@(string.IsNullOrEmpty(currentUser.FullName) ? "Admin User" : currentUser.FullName)</div>
+                                <div class="text-muted" style="font-size: 11.5px;">@currentUser.Email</div>
+                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle mt-1" style="font-size: 10px;">@currentCompany.CompanyName</span>
+                            </li>
+                            <li>
+                                <a class="dropdown-item py-2 rounded d-flex align-items-center gap-2" asp-controller="Profile" asp-action="Index">
+                                    <i class="fa-solid fa-palette text-primary"></i>
+                                    <div>
+                                        <div class="fw-semibold" style="font-size: 13px;">Organization &amp; Branding</div>
+                                        <small class="text-muted" style="font-size: 11px;">Company Name, Logo &amp; Identity</small>
+                                    </div>
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item py-2 rounded d-flex align-items-center gap-2" href="/Profile#statutory">
+                                    <i class="fa-solid fa-file-shield text-info"></i>
+                                    <div>
+                                        <div class="fw-semibold" style="font-size: 13px;">Statutory &amp; GST</div>
+                                        <small class="text-muted" style="font-size: 11px;">GSTIN, PAN, CIN, Address</small>
+                                    </div>
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item py-2 rounded d-flex align-items-center gap-2" href="/Profile#banking">
+                                    <i class="fa-solid fa-building-columns text-success"></i>
+                                    <div>
+                                        <div class="fw-semibold" style="font-size: 13px;">Bank &amp; Invoicing Setup</div>
+                                        <small class="text-muted" style="font-size: 11px;">Bank Account, IFSC, Signatory</small>
+                                    </div>
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item py-2 rounded d-flex align-items-center gap-2" href="/Profile#user">
+                                    <i class="fa-solid fa-user-gear text-purple"></i>
+                                    <div>
+                                        <div class="fw-semibold" style="font-size: 13px;">My Personal Profile</div>
+                                        <small class="text-muted" style="font-size: 11px;">Full Name, Title, Avatar &amp; Contact</small>
+                                    </div>
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item py-2 rounded d-flex align-items-center gap-2" href="/Profile#team">
+                                    <i class="fa-solid fa-users-gear text-warning"></i>
+                                    <div>
+                                        <div class="fw-semibold" style="font-size: 13px;">Team &amp; Organization Users</div>
+                                        <small class="text-muted" style="font-size: 11px;">Manage Multi-User Access</small>
+                                    </div>
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item py-2 rounded d-flex align-items-center gap-2" href="/Profile#tenants">
+                                    <i class="fa-solid fa-buildings text-primary"></i>
+                                    <div>
+                                        <div class="fw-semibold" style="font-size: 13px;">Multi-Company Hub</div>
+                                        <small class="text-muted" style="font-size: 11px;">Switch Active Workspace</small>
+                                    </div>
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider my-2"></li>
+                            <li>
+                                <a class="dropdown-item py-2 rounded d-flex align-items-center gap-2 text-secondary" asp-controller="Admin" asp-action="Index">
+                                    <i class="fa-solid fa-shield-halved text-secondary"></i>
+                                    <span class="fw-semibold" style="font-size: 13px;">Security &amp; Audit Logs</span>
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider my-2"></li>
+                            <li>
+                                <form asp-controller="Account" asp-action="Logout" method="post" class="d-inline w-100">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="dropdown-item py-2 rounded d-flex align-items-center gap-2 text-danger">
+                                        <i class="fa-solid fa-arrow-right-from-bracket text-danger"></i>
+                                        <span class="fw-semibold" style="font-size: 13px;">Sign Out of Workspace</span>
+                                    </button>
+                                </form>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Page Body -->
+            <main class="app-body">
+                @RenderBody()
+            </main>
+        </div>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

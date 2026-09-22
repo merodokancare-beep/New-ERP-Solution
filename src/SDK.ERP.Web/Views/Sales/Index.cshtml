@@ -1,0 +1,168 @@
+@model IEnumerable<SDK.ERP.Domain.Entities.Sales.SalesInvoice>
+@{
+    ViewData["Title"] = "Sales & Invoicing";
+    ViewData["ActiveMenu"] = "Sales";
+    var clients = ViewBag.Clients as IEnumerable<SDK.ERP.Domain.Entities.MasterData.Client> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.MasterData.Client>();
+    var projects = ViewBag.Projects as IEnumerable<SDK.ERP.Domain.Entities.Projects.Project> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Projects.Project>();
+}
+
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h3 style="font-weight: 700; color: var(--erp-primary); margin-bottom: 4px;">Sales, Tax Invoicing &amp; Receivables</h3>
+        <p style="color: var(--erp-text-muted); margin: 0; font-size: 13.5px;">Statutory Tax Invoices &bull; CGST/SGST/IGST Automatic Split &bull; Multi-Invoice Allocation</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a asp-controller="Sales" asp-action="AllocatePayment" class="btn btn-outline-success btn-sm px-3"><i class="fa-solid fa-coins me-1"></i> Multi-Receipt Allocation</a>
+        <button class="btn btn-primary btn-sm px-3 shadow-sm" style="background: var(--erp-primary);" data-bs-toggle="modal" data-bs-target="#createInvoiceModal">
+            <i class="fa-solid fa-plus me-1"></i> Create Tax Invoice
+        </button>
+    </div>
+</div>
+
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show d-flex align-items-center mb-4 shadow-sm" role="alert">
+        <i class="fa-solid fa-circle-check fs-5 me-2"></i>
+        <div>@Html.Raw(TempData["SuccessMessage"])</div>
+        <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+<div class="erp-card">
+    <div class="erp-card-header d-flex justify-content-between align-items-center">
+        <h5 class="erp-card-title"><i class="fa-solid fa-file-invoice-dollar me-2"></i>Sales Tax Invoices</h5>
+        <span class="badge bg-success-subtle text-success">Double-Entry AR Posting Ready</span>
+    </div>
+    <div class="erp-card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0" style="font-size: 13.5px;">
+                <thead class="table-light" style="font-size: 12px;">
+                    <tr>
+                        <th class="ps-4">Invoice No</th>
+                        <th>Date</th>
+                        <th>Client</th>
+                        <th>Project</th>
+                        <th>Taxable Value</th>
+                        <th>GST Split</th>
+                        <th>Grand Total</th>
+                        <th>Outstanding</th>
+                        <th>Status</th>
+                        <th class="text-end pe-4">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model != null && Model.Any())
+                    {
+                        @foreach (var inv in Model)
+                        {
+                            <tr>
+                                <td class="ps-4 fw-bold text-primary">@inv.InvoiceNumber</td>
+                                <td>@inv.InvoiceDate.ToString("dd MMM yyyy")</td>
+                                <td><strong>@(inv.Client?.ClientName ?? "N/A")</strong></td>
+                                <td>@(inv.Project?.ProjectCode ?? "N/A")</td>
+                                <td>&#8377; @inv.TaxableAmount.ToString("N2")</td>
+                                <td><small>CGST: &#8377;@inv.CgstAmount.ToString("N2")<br>SGST: &#8377;@inv.SgstAmount.ToString("N2")</small></td>
+                                <td>&#8377; @inv.TotalInvoiceValue.ToString("N2")</td>
+                                <td class="text-danger fw-bold">&#8377; @inv.OutstandingBalance.ToString("N2")</td>
+                                <td><span class="badge @(inv.Status == "PAID" ? "bg-success" : "bg-warning text-dark")">@inv.Status</span></td>
+                                <td class="text-end pe-4">
+                                    <a asp-controller="Sales" asp-action="PrintInvoice" asp-route-id="@inv.Id" target="_blank" class="btn btn-sm btn-outline-primary">
+                                        <i class="fa-solid fa-file-pdf me-1"></i> Tally PDF
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="10" class="text-center py-5">
+                                <i class="fa-solid fa-file-invoice mb-3" style="font-size: 40px; color: #CBD5E1;"></i>
+                                <h6 class="fw-bold text-secondary mb-1">No Invoices in Database</h6>
+                                <p class="text-muted mb-3" style="font-size: 12.5px;">No sales tax invoices have been generated yet in the database.</p>
+                                <button class="btn btn-primary btn-sm px-3 shadow-sm" style="background: var(--erp-primary);" data-bs-toggle="modal" data-bs-target="#createInvoiceModal">
+                                    <i class="fa-solid fa-plus me-1"></i> Create First Tax Invoice
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- CREATE TAX INVOICE MODAL (INTERACTIVE FORM) -->
+<!-- ========================================================================= -->
+<div class="modal fade" id="createInvoiceModal" tabindex="-1" aria-labelledby="createInvoiceModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow">
+            <form method="post" asp-controller="Sales" asp-action="Create">
+                @Html.AntiForgeryToken()
+                <div class="modal-header bg-light">
+                    <h5 class="modal-title fw-bold" id="createInvoiceModalLabel" style="color: var(--erp-primary); font-size: 16px;">
+                        <i class="fa-solid fa-file-invoice-dollar me-2"></i>Generate Statutory GST Tax Invoice
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Invoice Number <span class="text-danger">*</span></label>
+                            <input type="text" name="invoiceNumber" class="form-control" value="INV/@DateTime.Now.ToString("yy-MM")/@DateTime.Now.ToString("HHmmss")" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Client / Customer</label>
+                            <select name="clientId" class="form-select">
+                                <option value="">-- Select Client (or Auto-Create) --</option>
+                                @foreach (var c in clients)
+                                {
+                                    <option value="@c.Id">@c.ClientName (@c.ClientCode)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Project Association</label>
+                            <select name="projectId" class="form-select">
+                                <option value="">-- Select Project (or Auto-Create) --</option>
+                                @foreach (var p in projects)
+                                {
+                                    <option value="@p.Id">@p.ProjectCode - @p.ProjectName</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Applicable GST Rate</label>
+                            <select name="gstRate" class="form-select">
+                                <option value="18" selected>18% (CGST 9% + SGST 9%)</option>
+                                <option value="12">12% (CGST 6% + SGST 6%)</option>
+                                <option value="5">5% (CGST 2.5% + SGST 2.5%)</option>
+                                <option value="28">28% (CGST 14% + SGST 14%)</option>
+                                <option value="0">0% (Exempt / Nil Rated)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Taxable Amount (&#8377;) <span class="text-danger">*</span></label>
+                            <input type="number" step="0.01" name="taxableAmount" class="form-control" placeholder="e.g. 500000.00" value="250000.00" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Invoice Date</label>
+                            <input type="date" name="invoiceDate" class="form-control" value="@DateTime.Today.ToString("yyyy-MM-dd")" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Payment Due Date</label>
+                            <input type="date" name="dueDate" class="form-control" value="@DateTime.Today.AddDays(30).ToString("yyyy-MM-dd")" required />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm px-4" style="background: var(--erp-primary);">
+                        <i class="fa-solid fa-check me-1"></i> Generate &amp; Post Tax Invoice
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

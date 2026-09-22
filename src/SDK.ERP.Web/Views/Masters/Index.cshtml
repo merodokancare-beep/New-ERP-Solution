@@ -1,0 +1,869 @@
+@model SDK.ERP.Application.ViewModels.MastersViewModel
+@{
+    ViewData["Title"] = "Masters & System Configuration";
+    ViewData["ActiveMenu"] = "Masters";
+    var clients = Model?.Clients ?? new();
+    var vendors = Model?.Vendors ?? new();
+    var items = Model?.Items ?? new();
+    var taxRates = Model?.TaxRates ?? new();
+    var accountGroups = Model?.AccountGroups ?? new();
+}
+
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h3 style="font-weight: 700; color: var(--erp-primary); margin-bottom: 4px;">Masters &amp; Configuration</h3>
+        <p style="color: var(--erp-text-muted); margin: 0; font-size: 13.5px;">Centralized Master Repository &bull; Zero Data Duplication Architecture</p>
+    </div>
+    <div class="d-flex gap-2">
+        <button class="btn btn-primary btn-sm px-3 shadow-sm" style="background: var(--erp-primary); border-color: var(--erp-primary);" data-bs-toggle="modal" data-bs-target="#createClientModal">
+            <i class="fa-solid fa-plus me-1"></i> Add Record
+        </button>
+    </div>
+</div>
+
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show d-flex align-items-center mb-4 shadow-sm" role="alert">
+        <i class="fa-solid fa-circle-check fs-5 me-2"></i>
+        <div>@Html.Raw(TempData["SuccessMessage"])</div>
+        <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+<!-- Nav Tabs for Masters (Dynamic Counts) -->
+<ul class="nav nav-pills mb-4 gap-2" id="masterTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active fw-semibold" id="clients-tab" data-bs-toggle="pill" data-bs-target="#clients" type="button" role="tab">
+            <i class="fa-solid fa-user-tie me-2"></i>Clients (@clients.Count)
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-semibold" id="vendors-tab" data-bs-toggle="pill" data-bs-target="#vendors" type="button" role="tab">
+            <i class="fa-solid fa-truck-field me-2"></i>Vendors (@vendors.Count)
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-semibold" id="items-tab" data-bs-toggle="pill" data-bs-target="#items" type="button" role="tab">
+            <i class="fa-solid fa-box-archive me-2"></i>Consumable Items (@items.Count)
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-semibold" id="tax-tab" data-bs-toggle="pill" data-bs-target="#tax" type="button" role="tab">
+            <i class="fa-solid fa-percent me-2"></i>GST Tax Slabs (@taxRates.Count)
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-semibold" id="coa-tab" data-bs-toggle="pill" data-bs-target="#coa" type="button" role="tab">
+            <i class="fa-solid fa-sitemap me-2"></i>Chart of Accounts (@accountGroups.Count Groups)
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content" id="masterTabsContent">
+    <!-- 1. Clients Tab -->
+    <div class="tab-pane fade show active" id="clients" role="tabpanel">
+        <div class="erp-card">
+            <div class="erp-card-header d-flex justify-content-between align-items-center">
+                <h5 class="erp-card-title"><i class="fa-solid fa-users me-2"></i>Client Master Directory</h5>
+                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#createClientModal">
+                    <i class="fa-solid fa-plus me-1"></i> Add Client
+                </button>
+            </div>
+            <div class="erp-card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr style="font-size: 12px; text-transform: uppercase;">
+                                <th class="ps-4">Client Code</th>
+                                <th>Client Name</th>
+                                <th>GSTIN</th>
+                                <th>State</th>
+                                <th>Credit Terms</th>
+                                <th>Credit Limit</th>
+                                <th>Status</th>
+                                <th class="text-end pe-4">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody style="font-size: 13.5px;">
+                            @if (clients.Any())
+                            {
+                                @foreach (var c in clients)
+                                {
+                                    <tr>
+                                        <td class="ps-4 fw-bold text-primary">@c.ClientCode</td>
+                                        <td><strong>@c.ClientName</strong><br><small class="text-muted">@(c.Email ?? c.ContactPerson ?? "N/A")</small></td>
+                                        <td><code>@(c.Gstin ?? "Unregistered")</code></td>
+                                        <td><span class="badge bg-light text-dark border">@c.StateCode</span></td>
+                                        <td>@c.CreditDays Days</td>
+                                        <td>&#8377; @c.CreditLimit.ToString("N2")</td>
+                                        <td><span class="badge bg-success">Active</span></td>
+                                        <td class="text-end pe-4">
+                                            <button class="btn btn-sm btn-outline-primary" title="Edit Client Details" data-bs-toggle="modal" data-bs-target="#editClientModal_@c.Id">
+                                                <i class="fa-solid fa-pen-to-square"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+
+                                    <!-- Edit Client Modal -->
+                                    <div class="modal fade" id="editClientModal_@c.Id" tabindex="-1" aria-hidden="true">
+                                        <div class="modal-dialog modal-dialog-centered modal-lg">
+                                            <div class="modal-content border-0 shadow">
+                                                <form method="post" asp-controller="Masters" asp-action="EditClient">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="id" value="@c.Id" />
+                                                    <div class="modal-header bg-light">
+                                                        <h5 class="modal-title fw-bold" style="color: var(--erp-primary); font-size: 16px;">
+                                                            <i class="fa-solid fa-pen-to-square me-2"></i>Edit Client Details: @c.ClientCode
+                                                        </h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                    </div>
+                                                    <div class="modal-body p-4">
+                                                        <div class="row g-3">
+                                                            <div class="col-md-6">
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Client Code</label>
+                                                                <input type="text" class="form-control bg-light" value="@c.ClientCode" readonly />
+                                                            </div>
+                                                            <div class="col-md-6">
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Client / Company Name <span class="text-danger">*</span></label>
+                                                                <input type="text" name="clientName" class="form-control" value="@c.ClientName" required />
+                                                            </div>
+                                                            <div class="col-md-6">
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">GSTIN</label>
+                                                                <input type="text" name="gstin" class="form-control" value="@c.Gstin" />
+                                                            </div>
+                                                            <div class="col-md-6">
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">PAN</label>
+                                                                <input type="text" name="pan" class="form-control" value="@c.Pan" />
+                                                            </div>
+                                                            <div class="col-md-6">
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Contact Person</label>
+                                                                <input type="text" name="contactPerson" class="form-control" value="@c.ContactPerson" />
+                                                            </div>
+                                                            <div class="col-md-6">
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Phone / Mobile</label>
+                                                                <input type="text" name="phone" class="form-control" value="@c.Phone" />
+                                                            </div>
+                                                            <div class="col-md-6">
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Email</label>
+                                                                <input type="email" name="email" class="form-control" value="@c.Email" />
+                                                            </div>
+                                                            <div class="col-md-6">
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Credit Limit (&#8377;)</label>
+                                                                <input type="number" step="0.01" name="creditLimit" class="form-control" value="@c.CreditLimit" />
+                                                            </div>
+                                                            <div class="col-12">
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Billing Address <span class="text-danger">*</span></label>
+                                                                <textarea name="billingAddress" class="form-control" rows="2" required>@c.BillingAddress</textarea>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="modal-footer bg-light">
+                                                        <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+                                                        <button type="submit" class="btn btn-primary btn-sm px-4" style="background: var(--erp-primary);">
+                                                            <i class="fa-solid fa-save me-1"></i> Update Client Details
+                                                        </button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="8" class="text-center py-5">
+                                        <i class="fa-solid fa-user-tie mb-3" style="font-size: 40px; color: #CBD5E1;"></i>
+                                        <h6 class="fw-bold text-secondary mb-1">No Clients in Database</h6>
+                                        <p class="text-muted mb-3" style="font-size: 12.5px;">Register your enterprise clients to issue project quotations and tax invoices.</p>
+                                        <button class="btn btn-primary btn-sm px-3" style="background: var(--erp-primary);" data-bs-toggle="modal" data-bs-target="#createClientModal">
+                                            <i class="fa-solid fa-plus me-1"></i> Register First Client
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Vendors Tab -->
+    <div class="tab-pane fade" id="vendors" role="tabpanel">
+        <div class="erp-card">
+            <div class="erp-card-header d-flex justify-content-between align-items-center">
+                <h5 class="erp-card-title"><i class="fa-solid fa-truck-field me-2"></i>Vendor Directory</h5>
+                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#createVendorModal">
+                    <i class="fa-solid fa-plus me-1"></i> Add Vendor
+                </button>
+            </div>
+            <div class="erp-card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr style="font-size: 12px; text-transform: uppercase;">
+                                <th class="ps-4">Vendor Code</th>
+                                <th>Vendor Name</th>
+                                <th>Category</th>
+                                <th>GSTIN</th>
+                                <th>PAN</th>
+                                <th>MSME Type</th>
+                                <th class="text-end pe-4">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody style="font-size: 13.5px;">
+                            @if (vendors.Any())
+                            {
+                                @foreach (var v in vendors)
+                                {
+                                    <tr>
+                                        <td class="ps-4 fw-bold text-primary">@v.VendorCode</td>
+                                        <td><strong>@v.VendorName</strong></td>
+                                        <td><span class="badge bg-light text-dark border">@v.VendorCategory</span></td>
+                                        <td><code>@(v.Gstin ?? "N/A")</code></td>
+                                        <td>@v.Pan</td>
+                                        <td><span class="badge @(v.MsmeType != null ? "bg-info" : "bg-light text-muted border")">@(v.MsmeType ?? "Non-MSME")</span></td>
+                                        <td class="text-end pe-4">
+                                            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editVendorModal_@v.Id">
+                                                <i class="fa-solid fa-pen-to-square"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+
+                                    <!-- Edit Vendor Modal -->
+                                    <div class="modal fade" id="editVendorModal_@v.Id" tabindex="-1" aria-hidden="true">
+                                        <div class="modal-dialog modal-dialog-centered modal-lg">
+                                            <div class="modal-content border-0 shadow">
+                                                <form method="post" asp-controller="Masters" asp-action="EditVendor">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="id" value="@v.Id" />
+                                                    <div class="modal-header bg-light">
+                                                        <h5 class="modal-title fw-bold" style="color: var(--erp-primary); font-size: 16px;">
+                                                            <i class="fa-solid fa-pen-to-square me-2"></i>Edit Vendor: @v.VendorCode
+                                                        </h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                    </div>
+                                                    <div class="modal-body p-4">
+                                                        <div class="row g-3">
+                                                            <div class="col-md-6">
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Vendor Code</label>
+                                                                <input type="text" class="form-control bg-light" value="@v.VendorCode" readonly />
+                                                            </div>
+                                                            <div class="col-md-6">
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Vendor Name <span class="text-danger">*</span></label>
+                                                                <input type="text" name="vendorName" class="form-control" value="@v.VendorName" required />
+                                                            </div>
+                                                            <div class="col-md-6">
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">GSTIN</label>
+                                                                <input type="text" name="gstin" class="form-control" value="@v.Gstin" />
+                                                            </div>
+                                                            <div class="col-md-6">
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">PAN</label>
+                                                                <input type="text" name="pan" class="form-control" value="@v.Pan" />
+                                                            </div>
+                                                            <div class="col-md-6">
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Category</label>
+                                                                <select name="vendorCategory" class="form-select">
+                                                                    <option value="HARDWARE" selected="@(v.VendorCategory == "HARDWARE")">Hardware &amp; Equipment</option>
+                                                                    <option value="SERVICES" selected="@(v.VendorCategory == "SERVICES")">Services &amp; Subcontractors</option>
+                                                                    <option value="GENERAL" selected="@(v.VendorCategory == "GENERAL")">General Consumables</option>
+                                                                </select>
+                                                            </div>
+                                                            <div class="col-md-6">
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">MSME Classification</label>
+                                                                <select name="msmeType" class="form-select">
+                                                                    <option value="" selected="@(string.IsNullOrEmpty(v.MsmeType))">Non-MSME (Standard 30 Days)</option>
+                                                                    <option value="MICRO" selected="@(v.MsmeType == "MICRO")">Micro Enterprise (45-Day Rule)</option>
+                                                                    <option value="SMALL" selected="@(v.MsmeType == "SMALL")">Small Enterprise (45-Day Rule)</option>
+                                                                    <option value="MEDIUM" selected="@(v.MsmeType == "MEDIUM")">Medium Enterprise</option>
+                                                                </select>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="modal-footer bg-light">
+                                                        <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+                                                        <button type="submit" class="btn btn-primary btn-sm px-4" style="background: var(--erp-primary);">
+                                                            <i class="fa-solid fa-save me-1"></i> Update Vendor
+                                                        </button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="7" class="text-center py-5">
+                                        <i class="fa-solid fa-truck-field mb-3" style="font-size: 40px; color: #CBD5E1;"></i>
+                                        <h6 class="fw-bold text-secondary mb-1">No Vendors in Database</h6>
+                                        <p class="text-muted mb-3" style="font-size: 12.5px;">Register suppliers and contractors to issue purchase orders and bills.</p>
+                                        <button class="btn btn-primary btn-sm px-3" style="background: var(--erp-primary);" data-bs-toggle="modal" data-bs-target="#createVendorModal">
+                                            <i class="fa-solid fa-plus me-1"></i> Register First Vendor
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. Consumable Items Tab -->
+    <div class="tab-pane fade" id="items" role="tabpanel">
+        <div class="erp-card">
+            <div class="erp-card-header d-flex justify-content-between align-items-center">
+                <h5 class="erp-card-title"><i class="fa-solid fa-box-archive me-2"></i>Item Master &amp; Office Consumables</h5>
+                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#createItemModal">
+                    <i class="fa-solid fa-plus me-1"></i> Add Item
+                </button>
+            </div>
+            <div class="erp-card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr style="font-size: 12px; text-transform: uppercase;">
+                                <th class="ps-4">Item Code</th>
+                                <th>Item Name</th>
+                                <th>Category</th>
+                                <th>Unit Cost</th>
+                                <th>Current Stock</th>
+                                <th>Reorder Level</th>
+                                <th class="text-end pe-4">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody style="font-size: 13.5px;">
+                            @if (items.Any())
+                            {
+                                @foreach (var item in items)
+                                {
+                                    <tr>
+                                        <td class="ps-4 fw-bold text-primary">@item.ItemCode</td>
+                                        <td><strong>@item.ItemName</strong></td>
+                                        <td>@(item.Category?.CategoryName ?? "General")</td>
+                                        <td>&#8377; @item.UnitCost.ToString("N2")</td>
+                                        <td class="fw-bold @(item.CurrentStockQty <= item.ReorderLevelQty ? "text-danger" : "text-success")">
+                                            @item.CurrentStockQty @(item.Unit?.UnitCode ?? "NOS")
+                                        </td>
+                                        <td>@item.ReorderLevelQty @(item.Unit?.UnitCode ?? "NOS")</td>
+                                        <td class="text-end pe-4">
+                                            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editItemModal_@item.Id">
+                                                <i class="fa-solid fa-pen-to-square"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+
+                                    <!-- Edit Item Modal -->
+                                    <div class="modal fade" id="editItemModal_@item.Id" tabindex="-1" aria-hidden="true">
+                                        <div class="modal-dialog modal-dialog-centered modal-lg">
+                                            <div class="modal-content border-0 shadow">
+                                                <form method="post" asp-controller="Masters" asp-action="EditItem">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="id" value="@item.Id" />
+                                                    <div class="modal-header bg-light">
+                                                        <h5 class="modal-title fw-bold" style="color: var(--erp-primary); font-size: 16px;">
+                                                            <i class="fa-solid fa-pen-to-square me-2"></i>Edit Item: @item.ItemCode
+                                                        </h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                    </div>
+                                                    <div class="modal-body p-4">
+                                                        <div class="row g-3">
+                                                            <div class="col-md-6">
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Item Code</label>
+                                                                <input type="text" class="form-control bg-light" value="@item.ItemCode" readonly />
+                                                            </div>
+                                                            <div class="col-md-6">
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Item Name <span class="text-danger">*</span></label>
+                                                                <input type="text" name="itemName" class="form-control" value="@item.ItemName" required />
+                                                            </div>
+                                                            <div class="col-md-6">
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Unit Cost (&#8377;) <span class="text-danger">*</span></label>
+                                                                <input type="number" step="0.01" name="unitCost" class="form-control" value="@item.UnitCost" required />
+                                                            </div>
+                                                            <div class="col-md-6">
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Minimum Reorder Level Qty</label>
+                                                                <input type="number" step="1" name="reorderLevelQty" class="form-control" value="@item.ReorderLevelQty" />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="modal-footer bg-light">
+                                                        <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+                                                        <button type="submit" class="btn btn-primary btn-sm px-4" style="background: var(--erp-primary);">
+                                                            <i class="fa-solid fa-save me-1"></i> Update Item
+                                                        </button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="7" class="text-center py-5">
+                                        <i class="fa-solid fa-box-archive mb-3" style="font-size: 40px; color: #CBD5E1;"></i>
+                                        <h6 class="fw-bold text-secondary mb-1">No Items in Catalog</h6>
+                                        <p class="text-muted mb-3" style="font-size: 12.5px;">Add office consumable items and materials to track inventory levels.</p>
+                                        <button class="btn btn-primary btn-sm px-3" style="background: var(--erp-primary);" data-bs-toggle="modal" data-bs-target="#createItemModal">
+                                            <i class="fa-solid fa-plus me-1"></i> Add First Item
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. GST Tax Slabs Tab (Seeded Data) -->
+    <div class="tab-pane fade" id="tax" role="tabpanel">
+        <div class="erp-card">
+            <div class="erp-card-header">
+                <h5 class="erp-card-title"><i class="fa-solid fa-percent me-2"></i>Statutory Indian GST Tax Slabs</h5>
+            </div>
+            <div class="erp-card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr style="font-size: 12px; text-transform: uppercase;">
+                                <th class="ps-4">Tax Name</th>
+                                <th>Total GST %</th>
+                                <th>CGST Rate</th>
+                                <th>SGST Rate</th>
+                                <th>IGST Rate</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody style="font-size: 13.5px;">
+                            @foreach (var rate in taxRates)
+                            {
+                                <tr>
+                                    <td class="ps-4 fw-bold text-primary">@rate.TaxName</td>
+                                    <td class="fw-bold">@rate.RatePercentage.ToString("0.##")%</td>
+                                    <td>@rate.CgstPercentage.ToString("0.##")%</td>
+                                    <td>@rate.SgstPercentage.ToString("0.##")%</td>
+                                    <td>@rate.IgstPercentage.ToString("0.##")%</td>
+                                    <td><span class="badge bg-success">Active Slab</span></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 5. Chart of Accounts Tab (Seeded Data) -->
+    <div class="tab-pane fade" id="coa" role="tabpanel">
+        <div class="erp-card">
+            <div class="erp-card-header">
+                <h5 class="erp-card-title"><i class="fa-solid fa-sitemap me-2"></i>Double-Entry Chart of Accounts Architecture</h5>
+            </div>
+            <div class="erp-card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr style="font-size: 12px; text-transform: uppercase;">
+                                <th class="ps-4">Group Code</th>
+                                <th>Account Group Name</th>
+                                <th>Accounting Category</th>
+                                <th>Sub-Accounts</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody style="font-size: 13.5px;">
+                            @foreach (var g in accountGroups)
+                            {
+                                <tr>
+                                    <td class="ps-4 fw-bold text-primary">@g.GroupCode</td>
+                                    <td><strong>@g.GroupName</strong></td>
+                                    <td><span class="badge bg-light text-dark border">@g.AccountCategory</span></td>
+                                    <td>@g.Accounts.Count Active Ledgers</td>
+                                    <td><span class="badge bg-success">System Group</span></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- CREATE CLIENT MODAL -->
+<!-- ========================================================================= -->
+<div class="modal fade" id="createClientModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow">
+            <form method="post" asp-controller="Masters" asp-action="CreateClient">
+                @Html.AntiForgeryToken()
+                <div class="modal-header bg-light">
+                    <h5 class="modal-title fw-bold" style="color: var(--erp-primary); font-size: 16px;">
+                        <i class="fa-solid fa-user-tie me-2"></i>Register Enterprise Client
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Client Code <span class="text-danger">*</span></label>
+                            <input type="text" name="clientCode" class="form-control" value="CL-@DateTime.Now.ToString("MMddHHmm")" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Client / Company Name <span class="text-danger">*</span></label>
+                            <input type="text" name="clientName" id="createClientName" class="form-control" placeholder="e.g. Reliance Infra Ltd" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold d-flex justify-content-between align-items-center" style="font-size: 12.5px;">
+                                <span>GSTIN</span>
+                                <span class="text-muted" style="font-size: 11px;"><i class="fa-solid fa-bolt text-warning me-1"></i>Auto-fills PAN &amp; Details</span>
+                            </label>
+                            <div class="input-group">
+                                <input type="text" name="gstin" id="createClientGstin" class="form-control text-uppercase gstin-lookup-input" placeholder="e.g. 07AAAAA0000A1Z5" maxlength="15" autocomplete="off" />
+                                <button class="btn btn-outline-primary" type="button" id="btnFetchClientGstin" title="Auto-Fetch Client details from GSTIN">
+                                    <i class="fa-solid fa-wand-magic-sparkles me-1"></i> Auto-Fetch
+                                </button>
+                            </div>
+                            <div id="clientGstinFeedback" class="mt-1" style="font-size: 11.5px; display: none;"></div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">PAN</label>
+                            <input type="text" name="pan" id="createClientPan" class="form-control text-uppercase" placeholder="e.g. AAAAA0000A" maxlength="10" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Contact Person</label>
+                            <input type="text" name="contactPerson" class="form-control" placeholder="e.g. Procurement Lead" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Phone / Mobile</label>
+                            <input type="text" name="phone" class="form-control" placeholder="e.g. +91 98765 43210" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Billing Address <span class="text-danger">*</span></label>
+                            <textarea name="billingAddress" id="createClientAddress" class="form-control" rows="2" placeholder="Complete statutory billing address..." required>Corporate Headquarters, New Delhi</textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm px-4" style="background: var(--erp-primary);">
+                        <i class="fa-solid fa-check me-1"></i> Save Client
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- CREATE VENDOR MODAL -->
+<!-- ========================================================================= -->
+<div class="modal fade" id="createVendorModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow">
+            <form method="post" asp-controller="Masters" asp-action="CreateVendor">
+                @Html.AntiForgeryToken()
+                <div class="modal-header bg-light">
+                    <h5 class="modal-title fw-bold" style="color: var(--erp-primary); font-size: 16px;">
+                        <i class="fa-solid fa-truck-field me-2"></i>Register Supplier / Vendor
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Vendor Code <span class="text-danger">*</span></label>
+                            <input type="text" name="vendorCode" class="form-control" value="VEN-@DateTime.Now.ToString("MMddHHmm")" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Vendor Name <span class="text-danger">*</span></label>
+                            <input type="text" name="vendorName" id="createVendorName" class="form-control" placeholder="e.g. Apex Hardware Supplies" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold d-flex justify-content-between align-items-center" style="font-size: 12.5px;">
+                                <span>GSTIN</span>
+                                <span class="text-muted" style="font-size: 11px;"><i class="fa-solid fa-bolt text-warning me-1"></i>Auto-fills PAN &amp; Details</span>
+                            </label>
+                            <div class="input-group">
+                                <input type="text" name="gstin" id="createVendorGstin" class="form-control text-uppercase gstin-lookup-input" placeholder="e.g. 07AAAAA0000A1Z5" maxlength="15" autocomplete="off" />
+                                <button class="btn btn-outline-primary" type="button" id="btnFetchVendorGstin" title="Auto-Fetch Vendor details from GSTIN">
+                                    <i class="fa-solid fa-wand-magic-sparkles me-1"></i> Auto-Fetch
+                                </button>
+                            </div>
+                            <div id="vendorGstinFeedback" class="mt-1" style="font-size: 11.5px; display: none;"></div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">PAN</label>
+                            <input type="text" name="pan" id="createVendorPan" class="form-control text-uppercase" placeholder="e.g. AAAAA0000A" maxlength="10" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Category</label>
+                            <select name="vendorCategory" id="createVendorCategory" class="form-select">
+                                <option value="HARDWARE" selected>Hardware &amp; Equipment</option>
+                                <option value="SERVICES">Services &amp; Subcontractors</option>
+                                <option value="GENERAL">General Consumables</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">MSME Classification</label>
+                            <select name="msmeType" id="createVendorMsmeType" class="form-select">
+                                <option value="">Non-MSME (Standard 30 Days)</option>
+                                <option value="MICRO">Micro Enterprise (45-Day Rule)</option>
+                                <option value="SMALL">Small Enterprise (45-Day Rule)</option>
+                                <option value="MEDIUM">Medium Enterprise</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm px-4" style="background: var(--erp-primary);">
+                        <i class="fa-solid fa-check me-1"></i> Save Vendor
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- CREATE ITEM MODAL -->
+<!-- ========================================================================= -->
+<div class="modal fade" id="createItemModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow">
+            <form method="post" asp-controller="Masters" asp-action="CreateItem">
+                @Html.AntiForgeryToken()
+                <div class="modal-header bg-light">
+                    <h5 class="modal-title fw-bold" style="color: var(--erp-primary); font-size: 16px;">
+                        <i class="fa-solid fa-box-archive me-2"></i>Add Consumable Item
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Item Code <span class="text-danger">*</span></label>
+                            <input type="text" name="itemCode" class="form-control" value="ITM-@DateTime.Now.ToString("MMddHHmm")" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Item Name <span class="text-danger">*</span></label>
+                            <input type="text" name="itemName" class="form-control" placeholder="e.g. Cat6 Ethernet Cable (305m Roll)" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Unit Cost (&#8377;) <span class="text-danger">*</span></label>
+                            <input type="number" step="0.01" name="unitCost" class="form-control" placeholder="e.g. 4500.00" value="1500.00" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Minimum Reorder Level Qty</label>
+                            <input type="number" step="1" name="reorderLevelQty" class="form-control" placeholder="e.g. 5" value="5" />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm px-4" style="background: var(--erp-primary);">
+                        <i class="fa-solid fa-check me-1"></i> Save Item
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    (function () {
+        // Highlight animation helper
+        function flashField(el) {
+            if (!el) return;
+            el.style.transition = 'all 0.35s ease';
+            el.style.backgroundColor = '#EFF6FF';
+            el.style.borderColor = '#3B82F6';
+            setTimeout(() => {
+                el.style.backgroundColor = '';
+                el.style.borderColor = '';
+            }, 1200);
+        }
+
+        // Generic GSTIN Auto-fetch function
+        async function lookupGstin(gstinVal, targetType) {
+            const cleanGstin = (gstinVal || '').trim().toUpperCase();
+            const feedbackEl = document.getElementById(targetType === 'vendor' ? 'vendorGstinFeedback' : 'clientGstinFeedback');
+            const nameEl = document.getElementById(targetType === 'vendor' ? 'createVendorName' : 'createClientName');
+            const panEl = document.getElementById(targetType === 'vendor' ? 'createVendorPan' : 'createClientPan');
+            const categoryEl = targetType === 'vendor' ? document.getElementById('createVendorCategory') : null;
+            const msmeEl = targetType === 'vendor' ? document.getElementById('createVendorMsmeType') : null;
+            const addrEl = targetType === 'client' ? document.getElementById('createClientAddress') : null;
+
+            if (!cleanGstin || cleanGstin.length !== 15) {
+                if (feedbackEl) {
+                    feedbackEl.style.display = 'block';
+                    feedbackEl.innerHTML = '<span class="text-danger"><i class="fa-solid fa-circle-exclamation me-1"></i> GSTIN must be exactly 15 alphanumeric characters.</span>';
+                }
+                return;
+            }
+
+            // Immediately derive 10-digit PAN from characters 3-12
+            const derivedPan = cleanGstin.substring(2, 12);
+            if (panEl && (!panEl.value || panEl.value.length !== 10)) {
+                panEl.value = derivedPan;
+                flashField(panEl);
+            }
+
+            if (feedbackEl) {
+                feedbackEl.style.display = 'block';
+                feedbackEl.innerHTML = '<span class="text-primary"><i class="fa-solid fa-spinner fa-spin me-1"></i> Verifying GSTIN &amp; fetching taxpayer details...</span>';
+            }
+
+            try {
+                const response = await fetch(`/Masters/LookupGstin?gstin=${encodeURIComponent(cleanGstin)}`);
+                if (!response.ok) throw new Error('Lookup failed');
+                const data = await response.json();
+
+                if (data && data.success) {
+                    if (nameEl && data.tradeName) {
+                        nameEl.value = data.tradeName;
+                        flashField(nameEl);
+                    }
+                    if (panEl && data.pan) {
+                        panEl.value = data.pan;
+                        flashField(panEl);
+                    }
+                    if (categoryEl && data.category) {
+                        categoryEl.value = data.category;
+                        flashField(categoryEl);
+                    }
+                    if (msmeEl && data.msmeType !== undefined) {
+                        msmeEl.value = data.msmeType;
+                        flashField(msmeEl);
+                    }
+                    if (addrEl && data.address) {
+                        addrEl.value = data.address;
+                        flashField(addrEl);
+                    }
+
+                    if (feedbackEl) {
+                        if (data.isKnown && data.tradeName) {
+                            feedbackEl.innerHTML = `
+                                <div class="alert alert-success py-1 px-2 mb-0 d-flex align-items-center gap-2 border-0 shadow-sm" style="font-size: 11px; background: #ECFDF5; color: #065F46;">
+                                    <i class="fa-solid fa-circle-check fs-6 text-success"></i>
+                                    <div>
+                                        <strong>GSTIN Verified: Active</strong> &bull; ${data.stateName} (${data.stateCode})<br>
+                                        <span style="font-size: 10px; color: #047857;">Constitution: ${data.constitution}</span>
+                                    </div>
+                                </div>`;
+                        } else {
+                            if (nameEl && !nameEl.value) {
+                                nameEl.focus();
+                            }
+                            feedbackEl.innerHTML = `
+                                <div class="alert alert-info py-1 px-2 mb-0 d-flex align-items-center gap-2 border-0 shadow-sm" style="font-size: 11px; background: #EFF6FF; color: #1E40AF;">
+                                    <i class="fa-solid fa-circle-check fs-6 text-primary"></i>
+                                    <div>
+                                        <strong>GSTIN &amp; PAN (${data.pan}) Verified</strong> &bull; ${data.stateName} (${data.stateCode})<br>
+                                        <span style="font-size: 10px; color: #2563EB;">Type: <strong>${data.constitution}</strong> &bull; Please enter the Trade / Company Name.</span>
+                                    </div>
+                                </div>`;
+                        }
+                    }
+                } else {
+                    if (feedbackEl) {
+                        feedbackEl.innerHTML = `<span class="text-danger"><i class="fa-solid fa-circle-exclamation me-1"></i> ${data.message || 'Unable to retrieve details for this GSTIN.'}</span>`;
+                    }
+                }
+            } catch (err) {
+                console.error(err);
+                if (feedbackEl) {
+                    feedbackEl.innerHTML = `<span class="text-danger"><i class="fa-solid fa-triangle-exclamation me-1"></i> Network error connecting to GSTIN verification service.</span>`;
+                }
+            }
+        }
+
+        // Setup Vendor GSTIN handlers
+        const vendorGstinInput = document.getElementById('createVendorGstin');
+        const vendorPanInput = document.getElementById('createVendorPan');
+        const btnFetchVendor = document.getElementById('btnFetchVendorGstin');
+
+        if (vendorGstinInput) {
+            vendorGstinInput.addEventListener('input', function (e) {
+                this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                if (this.value.length >= 12 && vendorPanInput) {
+                    vendorPanInput.value = this.value.substring(2, 12);
+                }
+                if (this.value.length === 15) {
+                    lookupGstin(this.value, 'vendor');
+                }
+            });
+
+            vendorGstinInput.addEventListener('paste', function () {
+                setTimeout(() => {
+                    this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                    if (this.value.length === 15) lookupGstin(this.value, 'vendor');
+                }, 50);
+            });
+        }
+
+        if (btnFetchVendor && vendorGstinInput) {
+            btnFetchVendor.addEventListener('click', function () {
+                lookupGstin(vendorGstinInput.value, 'vendor');
+            });
+        }
+
+        // Setup Client GSTIN handlers
+        const clientGstinInput = document.getElementById('createClientGstin');
+        const clientPanInput = document.getElementById('createClientPan');
+        const btnFetchClient = document.getElementById('btnFetchClientGstin');
+
+        if (clientGstinInput) {
+            clientGstinInput.addEventListener('input', function (e) {
+                this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                if (this.value.length >= 12 && clientPanInput) {
+                    clientPanInput.value = this.value.substring(2, 12);
+                }
+                if (this.value.length === 15) {
+                    lookupGstin(this.value, 'client');
+                }
+            });
+
+            clientGstinInput.addEventListener('paste', function () {
+                setTimeout(() => {
+                    this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                    if (this.value.length === 15) lookupGstin(this.value, 'client');
+                }, 50);
+            });
+        }
+
+        if (btnFetchClient && clientGstinInput) {
+            btnFetchClient.addEventListener('click', function () {
+                lookupGstin(clientGstinInput.value, 'client');
+            });
+        }
+
+        // Support for edit vendor & client modals (auto-extract PAN)
+        document.querySelectorAll('input[name="gstin"]').forEach(input => {
+            if (input.id !== 'createVendorGstin' && input.id !== 'createClientGstin') {
+                input.addEventListener('input', function () {
+                    this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                    const row = this.closest('.row');
+                    if (row && this.value.length >= 12) {
+                        const panField = row.querySelector('input[name="pan"]');
+                        if (panField && (!panField.value || panField.value.length !== 10)) {
+                            panField.value = this.value.substring(2, 12);
+                            flashField(panField);
+                        }
+                    }
+                });
+            }
+        });
+    })();
+</script>
+}

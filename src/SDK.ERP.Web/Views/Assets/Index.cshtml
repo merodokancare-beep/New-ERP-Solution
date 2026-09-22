@@ -1,0 +1,65 @@
+@model IEnumerable<SDK.ERP.Domain.Entities.AssetsAndSupport.FixedAsset>
+@{
+    ViewData["Title"] = "Fixed Asset Management";
+    ViewData["ActiveMenu"] = "Assets";
+    var assetList = Model ?? Enumerable.Empty<SDK.ERP.Domain.Entities.AssetsAndSupport.FixedAsset>();
+}
+
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h3 style="font-weight: 700; color: var(--erp-primary); margin-bottom: 4px;">Fixed Asset Management</h3>
+        <p style="color: var(--erp-text-muted); margin: 0; font-size: 13.5px;">Capitalized IT Hardware, Servers &amp; Fixtures &bull; Custodian Tracking &bull; WDV Depreciation</p>
+    </div>
+    <button class="btn btn-primary btn-sm px-3" style="background: var(--erp-primary);"><i class="fa-solid fa-plus me-1"></i> Register Hardware Asset</button>
+</div>
+
+<div class="erp-card">
+    <div class="erp-card-header d-flex justify-content-between align-items-center">
+        <h5 class="erp-card-title"><i class="fa-solid fa-laptop-code me-2"></i>Capitalized Fixed Assets Register</h5>
+        <span class="badge bg-primary">@assetList.Count() Asset(s) Registered</span>
+    </div>
+    <div class="erp-card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0" style="font-size: 13.5px;">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-4">Asset Code</th>
+                        <th>Asset Description</th>
+                        <th>Category</th>
+                        <th>Serial Number</th>
+                        <th>Purchase Cost (&#8377;)</th>
+                        <th>Book Value (WDV)</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (assetList.Any())
+                    {
+                        @foreach (var asset in assetList)
+                        {
+                            <tr>
+                                <td class="ps-4 fw-bold text-primary">@asset.AssetTagCode</td>
+                                <td><strong>@asset.AssetName</strong></td>
+                                <td><span class="badge bg-light text-dark border">@asset.Category</span></td>
+                                <td><code>@asset.SerialNumber</code></td>
+                                <td class="fw-bold">&#8377; @asset.PurchaseCost.ToString("N2")</td>
+                                <td class="text-success fw-bold">&#8377; @asset.CurrentBookValue.ToString("N2")</td>
+                                <td><span class="badge bg-success">@asset.Status</span></td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="7" class="text-center py-5 text-muted">
+                                <i class="fa-solid fa-laptop-code mb-2" style="font-size: 32px; color: #CBD5E1;"></i>
+                                <h6 class="fw-bold text-secondary mb-1">No Assets Registered</h6>
+                                <p class="mb-0" style="font-size: 12.5px;">No capitalized hardware or IT equipment exists in the database.</p>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,95 @@
+@model IEnumerable<SDK.ERP.Domain.Entities.Tax.GstTransaction>
+@{
+    ViewData["Title"] = "GST & Tax Compliance Desk";
+    ViewData["ActiveMenu"] = "Gst";
+    var transactions = Model ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Tax.GstTransaction>();
+
+    var outwardTax = transactions.Where(t => t.TransactionType == "OUTPUT").Sum(t => t.CgstAmount + t.SgstAmount + t.IgstAmount);
+    var inwardItc = transactions.Where(t => t.TransactionType == "INPUT").Sum(t => t.CgstAmount + t.SgstAmount + t.IgstAmount);
+    var netPayable = Math.Max(0, outwardTax - inwardItc);
+}
+
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h3 style="font-weight: 700; color: var(--erp-primary); margin-bottom: 4px;">GST &amp; Tax Compliance Desk</h3>
+        <p style="color: var(--erp-text-muted); margin: 0; font-size: 13.5px;">GSTR-1 Outward &bull; GSTR-3B Liability &bull; Automated GSTR-2B 4-Way ITC Reconciliation</p>
+    </div>
+    <button class="btn btn-primary btn-sm px-3" style="background: var(--erp-primary);"><i class="fa-solid fa-file-arrow-up me-1"></i> Import GSTR-2B JSON</button>
+</div>
+
+<!-- Dynamic GST Summary Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="p-3 bg-white border rounded shadow-sm">
+            <small class="text-muted fw-semibold" style="font-size: 11px;">OUTWARD TAX LIABILITY (GSTR-1)</small>
+            <div class="fs-4 fw-bold text-primary">&#8377; @outwardTax.ToString("N2")</div>
+            <small class="text-muted">From Output Sales Invoices</small>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="p-3 bg-white border rounded shadow-sm">
+            <small class="text-muted fw-semibold" style="font-size: 11px;">ELIGIBLE INWARD ITC (GSTR-2B)</small>
+            <div class="fs-4 fw-bold text-success">&#8377; @inwardItc.ToString("N2")</div>
+            <small class="text-muted">From Input Purchase Orders</small>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="p-3 bg-white border rounded shadow-sm">
+            <small class="text-muted fw-semibold" style="font-size: 11px;">NET CASH TAX PAYABLE (GSTR-3B)</small>
+            <div class="fs-4 fw-bold text-danger">&#8377; @netPayable.ToString("N2")</div>
+            <small class="text-muted">Current Period Position</small>
+        </div>
+    </div>
+</div>
+
+<!-- GST Transactions Register -->
+<div class="erp-card">
+    <div class="erp-card-header d-flex justify-content-between align-items-center">
+        <h5 class="erp-card-title"><i class="fa-solid fa-file-invoice me-2"></i>Statutory GST Transactions Register</h5>
+        <span class="badge bg-primary">@transactions.Count() Transaction(s)</span>
+    </div>
+    <div class="erp-card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0" style="font-size: 13px;">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-4">Type</th>
+                        <th>Taxable Value (&#8377;)</th>
+                        <th>Rate</th>
+                        <th>CGST (&#8377;)</th>
+                        <th>SGST (&#8377;)</th>
+                        <th>IGST (&#8377;)</th>
+                        <th>Return Period</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (transactions.Any())
+                    {
+                        @foreach (var t in transactions)
+                        {
+                            <tr>
+                                <td class="ps-4"><span class="badge @(t.TransactionType == "OUTPUT" ? "bg-primary" : "bg-success")">@t.TransactionType</span></td>
+                                <td class="fw-bold">&#8377; @t.TaxableValue.ToString("N2")</td>
+                                <td>@t.TaxRatePercentage%</td>
+                                <td>&#8377; @t.CgstAmount.ToString("N2")</td>
+                                <td>&#8377; @t.SgstAmount.ToString("N2")</td>
+                                <td>&#8377; @t.IgstAmount.ToString("N2")</td>
+                                <td>@t.ReturnPeriod</td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="7" class="text-center py-5 text-muted">
+                                <i class="fa-solid fa-receipt mb-2" style="font-size: 32px; color: #CBD5E1;"></i>
+                                <h6 class="fw-bold text-secondary mb-1">No GST Transactions in Current Period</h6>
+                                <p class="mb-0" style="font-size: 12.5px;">GST ledger entries will appear here automatically when sales invoices or purchase bills are posted.</p>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

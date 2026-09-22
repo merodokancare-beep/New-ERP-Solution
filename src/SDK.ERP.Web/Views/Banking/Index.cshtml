@@ -1,0 +1,63 @@
+@model IEnumerable<SDK.ERP.Domain.Entities.Banking.BankAccount>
+@{
+    ViewData["Title"] = "Cash & Banking Management";
+    ViewData["ActiveMenu"] = "Banking";
+    var bankList = Model ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Banking.BankAccount>();
+}
+
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h3 style="font-weight: 700; color: var(--erp-primary); margin-bottom: 4px;">Cash &amp; Banking Management</h3>
+        <p style="color: var(--erp-text-muted); margin: 0; font-size: 13.5px;">Multi-Bank Accounts &bull; Bank Reconciliation (BRS) &bull; Imprest Petty Cash Floats</p>
+    </div>
+    <button class="btn btn-primary btn-sm px-3" style="background: var(--erp-primary);"><i class="fa-solid fa-arrow-right-arrow-left me-1"></i> Inter-Bank Transfer</button>
+</div>
+
+<div class="erp-card">
+    <div class="erp-card-header d-flex justify-content-between align-items-center">
+        <h5 class="erp-card-title"><i class="fa-solid fa-building-columns me-2"></i>Corporate Bank Accounts &amp; Book Balances</h5>
+        <span class="badge bg-primary">@bankList.Count() Account(s)</span>
+    </div>
+    <div class="erp-card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0" style="font-size: 13.5px;">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-4">Bank Name</th>
+                        <th>Account No</th>
+                        <th>IFSC</th>
+                        <th>Account Type</th>
+                        <th>Book Balance (&#8377;)</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (bankList.Any())
+                    {
+                        @foreach (var b in bankList)
+                        {
+                            <tr>
+                                <td class="ps-4 fw-bold">@b.BankName - @b.BranchName</td>
+                                <td><code>@b.AccountNumber</code></td>
+                                <td><code>@b.IfscCode</code></td>
+                                <td><span class="badge bg-light text-dark border">@b.AccountType</span></td>
+                                <td class="fw-bold text-success fs-6">&#8377; @b.BookBalance.ToString("N2")</td>
+                                <td><span class="badge @(b.IsActive ? "bg-success" : "bg-secondary")">@(b.IsActive ? "ACTIVE" : "INACTIVE")</span></td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="6" class="text-center py-5 text-muted">
+                                <i class="fa-solid fa-building-columns mb-2" style="font-size: 32px; color: #CBD5E1;"></i>
+                                <h6 class="fw-bold text-secondary mb-1">No Corporate Bank Accounts Registered</h6>
+                                <p class="mb-0" style="font-size: 12.5px;">No bank accounts have been added to the database yet.</p>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,686 @@
+@model SDK.ERP.Domain.Entities.Projects.Project
+@{
+    ViewData["Title"] = Model != null ? $"Project Workspace - {Model.ProjectCode}" : "Project Workspace";
+    ViewData["ActiveMenu"] = "Projects";
+
+    var salesInvoices = ViewBag.SalesInvoices as IEnumerable<SDK.ERP.Domain.Entities.Sales.SalesInvoice> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Sales.SalesInvoice>();
+    var procurementPos = ViewBag.ProcurementPos as IEnumerable<SDK.ERP.Domain.Entities.Procurement.PurchaseOrder> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Procurement.PurchaseOrder>();
+    var deliveries = ViewBag.Deliveries as IEnumerable<SDK.ERP.Domain.Entities.Projects.ProjectDelivery> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Projects.ProjectDelivery>();
+    var expenses = ViewBag.Expenses as IEnumerable<SDK.ERP.Domain.Entities.Projects.ProjectExpense> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Projects.ProjectExpense>();
+    var milestones = ViewBag.Milestones as IEnumerable<SDK.ERP.Domain.Entities.Projects.ProjectMilestone> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Projects.ProjectMilestone>();
+    var documents = ViewBag.Documents as IEnumerable<SDK.ERP.Domain.Entities.Admin.DocumentAttachment> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Admin.DocumentAttachment>();
+
+    var contractVal = Model?.ContractValue ?? 0;
+    var totalInvoiced = salesInvoices.Sum(s => s.TaxableAmount);
+    var totalCosts = procurementPos.Sum(p => p.TaxableAmount) + expenses.Sum(e => e.Amount);
+    var currentMargin = totalInvoiced - totalCosts;
+    var marginPercent = totalInvoiced > 0 ? Math.Round((currentMargin / totalInvoiced) * 100, 2) : 0;
+    var unbilledContract = Math.Max(0, contractVal - totalInvoiced);
+    var billedPercentage = contractVal > 0 ? Math.Round((totalInvoiced / contractVal) * 100, 1) : 0;
+    var isPremature = unbilledContract > 0;
+    var outstandingReceivables = salesInvoices.Sum(s => s.OutstandingBalance);
+}
+
+@if (Model == null)
+{
+    <div class="alert alert-warning d-flex align-items-center mb-4 shadow-sm" role="alert">
+        <i class="fa-solid fa-triangle-exclamation fs-4 me-3"></i>
+        <div>
+            <h5 class="alert-heading mb-1 fw-bold">Project Not Found</h5>
+            <p class="mb-0" style="font-size: 13.5px;">No matching project record found in the database. Please select a project from the register.</p>
+        </div>
+        <a asp-controller="Projects" asp-action="Index" class="btn btn-primary btn-sm ms-auto"><i class="fa-solid fa-arrow-left me-1"></i> Back to Projects</a>
+    </div>
+}
+else
+{
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show d-flex align-items-center mb-3 shadow-sm" role="alert">
+            <i class="fa-solid fa-circle-check fs-5 me-2"></i>
+            <div>@TempData["SuccessMessage"]</div>
+            <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    <!-- Project Header Bar -->
+    <div class="d-flex align-items-center justify-content-between mb-3 bg-white p-3 border rounded shadow-sm">
+        <div>
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-primary fs-6">@Model.ProjectCode</span>
+                <h4 class="m-0 fw-bold text-primary">@Model.ProjectName</h4>
+                <span class="badge @(Model.Status == "ACTIVE" ? "bg-success" : (Model.Status == "CLOSED" ? "bg-dark" : "bg-secondary")) ms-2">@Model.Status</span>
+            </div>
+            <small class="text-muted">
+                Client: <strong>@(Model.Client?.ClientName ?? "Unassigned")</strong> &bull; 
+                Manager: <strong>@(Model.Manager?.Username ?? "Admin")</strong> &bull; 
+                Contract: <strong>&#8377; @Model.ContractValue.ToString("N2")</strong> &bull;
+                Type: <strong>@Model.ProjectType</strong>
+            </small>
+        </div>
+        <div class="d-flex gap-2">
+            <a asp-controller="Projects" asp-action="Index" class="btn btn-outline-secondary btn-sm"><i class="fa-solid fa-arrow-left me-1"></i> Back to List</a>
+            @if (Model.Status != "CLOSED")
+            {
+                <button class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#closeProjectModal">
+                    <i class="fa-solid fa-lock me-1"></i> Execute Project Closure
+                </button>
+            }
+            else
+            {
+                <form method="post" asp-controller="Projects" asp-action="ReopenProject" style="display:inline;">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" value="@Model.Id" />
+                    <button type="submit" class="btn btn-outline-success btn-sm">
+                        <i class="fa-solid fa-lock-open me-1"></i> Reopen Project (Make Active)
+                    </button>
+                </form>
+            }
+        </div>
+    </div>
+
+    <!-- 11-Tab Workspace Navigation -->
+    <ul class="nav nav-tabs mb-3" id="projectWorkspaceTabs" role="tablist">
+        <li class="nav-item"><button class="nav-link active fw-semibold" data-bs-toggle="tab" data-bs-target="#tab-overview"><i class="fa-solid fa-gauge me-1"></i> 1. Overview</button></li>
+        <li class="nav-item"><button class="nav-link fw-semibold" data-bs-toggle="tab" data-bs-target="#tab-metadata"><i class="fa-solid fa-info me-1"></i> 2. Details</button></li>
+        <li class="nav-item"><button class="nav-link fw-semibold" data-bs-toggle="tab" data-bs-target="#tab-po"><i class="fa-solid fa-file-contract me-1"></i> 3. Client PO</button></li>
+        <li class="nav-item"><button class="nav-link fw-semibold" data-bs-toggle="tab" data-bs-target="#tab-invoices"><i class="fa-solid fa-file-invoice-dollar me-1"></i> 4. Sales &amp; Invoices</button></li>
+        <li class="nav-item"><button class="nav-link fw-semibold" data-bs-toggle="tab" data-bs-target="#tab-receipts"><i class="fa-solid fa-receipt me-1"></i> 5. Receipts</button></li>
+        <li class="nav-item"><button class="nav-link fw-semibold" data-bs-toggle="tab" data-bs-target="#tab-procurement"><i class="fa-solid fa-cart-shopping me-1"></i> 6. Procurement POs</button></li>
+        <li class="nav-item"><button class="nav-link fw-semibold" data-bs-toggle="tab" data-bs-target="#tab-deliveries"><i class="fa-solid fa-truck me-1"></i> 7. Deliveries (DC)</button></li>
+        <li class="nav-item"><button class="nav-link fw-semibold" data-bs-toggle="tab" data-bs-target="#tab-expenses"><i class="fa-solid fa-money-bill-transfer me-1"></i> 8. Expenses</button></li>
+        <li class="nav-item"><button class="nav-link fw-semibold" data-bs-toggle="tab" data-bs-target="#tab-documents"><i class="fa-solid fa-paperclip me-1"></i> 9. Documents</button></li>
+        <li class="nav-item"><button class="nav-link fw-semibold text-success" data-bs-toggle="tab" data-bs-target="#tab-pnl"><i class="fa-solid fa-chart-pie me-1"></i> 10. Project P&amp;L</button></li>
+        <li class="nav-item"><button class="nav-link fw-semibold" data-bs-toggle="tab" data-bs-target="#tab-audit"><i class="fa-solid fa-clock-rotate-left me-1"></i> 11. Audit Trail</button></li>
+    </ul>
+
+    <div class="tab-content">
+        <!-- 1. OVERVIEW TAB -->
+        <div class="tab-pane fade show active" id="tab-overview">
+            @if (Model.Status == "CLOSED")
+            {
+                var closureDoc = documents.FirstOrDefault(d => d.EntityType == "ProjectClosure");
+                <div class="alert alert-dark d-flex align-items-center justify-content-between mb-3 shadow-sm border-2">
+                    <div class="d-flex align-items-center">
+                        <i class="fa-solid fa-lock text-danger fs-3 me-3"></i>
+                        <div>
+                            <h6 class="fw-bold mb-1 text-dark">
+                                Project Formally Closed &amp; Locked
+                                <span class="badge bg-secondary ms-2">@(Model.ActualClosedDate.HasValue ? Model.ActualClosedDate.Value.ToString("dd MMM yyyy") : "Closed")</span>
+                            </h6>
+                            <div style="font-size: 13px;" class="text-muted">
+                                <strong>Closure Justification:</strong> @(Model.ClosureNotes ?? "Project completed and reconciled.")
+                            </div>
+                        </div>
+                    </div>
+                    @if (closureDoc != null)
+                    {
+                        <a href="@closureDoc.FilePath" target="_blank" download class="btn btn-danger btn-sm px-3 fw-bold ms-3">
+                            <i class="fa-solid fa-file-pdf me-1"></i> Download Closure Certificate
+                        </a>
+                    }
+                </div>
+            }
+            <div class="row g-3 mb-3">
+                <div class="col-md-3">
+                    <div class="p-3 bg-white border rounded shadow-sm">
+                        <small class="text-muted fw-semibold text-uppercase" style="font-size: 11px;">Contract Value</small>
+                        <div class="fs-5 fw-bold text-dark">&#8377; @contractVal.ToString("N2")</div>
+                        <small class="text-muted">Agreement Base</small>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="p-3 bg-white border rounded shadow-sm">
+                        <small class="text-muted fw-semibold text-uppercase" style="font-size: 11px;">Total Invoiced</small>
+                        <div class="fs-5 fw-bold text-primary">&#8377; @totalInvoiced.ToString("N2")</div>
+                        <small class="text-muted">@salesInvoices.Count() Tax Invoice(s)</small>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="p-3 bg-white border rounded shadow-sm">
+                        <small class="text-muted fw-semibold text-uppercase" style="font-size: 11px;">Total Direct Costs</small>
+                        <div class="fs-5 fw-bold text-danger">&#8377; @totalCosts.ToString("N2")</div>
+                        <small class="text-muted">POs + Expenses</small>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="p-3 bg-white border rounded shadow-sm">
+                        <small class="text-muted fw-semibold text-uppercase" style="font-size: 11px;">Realized Margin</small>
+                        <div class="fs-5 fw-bold @(currentMargin >= 0 ? "text-success" : "text-danger")">
+                            @marginPercent% (&#8377; @currentMargin.ToString("N2"))
+                        </div>
+                        <small class="text-muted">Net Gross P&amp;L</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="erp-card">
+                        <div class="erp-card-header"><h6 class="erp-card-title mb-0"><i class="fa-solid fa-calendar me-2"></i>Project Timeline</h6></div>
+                        <div class="erp-card-body">
+                            <ul class="list-group list-group-flush" style="font-size: 13.5px;">
+                                <li class="list-group-item d-flex justify-content-between"><span>Start Date:</span> <strong>@Model.StartDate.ToString("dd MMM yyyy")</strong></li>
+                                <li class="list-group-item d-flex justify-content-between"><span>Expected End Date:</span> <strong>@(Model.ExpectedEndDate.HasValue ? Model.ExpectedEndDate.Value.ToString("dd MMM yyyy") : "Open-ended")</strong></li>
+                                <li class="list-group-item d-flex justify-content-between"><span>Actual Closed Date:</span> <strong>@(Model.ActualClosedDate.HasValue ? Model.ActualClosedDate.Value.ToString("dd MMM yyyy") : "In Progress")</strong></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="erp-card">
+                        <div class="erp-card-header"><h6 class="erp-card-title mb-0"><i class="fa-solid fa-building me-2"></i>Client Information</h6></div>
+                        <div class="erp-card-body">
+                            <ul class="list-group list-group-flush" style="font-size: 13.5px;">
+                                <li class="list-group-item d-flex justify-content-between"><span>Client Name:</span> <strong>@(Model.Client?.ClientName ?? "N/A")</strong></li>
+                                <li class="list-group-item d-flex justify-content-between"><span>Client Code:</span> <strong>@(Model.Client?.ClientCode ?? "N/A")</strong></li>
+                                <li class="list-group-item d-flex justify-content-between"><span>GSTIN:</span> <code>@(Model.Client?.Gstin ?? "Unregistered")</code></li>
+                                <li class="list-group-item d-flex justify-content-between"><span>PAN:</span> <code>@(Model.Client?.Pan ?? "N/A")</code></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. DETAILS TAB -->
+        <div class="tab-pane fade" id="tab-metadata">
+            <div class="erp-card">
+                <div class="erp-card-header"><h5 class="erp-card-title"><i class="fa-solid fa-info me-2"></i>Comprehensive Project Metadata</h5></div>
+                <div class="erp-card-body">
+                    <div class="row g-3" style="font-size: 13.5px;">
+                        <div class="col-md-4"><label class="text-muted d-block">Project Code</label><strong>@Model.ProjectCode</strong></div>
+                        <div class="col-md-4"><label class="text-muted d-block">Project Name</label><strong>@Model.ProjectName</strong></div>
+                        <div class="col-md-4"><label class="text-muted d-block">Project Type</label><span class="badge bg-light text-dark border">@Model.ProjectType</span></div>
+                        <div class="col-md-4"><label class="text-muted d-block">Client Name</label><strong>@(Model.Client?.ClientName ?? "N/A")</strong></div>
+                        <div class="col-md-4"><label class="text-muted d-block">Contract Value</label><strong class="text-success">&#8377; @Model.ContractValue.ToString("N2")</strong></div>
+                        <div class="col-md-4"><label class="text-muted d-block">Start Date</label><span>@Model.StartDate.ToString("dd MMM yyyy")</span></div>
+                        <div class="col-md-4"><label class="text-muted d-block">Created In System</label><span>@Model.CreatedAt.ToString("dd MMM yyyy HH:mm")</span></div>
+                        <div class="col-md-4"><label class="text-muted d-block">Last Updated</label><span>@Model.UpdatedAt.ToString("dd MMM yyyy HH:mm")</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. CLIENT PO / MILESTONES TAB -->
+        <div class="tab-pane fade" id="tab-po">
+            <div class="erp-card">
+                <div class="erp-card-header d-flex justify-content-between align-items-center">
+                    <h5 class="erp-card-title"><i class="fa-solid fa-file-contract me-2"></i>Project Milestones &amp; Billing Schedule</h5>
+                </div>
+                <div class="erp-card-body p-0">
+                    <table class="table table-hover align-middle mb-0" style="font-size: 13px;">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-4">Milestone</th>
+                                <th>Target Date</th>
+                                <th>Percentage</th>
+                                <th>Amount (&#8377;)</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (milestones.Any())
+                            {
+                                @foreach (var m in milestones)
+                                {
+                                    <tr>
+                                        <td class="ps-4 fw-bold">@m.MilestoneName</td>
+                                        <td>@m.ExpectedDate.ToString("dd MMM yyyy")</td>
+                                        <td>@(m.PercentageOfContract.HasValue ? $"{m.PercentageOfContract.Value}%" : "-")</td>
+                                        <td class="fw-bold">&#8377; @m.MilestoneAmount.ToString("N2")</td>
+                                        <td><span class="badge bg-primary">@m.Status</span></td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="5" class="text-center py-4 text-muted">
+                                        <i class="fa-solid fa-list-check mb-2" style="font-size: 24px; color: #CBD5E1;"></i>
+                                        <div>No billing milestones recorded for this project yet.</div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. SALES & INVOICES TAB -->
+        <div class="tab-pane fade" id="tab-invoices">
+            <div class="erp-card">
+                <div class="erp-card-header d-flex justify-content-between align-items-center">
+                    <h5 class="erp-card-title"><i class="fa-solid fa-file-invoice-dollar me-2"></i>Sales Tax Invoices for Project</h5>
+                </div>
+                <div class="erp-card-body p-0">
+                    <table class="table table-hover align-middle mb-0" style="font-size: 13px;">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-4">Invoice No</th>
+                                <th>Date</th>
+                                <th>Due Date</th>
+                                <th>Taxable Amount</th>
+                                <th>Total Bill</th>
+                                <th>Outstanding</th>
+                                <th>Status</th>
+                                <th class="text-end pe-4">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (salesInvoices.Any())
+                            {
+                                @foreach (var inv in salesInvoices)
+                                {
+                                    <tr>
+                                        <td class="ps-4 fw-bold text-primary">@inv.InvoiceNumber</td>
+                                        <td>@inv.InvoiceDate.ToString("dd MMM yyyy")</td>
+                                        <td>@inv.DueDate.ToString("dd MMM yyyy")</td>
+                                        <td>&#8377; @inv.TaxableAmount.ToString("N2")</td>
+                                        <td class="fw-bold">&#8377; @inv.TotalInvoiceValue.ToString("N2")</td>
+                                        <td class="fw-bold @(inv.OutstandingBalance > 0 ? "text-danger" : "text-success")">&#8377; @inv.OutstandingBalance.ToString("N2")</td>
+                                        <td><span class="badge bg-success">@inv.Status</span></td>
+                                        <td class="text-end pe-4">
+                                            <a asp-controller="Sales" asp-action="PrintInvoice" asp-route-id="@inv.Id" target="_blank" class="btn btn-sm btn-outline-primary">
+                                                <i class="fa-solid fa-file-pdf me-1"></i> Tally PDF
+                                            </a>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="8" class="text-center py-4 text-muted">
+                                        <i class="fa-solid fa-file-invoice-dollar mb-2" style="font-size: 24px; color: #CBD5E1;"></i>
+                                        <div>No sales tax invoices issued for this project in the database.</div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 5. RECEIPTS TAB -->
+        <div class="tab-pane fade" id="tab-receipts">
+            <div class="erp-card">
+                <div class="erp-card-header"><h5 class="erp-card-title"><i class="fa-solid fa-receipt me-2"></i>Customer Receipts &amp; Bank Remittances</h5></div>
+                <div class="erp-card-body p-0">
+                    <div class="text-center py-5 text-muted">
+                        <i class="fa-solid fa-money-check-dollar mb-2" style="font-size: 28px; color: #CBD5E1;"></i>
+                        <div>No customer receipt vouchers allocated to this project yet.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 6. PROCUREMENT POS TAB -->
+        <div class="tab-pane fade" id="tab-procurement">
+            <div class="erp-card">
+                <div class="erp-card-header"><h5 class="erp-card-title"><i class="fa-solid fa-cart-shopping me-2"></i>Procurement Purchase Orders Issued</h5></div>
+                <div class="erp-card-body p-0">
+                    <table class="table table-hover align-middle mb-0" style="font-size: 13px;">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-4">PO Number</th>
+                                <th>Vendor</th>
+                                <th>Date</th>
+                                <th>Taxable (&#8377;)</th>
+                                <th>GST (&#8377;)</th>
+                                <th>Total PO (&#8377;)</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (procurementPos.Any())
+                            {
+                                @foreach (var po in procurementPos)
+                                {
+                                    <tr>
+                                        <td class="ps-4 fw-bold text-primary">@po.PoNumber</td>
+                                        <td>@(po.Vendor?.VendorName ?? "N/A")</td>
+                                        <td>@po.PoDate.ToString("dd MMM yyyy")</td>
+                                        <td>&#8377; @po.TaxableAmount.ToString("N2")</td>
+                                        <td>&#8377; @po.GstAmount.ToString("N2")</td>
+                                        <td class="fw-bold">&#8377; @po.TotalPoValue.ToString("N2")</td>
+                                        <td><span class="badge bg-success">@po.ApprovalStatus</span></td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="7" class="text-center py-4 text-muted">
+                                        <i class="fa-solid fa-cart-shopping mb-2" style="font-size: 24px; color: #CBD5E1;"></i>
+                                        <div>No procurement purchase orders linked to this project in the database.</div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 7. DELIVERIES TAB -->
+        <div class="tab-pane fade" id="tab-deliveries">
+            <div class="erp-card">
+                <div class="erp-card-header"><h5 class="erp-card-title"><i class="fa-solid fa-truck me-2"></i>Material Delivery Challans (DC)</h5></div>
+                <div class="erp-card-body p-0">
+                    @if (deliveries.Any())
+                    {
+                        <table class="table table-hover align-middle mb-0" style="font-size: 13px;">
+                            <thead class="table-light">
+                                <tr><th class="ps-4">DC Number</th><th>Date</th><th>Recipient</th><th>Mode</th><th>Status</th></tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var d in deliveries)
+                                {
+                                    <tr>
+                                        <td class="ps-4 fw-bold">@d.DcNumber</td>
+                                        <td>@d.DeliveryDate.ToString("dd MMM yyyy")</td>
+                                        <td>@d.RecipientName</td>
+                                        <td>@d.DispatchMode</td>
+                                        <td><span class="badge bg-info">@d.Status</span></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                    else
+                    {
+                        <div class="text-center py-5 text-muted">
+                            <i class="fa-solid fa-truck-ramp-box mb-2" style="font-size: 28px; color: #CBD5E1;"></i>
+                            <div>No delivery challans recorded for this project yet.</div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- 8. EXPENSES TAB -->
+        <div class="tab-pane fade" id="tab-expenses">
+            <div class="erp-card">
+                <div class="erp-card-header"><h5 class="erp-card-title"><i class="fa-solid fa-money-bill-transfer me-2"></i>Direct Project Site Expenses</h5></div>
+                <div class="erp-card-body p-0">
+                    @if (expenses.Any())
+                    {
+                        <table class="table table-hover align-middle mb-0" style="font-size: 13px;">
+                            <thead class="table-light">
+                                <tr><th class="ps-4">Date</th><th>Payment Mode</th><th>Amount (&#8377;)</th><th>Status</th></tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var e in expenses)
+                                {
+                                    <tr>
+                                        <td class="ps-4">@e.ExpenseDate.ToString("dd MMM yyyy")</td>
+                                        <td><strong>@e.PaymentMode</strong></td>
+                                        <td class="fw-bold text-danger">&#8377; @e.Amount.ToString("N2")</td>
+                                        <td><span class="badge bg-primary">@e.Status</span></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                    else
+                    {
+                        <div class="text-center py-5 text-muted">
+                            <i class="fa-solid fa-money-bill mb-2" style="font-size: 28px; color: #CBD5E1;"></i>
+                            <div>No direct site expenses logged for this project yet.</div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- 9. DOCUMENTS TAB -->
+        <div class="tab-pane fade" id="tab-documents">
+            <div class="erp-card">
+                <div class="erp-card-header"><h5 class="erp-card-title"><i class="fa-solid fa-paperclip me-2"></i>Project Documents &amp; Attachments</h5></div>
+                <div class="erp-card-body p-0">
+                    @if (documents.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0" style="font-size: 13px;">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="ps-4">Document / File Name</th>
+                                        <th>Document Type</th>
+                                        <th>Uploaded Date</th>
+                                        <th>File Size</th>
+                                        <th class="text-end pe-4">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var doc in documents)
+                                    {
+                                        <tr>
+                                            <td class="ps-4">
+                                                <i class="fa-solid fa-file-pdf text-danger me-2"></i>
+                                                <strong>@doc.FileName</strong>
+                                            </td>
+                                            <td>
+                                                @if (doc.EntityType == "ProjectClosure")
+                                                {
+                                                    <span class="badge bg-danger-subtle text-danger"><i class="fa-solid fa-lock me-1"></i> Closure Certificate</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-primary-subtle text-primary">Project Document</span>
+                                                }
+                                            </td>
+                                            <td>@doc.UploadedAt.ToString("dd MMM yyyy HH:mm")</td>
+                                            <td>@((doc.FileSizeBytes / 1024.0).ToString("N1")) KB</td>
+                                            <td class="text-end pe-4">
+                                                <a href="@doc.FilePath" target="_blank" download class="btn btn-sm btn-outline-primary px-3">
+                                                    <i class="fa-solid fa-download me-1"></i> Download
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center py-5 text-muted">
+                            <i class="fa-solid fa-file-arrow-up mb-2" style="font-size: 28px; color: #CBD5E1;"></i>
+                            <div>No attachments uploaded for this project yet. (Uploaded upon project closure or milestone sign-off).</div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- 10. PROJECT P&L TAB -->
+        <div class="tab-pane fade" id="tab-pnl">
+            <div class="erp-card">
+                <div class="erp-card-header"><h5 class="erp-card-title text-success"><i class="fa-solid fa-chart-line me-2"></i>Real-Time Project Profit &amp; Loss Statement</h5></div>
+                <div class="erp-card-body">
+                    <table class="table table-bordered mb-0" style="font-size: 13.5px;">
+                        <tr class="table-light">
+                            <th colspan="2">A. Contract Revenue (Actual Tax Invoiced)</th>
+                            <th class="text-end fw-bold text-primary">&#8377; @totalInvoiced.ToString("N2")</th>
+                        </tr>
+                        @if (salesInvoices.Any())
+                        {
+                            @foreach (var inv in salesInvoices)
+                            {
+                                <tr>
+                                    <td class="ps-4">Invoice @inv.InvoiceNumber</td>
+                                    <td>Taxable Value (@inv.InvoiceDate.ToString("dd MMM yyyy"))</td>
+                                    <td class="text-end">&#8377; @inv.TaxableAmount.ToString("N2")</td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="3" class="ps-4 text-muted fst-italic">No sales invoices billed yet for this project.</td>
+                            </tr>
+                        }
+
+                        <tr class="table-light">
+                            <th colspan="2">B. Direct Operational Costs (Procurement POs + Site Expenses)</th>
+                            <th class="text-end fw-bold text-danger">&#8377; @totalCosts.ToString("N2")</th>
+                        </tr>
+                        @if (procurementPos.Any())
+                        {
+                            @foreach (var po in procurementPos)
+                            {
+                                <tr>
+                                    <td class="ps-4">PO @po.PoNumber (@(po.Vendor?.VendorName ?? "Vendor"))</td>
+                                    <td>Taxable Purchase Cost</td>
+                                    <td class="text-end text-danger">&#8377; @po.TaxableAmount.ToString("N2")</td>
+                                </tr>
+                            }
+                        }
+                        @if (expenses.Any())
+                        {
+                            @foreach (var exp in expenses)
+                            {
+                                <tr>
+                                    <td class="ps-4">Expense: @exp.PaymentMode</td>
+                                    <td>Direct Site Expense</td>
+                                    <td class="text-end text-danger">&#8377; @exp.Amount.ToString("N2")</td>
+                                </tr>
+                            }
+                        }
+                        @if (!procurementPos.Any() && !expenses.Any())
+                        {
+                            <tr>
+                                <td colspan="3" class="ps-4 text-muted fst-italic">No direct procurement or site expenses recorded yet.</td>
+                            </tr>
+                        }
+
+                        <tr class="@(currentMargin >= 0 ? "table-success" : "table-danger") fs-5">
+                            <th>Net Project Gross Margin (A - B)</th>
+                            <th>@marginPercent% Margin</th>
+                            <th class="text-end fw-bold">&#8377; @currentMargin.ToString("N2")</th>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 11. AUDIT TRAIL TAB -->
+        <div class="tab-pane fade" id="tab-audit">
+            <div class="erp-card">
+                <div class="erp-card-header"><h5 class="erp-card-title"><i class="fa-solid fa-clock-rotate-left me-2"></i>Project Audit History</h5></div>
+                <div class="erp-card-body">
+                    <ul class="list-group list-group-flush" style="font-size: 13px;">
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span><span class="badge bg-success me-2">CREATED</span> Project initialized in database</span>
+                            <span class="text-muted">@Model.CreatedAt.ToString("dd MMM yyyy HH:mm:ss")</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span><span class="badge bg-info me-2">UPDATED</span> Project state synchronized</span>
+                            <span class="text-muted">@Model.UpdatedAt.ToString("dd MMM yyyy HH:mm:ss")</span>
+                        </li>
+                        @if (Model.ActualClosedDate.HasValue)
+                        {
+                            <li class="list-group-item d-flex justify-content-between">
+                                <span><span class="badge bg-dark me-2">CLOSED</span> Formally closed and ledger locked</span>
+                                <span class="text-muted">@Model.ActualClosedDate.Value.ToString("dd MMM yyyy")</span>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CLOSE PROJECT MODAL -->
+    <div class="modal fade" id="closeProjectModal" tabindex="-1" aria-labelledby="closeProjectModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0 shadow">
+                <form method="post" asp-controller="Projects" asp-action="CloseProject" enctype="multipart/form-data">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" value="@Model.Id" />
+                    <input type="hidden" name="isPrematureClosure" value="@(isPremature ? "true" : "false")" />
+                    <div class="modal-header bg-light">
+                        <h5 class="modal-title fw-bold text-danger" id="closeProjectModalLabel" style="font-size: 16px;">
+                            <i class="fa-solid fa-lock me-2"></i>Pre-Closure Audit &amp; Formal Project Closure
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <!-- Contract Financial Audit Summary -->
+                        <div class="card mb-3 border bg-light">
+                            <div class="card-body p-3">
+                                <h6 class="fw-bold mb-2" style="font-size: 13px;"><i class="fa-solid fa-calculator me-1 text-primary"></i> Contract Commercial Position</h6>
+                                <div class="row g-2 text-center" style="font-size: 12.5px;">
+                                    <div class="col-4 p-2 bg-white border rounded">
+                                        <small class="text-muted d-block">Contract Value</small>
+                                        <strong class="text-dark">&#8377; @Model.ContractValue.ToString("N2")</strong>
+                                    </div>
+                                    <div class="col-4 p-2 bg-white border rounded">
+                                        <small class="text-muted d-block">Total Tax Invoiced</small>
+                                        <strong class="text-primary">&#8377; @totalInvoiced.ToString("N2") (@billedPercentage%)</strong>
+                                    </div>
+                                    <div class="col-4 p-2 bg-white border rounded">
+                                        <small class="text-muted d-block">Unbilled Balance</small>
+                                        <strong class="@(isPremature ? "text-danger" : "text-success")">&#8377; @unbilledContract.ToString("N2")</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        @if (isPremature)
+                        {
+                            <div class="alert alert-danger d-flex align-items-start mb-3" style="font-size: 13px;">
+                                <i class="fa-solid fa-triangle-exclamation fs-4 me-3 mt-1"></i>
+                                <div>
+                                    <h6 class="fw-bold mb-1">Premature Project Closure Warning</h6>
+                                    <div>The contract value is <strong>&#8377; @Model.ContractValue.ToString("N2")</strong>, but only <strong>&#8377; @totalInvoiced.ToString("N2") (@billedPercentage%)</strong> has been tax invoiced.</div>
+                                    <div class="mt-1 text-danger fw-semibold">&#8377; @unbilledContract.ToString("N2") remains unbilled in the contract baseline.</div>
+                                </div>
+                            </div>
+
+                            <div class="form-check p-3 bg-light border rounded mb-3">
+                                <input class="form-check-input ms-0 me-2" type="checkbox" id="confirmPrematureCheck" required />
+                                <label class="form-check-label fw-bold text-dark" for="confirmPrematureCheck" style="font-size: 12.5px;">
+                                    I explicitly authorize premature closure due to scope termination, contract amendment, or partial handover.
+                                </label>
+                            </div>
+                        }
+
+                        @if (outstandingReceivables > 0)
+                        {
+                            <div class="alert alert-warning d-flex align-items-center mb-3" style="font-size: 12.5px;">
+                                <i class="fa-solid fa-circle-info fs-5 me-2"></i>
+                                <div>Note: <strong>&#8377; @outstandingReceivables.ToString("N2")</strong> in issued invoices remains pending customer payment collection.</div>
+                            </div>
+                        }
+
+                        <!-- Mandatory Closure Document Upload -->
+                        <div class="mb-3 p-3 bg-light border rounded">
+                            <label class="form-label fw-bold text-dark" style="font-size: 12.5px;">
+                                <i class="fa-solid fa-file-arrow-up text-primary me-1"></i> Project Handover / Closure Certificate (Mandatory Upload) <span class="text-danger">*</span>
+                            </label>
+                            <input type="file" name="closureDocument" class="form-control" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.zip" required />
+                            <small class="text-muted d-block mt-1" style="font-size: 11.5px;">
+                                Attach the client sign-off sheet, work completion certificate, or scope amendment/termination letter (PDF, Word, Scan).
+                            </small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Managerial Closure Notes &amp; Justification <span class="text-danger">*</span></label>
+                            <textarea name="closureNotes" class="form-control" rows="3" placeholder="State reason for closure (e.g., Deliverables complete, scope reconciled, final handover signed off)." required></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light">
+                        <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-danger btn-sm px-4 fw-bold">
+                            <i class="fa-solid fa-lock me-1"></i> Approve &amp; Lock Project
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+}

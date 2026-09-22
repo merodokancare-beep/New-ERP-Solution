@@ -1,0 +1,112 @@
+@model IEnumerable<SDK.ERP.Domain.Entities.Sales.SalesInvoice>
+@{
+    ViewData["Title"] = "Customer Payment Allocation";
+    ViewData["ActiveMenu"] = "Sales";
+    var invoiceList = Model ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Sales.SalesInvoice>();
+    var clients = ViewBag.Clients as IEnumerable<SDK.ERP.Domain.Entities.MasterData.Client> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.MasterData.Client>();
+    var bankAccounts = ViewBag.BankAccounts as IEnumerable<SDK.ERP.Domain.Entities.Banking.BankAccount> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Banking.BankAccount>();
+    var totalOutstanding = invoiceList.Sum(i => i.OutstandingBalance);
+}
+
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h3 style="font-weight: 700; color: var(--erp-primary); margin-bottom: 4px;">Customer Multi-Invoice Payment Allocation</h3>
+        <p style="color: var(--erp-text-muted); margin: 0; font-size: 13.5px;">Split single remittance voucher across multiple outstanding client invoices</p>
+    </div>
+    <a asp-controller="Sales" asp-action="Index" class="btn btn-outline-secondary btn-sm"><i class="fa-solid fa-arrow-left me-1"></i> Back to Invoices</a>
+</div>
+
+<form method="post" asp-action="AllocatePayment">
+    @Html.AntiForgeryToken()
+    <div class="row g-4">
+        <div class="col-md-4">
+            <div class="erp-card">
+                <div class="erp-card-header"><h5 class="erp-card-title"><i class="fa-solid fa-receipt me-2"></i>Receipt Header</h5></div>
+                <div class="erp-card-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold" style="font-size: 12.5px;">Select Client</label>
+                        <select name="clientId" class="form-select">
+                            <option value="">-- Choose Client --</option>
+                            @foreach (var c in clients)
+                            {
+                                <option value="@c.Id">@c.ClientName (@c.ClientCode)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold" style="font-size: 12.5px;">Amount Received (&#8377;) <span class="text-danger">*</span></label>
+                        <input type="number" step="0.01" name="amountReceived" class="form-control fw-bold fs-5 text-success" placeholder="0.00" required />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold" style="font-size: 12.5px;">Deposit Bank Account</label>
+                        <select name="bankAccountId" class="form-select">
+                            <option value="">-- Choose Bank Account --</option>
+                            @foreach (var b in bankAccounts)
+                            {
+                                <option value="@b.Id">@b.BankName - @b.AccountNumber</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold" style="font-size: 12.5px;">Payment Mode &amp; Reference (UTR)</label>
+                        <input type="text" name="paymentRef" class="form-control" placeholder="e.g. NEFT / UTR-00998822" />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-8">
+            <div class="erp-card">
+                <div class="erp-card-header d-flex justify-content-between align-items-center">
+                    <h5 class="erp-card-title"><i class="fa-solid fa-list-check me-2"></i>Outstanding Invoices Allocation Grid</h5>
+                    <span class="badge bg-primary">Total Outstanding: &#8377; @totalOutstanding.ToString("N2")</span>
+                </div>
+                <div class="erp-card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-bordered align-middle mb-0" style="font-size: 13px;">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-3">Invoice Number</th>
+                                    <th>Client</th>
+                                    <th>Total Bill</th>
+                                    <th>Outstanding</th>
+                                    <th style="width: 180px;">Allocate Amount (&#8377;)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (invoiceList.Any())
+                                {
+                                    @foreach (var inv in invoiceList)
+                                    {
+                                        <tr>
+                                            <td class="ps-3 fw-bold text-primary">@inv.InvoiceNumber</td>
+                                            <td>@(inv.Client?.ClientName ?? "N/A")</td>
+                                            <td>&#8377; @inv.TotalInvoiceValue.ToString("N2")</td>
+                                            <td class="text-danger fw-bold">&#8377; @inv.OutstandingBalance.ToString("N2")</td>
+                                            <td><input type="number" step="0.01" name="alloc_@inv.Id" class="form-control form-control-sm text-end fw-bold" placeholder="0.00" /></td>
+                                        </tr>
+                                    }
+                                }
+                                else
+                                {
+                                    <tr>
+                                        <td colspan="5" class="text-center py-4 text-muted">
+                                            <i class="fa-solid fa-circle-check mb-2" style="font-size: 24px; color: #10B981;"></i>
+                                            <div>No unpaid or outstanding invoices in the database.</div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                @if (invoiceList.Any())
+                {
+                    <div class="erp-card-body text-end border-top">
+                        <button type="submit" class="btn btn-success px-4 fw-bold"><i class="fa-solid fa-check me-1"></i> Commit Payment Allocation</button>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</form>

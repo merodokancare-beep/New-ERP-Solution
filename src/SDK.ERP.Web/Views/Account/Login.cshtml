@@ -1,0 +1,243 @@
+@model SDK.ERP.Application.ViewModels.LoginViewModel
+@{
+    Layout = null;
+    ViewData["Title"] = "Enterprise ERP - Secure Portal Login";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"]</title>
+    <!-- Google Fonts Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Bootstrap 5 CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" />
+    <!-- FontAwesome 6 Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+    <style>
+        :root {
+            --erp-primary: #0284C7;
+            --erp-primary-hover: #0369A1;
+            --erp-dark: #0F172A;
+            --erp-slate: #1E293B;
+            --erp-border: #E2E8F0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #0B1329 0%, #1E293B 50%, #0F172A 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            color: #1E293B;
+        }
+
+        .login-card {
+            background: #FFFFFF;
+            border-radius: 20px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+            width: 100%;
+            max-width: 460px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .login-header {
+            background: linear-gradient(135deg, #0284C7 0%, #0EA5E9 100%);
+            padding: 32px 32px 28px 32px;
+            color: #FFFFFF;
+            text-align: center;
+            position: relative;
+        }
+
+        .brand-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 12px;
+            padding: 8px 16px;
+            font-weight: 800;
+            font-size: 16px;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .login-body {
+            padding: 32px;
+        }
+
+        .form-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #334155;
+            margin-bottom: 6px;
+        }
+
+        .form-control, .form-select {
+            border-radius: 10px;
+            border: 1.5px solid #CBD5E1;
+            padding: 10px 14px;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .form-control:focus, .form-select:focus {
+            border-color: var(--erp-primary);
+            box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
+        }
+
+        .btn-login {
+            background: linear-gradient(135deg, #0284C7 0%, #0369A1 100%);
+            border: none;
+            color: #FFFFFF;
+            font-weight: 700;
+            font-size: 15px;
+            padding: 12px;
+            border-radius: 10px;
+            box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35);
+            transition: all 0.2s ease;
+        }
+
+        .btn-login:hover {
+            background: linear-gradient(135deg, #0369A1 0%, #075985 100%);
+            color: #FFFFFF;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 18px rgba(2, 132, 199, 0.45);
+        }
+
+        .input-group-text {
+            background: #F8FAFC;
+            border: 1.5px solid #CBD5E1;
+            border-radius: 10px;
+            color: #64748B;
+        }
+
+        .toggle-password {
+            cursor: pointer;
+        }
+
+        .tenant-indicator {
+            background: #F1F5F9;
+            border-radius: 10px;
+            padding: 10px 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #E2E8F0;
+        }
+    </style>
+</head>
+<body>
+
+<div class="login-card">
+    <!-- Header Banner -->
+    <div class="login-header">
+        <div class="brand-badge">
+            <i class="fa-solid fa-cube me-2"></i> ENTERPRISE ERP
+        </div>
+        <h4 class="fw-bold mb-1">Corporate Portal Login</h4>
+        <p class="mb-0 text-white-50" style="font-size: 13.5px;">Multi-Tenant Secured Authentication</p>
+    </div>
+
+    <!-- Login Form -->
+    <div class="login-body">
+        @if (!ViewData.ModelState.IsValid)
+        {
+            <div class="alert alert-danger alert-dismissible fade show p-3 mb-4 shadow-sm" role="alert" style="font-size: 13px;">
+                <div class="d-flex align-items-center">
+                    <i class="fa-solid fa-circle-exclamation fs-5 me-2 flex-shrink-0"></i>
+                    <div>
+                        <div asp-validation-summary="All" class="text-danger fw-semibold mb-0 list-unstyled"></div>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        <form asp-controller="Account" asp-action="Login" method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="ReturnUrl" value="@Model.ReturnUrl" />
+            <!-- Username / Email -->
+            <div class="mb-3">
+                <label class="form-label"><i class="fa-solid fa-user me-1 text-primary"></i> Username or Email</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="fa-solid fa-at"></i></span>
+                    <input type="text" class="form-control" name="Username" value="@Model.Username" required autofocus placeholder="e.g. admin or your.email@company.com" autocomplete="username" />
+                </div>
+            </div>
+
+            <!-- Password -->
+            <div class="mb-3">
+                <label class="form-label d-flex justify-content-between align-items-center">
+                    <span><i class="fa-solid fa-lock me-1 text-primary"></i> Password</span>
+                </label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="fa-solid fa-key"></i></span>
+                    <input type="password" class="form-control" name="Password" id="loginPassword" required placeholder="Enter your password" autocomplete="current-password" />
+                    <button class="btn btn-outline-secondary toggle-password" type="button" id="togglePasswordBtn">
+                        <i class="fa-regular fa-eye" id="togglePasswordIcon"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Remember Me & Security Tag -->
+            <div class="d-flex align-items-center justify-content-between mb-4">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="RememberMe" id="rememberMeCheck" value="true" checked />
+                    <label class="form-check-label text-muted" for="rememberMeCheck" style="font-size: 13px;">
+                        Remember this device
+                    </label>
+                </div>
+                <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1" style="font-size: 11px;">
+                    <i class="fa-solid fa-shield-check me-1"></i> Isolated Tenant
+                </span>
+            </div>
+
+            <!-- Sign In Button -->
+            <button type="submit" class="btn btn-login w-100 mb-3 shadow-sm">
+                <i class="fa-solid fa-arrow-right-to-bracket me-2"></i> Log In to Workspace
+            </button>
+
+            <!-- Quick Demo Helper -->
+            <div class="p-2 rounded-3 bg-light border text-center text-muted" style="font-size: 11.5px;">
+                <i class="fa-solid fa-info-circle me-1 text-primary"></i> Initial Default Admin: 
+                <strong class="text-dark">admin</strong> / Password: <strong class="text-dark">admin123</strong>
+            </div>
+
+            <!-- Onboard Sister / New Company Link -->
+            <div class="text-center mt-3 pt-3 border-top">
+                <span class="text-muted small">Need to onboard a new organization?</span><br />
+                <a href="/Account/Register" class="text-primary fw-bold small text-decoration-none">
+                    <i class="fa-solid fa-building-circle-plus me-1"></i> Register New Enterprise Organization
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    const togglePasswordBtn = document.getElementById('togglePasswordBtn');
+    const loginPassword = document.getElementById('loginPassword');
+    const togglePasswordIcon = document.getElementById('togglePasswordIcon');
+
+    if (togglePasswordBtn && loginPassword) {
+        togglePasswordBtn.addEventListener('click', function () {
+            const isPassword = loginPassword.getAttribute('type') === 'password';
+            loginPassword.setAttribute('type', isPassword ? 'text' : 'password');
+            togglePasswordIcon.className = isPassword ? 'fa-regular fa-eye-slash' : 'fa-regular fa-eye';
+        });
+    }
+</script>
+
+</body>
+</html>
