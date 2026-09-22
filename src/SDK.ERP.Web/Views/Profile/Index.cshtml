@@ -480,6 +480,22 @@
                         <span class="badge bg-primary-subtle text-primary px-3 py-1 mb-2">@(string.IsNullOrEmpty(u.Designation) ? "Administrator" : u.Designation)</span>
                         <div class="text-muted small">Username: <strong class="text-dark">@u.Username</strong></div>
                         <div class="text-muted small">Role: <strong class="text-dark">@(u.Role?.RoleName ?? "SUPER_ADMIN")</strong></div>
+                        @if (u.Username.Equals("admin", StringComparison.OrdinalIgnoreCase) || (u.CompanyId == 1 && (u.Role != null && u.Role.RoleName == "SUPER_ADMIN")))
+                        {
+                            <div class="mt-2">
+                                <span class="badge bg-warning-subtle text-dark border border-warning-subtle px-2 py-1" style="font-size: 11px;">
+                                    <i class="fa-solid fa-crown text-warning me-1"></i> Global ERP Owner
+                                </span>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="mt-2">
+                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1" style="font-size: 11px;">
+                                    <i class="fa-solid fa-building-user me-1"></i> Organization Admin
+                                </span>
+                            </div>
+                        }
                     </div>
 
                     <div class="col-md-8">
@@ -496,12 +512,52 @@
                                 <small class="text-muted">Displayed below your name in the topbar header.</small>
                             </div>
                             <div class="col-md-6">
+                                <label class="form-label fw-semibold">Login Username <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control font-monospace" name="Username" value="@u.Username" required placeholder="e.g. admin" />
+                                <small class="text-muted">Primary login identifier across ERP workspaces.</small>
+                            </div>
+                            <div class="col-md-6">
                                 <label class="form-label fw-semibold">Email Address <span class="text-danger">*</span></label>
                                 <input type="email" class="form-control" name="Email" value="@u.Email" required placeholder="user@company.com" />
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Phone / Mobile Number</label>
                                 <input type="tel" class="form-control" name="PhoneNumber" value="@u.PhoneNumber" placeholder="+91 98765 43210" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Role / System Permissions</label>
+                                <select class="form-select" name="RoleId">
+                                    @if (Model.Roles != null && Model.Roles.Any())
+                                    {
+                                        @foreach (var r in Model.Roles)
+                                        {
+                                            <option value="@r.Id" selected="@(u.RoleId == r.Id ? "selected" : null)">@r.RoleName</option>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <option value="1">SUPER_ADMIN</option>
+                                    }
+                                </select>
+                                <small class="text-muted">Enterprise permission role level.</small>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Branch Office Location</label>
+                                <select class="form-select" name="BranchId">
+                                    @if (Model.Branches != null && Model.Branches.Any())
+                                    {
+                                        @foreach (var b in Model.Branches)
+                                        {
+                                            <option value="@b.Id" selected="@(u.BranchId == b.Id ? "selected" : null)">@b.BranchName</option>
+                                        }
+                                    }
+                                </select>
+                                <small class="text-muted">Assigned company branch.</small>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Change Password <span class="text-muted small fw-normal">(Leave blank to keep current)</span></label>
+                                <input type="password" class="form-control font-monospace" name="newPassword" placeholder="Enter new password to update" autocomplete="new-password" />
+                                <small class="text-muted">Updates your credentials across all ERP workspaces.</small>
                             </div>
                         </div>
 
@@ -561,7 +617,21 @@
                                                 </div>
                                             }
                                             <div>
-                                                <div class="fw-bold text-dark">@usr.FullName</div>
+                                                <div class="fw-bold text-dark d-flex align-items-center gap-1">
+                                                    @usr.FullName
+                                                    @if (usr.Username.Equals("admin", StringComparison.OrdinalIgnoreCase) || (usr.CompanyId == 1 && (usr.Role != null && usr.Role.RoleName == "SUPER_ADMIN")))
+                                                    {
+                                                        <span class="badge bg-warning-subtle text-dark border border-warning-subtle px-1 py-0" style="font-size: 10px;" title="Master ERP Platform Owner">
+                                                            <i class="fa-solid fa-crown text-warning me-1"></i>Master Owner
+                                                        </span>
+                                                    }
+                                                    else if (usr.Role != null && (usr.Role.RoleName == "COMPANY_ADMIN" || usr.Role.RoleName == "ORG_ADMIN"))
+                                                    {
+                                                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-1 py-0" style="font-size: 10px;" title="Organization Administrator">
+                                                            <i class="fa-solid fa-building-user me-1"></i>Org Admin
+                                                        </span>
+                                                    }
+                                                </div>
                                                 <div class="text-muted small">@usr.Designation</div>
                                             </div>
                                         </div>
@@ -589,21 +659,38 @@
                                         }
                                     </td>
                                     <td class="text-end pe-3">
-                                        @if (usr.Id != u.Id)
-                                        {
-                                            <form asp-controller="Profile" asp-action="ToggleUserStatus" method="post" class="d-inline">
-                                                @Html.AntiForgeryToken()
-                                                <input type="hidden" name="userId" value="@usr.Id" />
-                                                <button type="submit" class="btn btn-sm @(usr.IsActive ? "btn-outline-danger" : "btn-outline-success")" style="font-size: 11.5px;">
-                                                    <i class="fa-solid @(usr.IsActive ? "fa-user-slash" : "fa-user-check") me-1"></i>
-                                                    @(usr.IsActive ? "Deactivate" : "Activate")
-                                                </button>
-                                            </form>
-                                        }
-                                        else
-                                        {
-                                            <span class="badge bg-secondary-subtle text-secondary">Logged In User</span>
-                                        }
+                                        <div class="d-inline-flex align-items-center gap-1">
+                                            <button type="button" 
+                                                    class="btn btn-sm btn-outline-primary btn-edit-user px-2 py-1 shadow-sm"
+                                                    style="font-size: 11.5px;"
+                                                    data-user-id="@usr.Id"
+                                                    data-username="@usr.Username"
+                                                    data-fullname="@usr.FullName"
+                                                    data-email="@usr.Email"
+                                                    data-phone="@usr.PhoneNumber"
+                                                    data-designation="@usr.Designation"
+                                                    data-role-id="@usr.RoleId"
+                                                    data-branch-id="@usr.BranchId"
+                                                    data-is-active="@(usr.IsActive ? "true" : "false")"
+                                                    title="Edit User Details & Role">
+                                                <i class="fa-solid fa-user-pen me-1"></i> Edit
+                                            </button>
+                                            @if (usr.Id != u.Id)
+                                            {
+                                                <form asp-controller="Profile" asp-action="ToggleUserStatus" method="post" class="d-inline">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="userId" value="@usr.Id" />
+                                                    <button type="submit" class="btn btn-sm @(usr.IsActive ? "btn-outline-danger" : "btn-outline-success") px-2 py-1 shadow-sm" style="font-size: 11.5px;">
+                                                        <i class="fa-solid @(usr.IsActive ? "fa-user-slash" : "fa-user-check") me-1"></i>
+                                                        @(usr.IsActive ? "Deactivate" : "Activate")
+                                                    </button>
+                                                </form>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-secondary-subtle text-secondary px-2 py-1" style="font-size: 11px;">You</span>
+                                            }
+                                        </div>
                                     </td>
                                 </tr>
                             }
@@ -843,6 +930,102 @@
     </div>
 </div>
 
+<!-- Modal: Edit Team Member & System Role -->
+<div class="modal fade" id="editTeamMemberModal" tabindex="-1" aria-labelledby="editTeamMemberModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
+            <div class="modal-header text-white" style="background: linear-gradient(135deg, #0284C7, #0EA5E9);">
+                <h5 class="modal-title fw-bold" id="editTeamMemberModalLabel">
+                    <i class="fa-solid fa-user-pen me-2"></i>Edit User Account &amp; Role Permissions
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form asp-controller="Profile" asp-action="UpdateTeamUser" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="userId" id="editUserId" />
+                <div class="modal-body p-4">
+                    <p class="text-muted small mb-4">Update user identity, role permissions, branch allocation, or reset the account password for this team member in <strong>@c.CompanyName</strong>.</p>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Full Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="fullName" id="editFullName" required placeholder="e.g. Ramesh Sharma" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Username <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="username" id="editUsername" required placeholder="e.g. ramesh.sharma" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Email Address <span class="text-danger">*</span></label>
+                            <input type="email" class="form-control" name="email" id="editEmail" required placeholder="ramesh@company.com" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Phone / Mobile</label>
+                            <input type="tel" class="form-control" name="phoneNumber" id="editPhoneNumber" placeholder="+91 98765 43210" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Designation / Job Title</label>
+                            <input type="text" class="form-control" name="designation" id="editDesignation" placeholder="e.g. Senior Accountant / Project Manager" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Account Status</label>
+                            <select class="form-select" name="isActive" id="editIsActive">
+                                <option value="true">Active (Can Sign In)</option>
+                                <option value="false">Inactive / Suspended</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold text-primary">System Role &amp; Access Level <span class="text-danger">*</span></label>
+                            <select class="form-select border-primary" name="roleId" id="editRoleId" required>
+                                @if (Model.Roles != null && Model.Roles.Any())
+                                {
+                                    @foreach (var r in Model.Roles)
+                                    {
+                                        <option value="@r.Id">@r.RoleName @(!string.IsNullOrEmpty(r.Description) ? $"- {r.Description}" : "")</option>
+                                    }
+                                }
+                                else
+                                {
+                                    <option value="1">SUPER_ADMIN - Full Enterprise Administration</option>
+                                    <option value="2">PROJECT_MANAGER - Project Management & Delivery</option>
+                                    <option value="3">ACCOUNTANT - Financial Accounting & GST Compliance</option>
+                                }
+                            </select>
+                            <small class="text-muted">Controls authorization and module visibility across the ERP.</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Branch Office</label>
+                            <select class="form-select" name="branchId" id="editBranchId">
+                                @if (Model.Branches != null && Model.Branches.Any())
+                                {
+                                    @foreach (var b in Model.Branches)
+                                    {
+                                        <option value="@b.Id">@b.BranchName</option>
+                                    }
+                                }
+                                else
+                                {
+                                    <option value="1">Head Office</option>
+                                }
+                            </select>
+                            <small class="text-muted">Primary operational branch for transactional records.</small>
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label fw-semibold">Reset Password <span class="text-muted small fw-normal">(Leave blank to keep current password)</span></label>
+                            <input type="password" class="form-control font-monospace" name="newPassword" id="editNewPassword" placeholder="Enter new password to reset, or leave empty" autocomplete="new-password" />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm px-4" style="background: var(--erp-primary);">
+                        <i class="fa-solid fa-floppy-disk me-1"></i> Update User Account
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
 <script>
     document.addEventListener('DOMContentLoaded', function () {
@@ -941,6 +1124,48 @@
                 }
             });
         }
+
+        // Dynamic Team Member Edit Modal Handlers
+        document.querySelectorAll('.btn-edit-user').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                const userId = this.getAttribute('data-user-id') || '';
+                const username = this.getAttribute('data-username') || '';
+                const fullname = this.getAttribute('data-fullname') || '';
+                const email = this.getAttribute('data-email') || '';
+                const phone = this.getAttribute('data-phone') || '';
+                const designation = this.getAttribute('data-designation') || '';
+                const roleId = this.getAttribute('data-role-id') || '1';
+                const branchId = this.getAttribute('data-branch-id') || '1';
+                const isActive = this.getAttribute('data-is-active') === 'true';
+
+                const editUserId = document.getElementById('editUserId');
+                const editUsername = document.getElementById('editUsername');
+                const editFullName = document.getElementById('editFullName');
+                const editEmail = document.getElementById('editEmail');
+                const editPhoneNumber = document.getElementById('editPhoneNumber');
+                const editDesignation = document.getElementById('editDesignation');
+                const editRoleId = document.getElementById('editRoleId');
+                const editBranchId = document.getElementById('editBranchId');
+                const editIsActive = document.getElementById('editIsActive');
+                const editNewPassword = document.getElementById('editNewPassword');
+
+                if (editUserId) editUserId.value = userId;
+                if (editUsername) editUsername.value = username;
+                if (editFullName) editFullName.value = fullname;
+                if (editEmail) editEmail.value = email;
+                if (editPhoneNumber) editPhoneNumber.value = phone;
+                if (editDesignation) editDesignation.value = designation;
+                if (editRoleId) editRoleId.value = roleId;
+                if (editBranchId) editBranchId.value = branchId;
+                if (editIsActive) editIsActive.value = isActive ? 'true' : 'false';
+                if (editNewPassword) editNewPassword.value = '';
+
+                const modalEl = document.getElementById('editTeamMemberModal');
+                if (modalEl && typeof bootstrap !== 'undefined') {
+                    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+                }
+            });
+        });
     });
 </script>
 <style>

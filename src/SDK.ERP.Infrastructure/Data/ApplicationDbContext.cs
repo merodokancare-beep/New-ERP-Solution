@@ -121,6 +121,12 @@ public class ApplicationDbContext : DbContext
         base.OnModelCreating(modelBuilder);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
 
+        // Prevent multiple cascade paths / cycle errors on SQL Server
+        foreach (var foreignKey in modelBuilder.Model.GetEntityTypes().SelectMany(e => e.GetForeignKeys()))
+        {
+            foreignKey.DeleteBehavior = DeleteBehavior.Restrict;
+        }
+
         // Zero Data Leakage: Register EF Core Global Query Filter on all tenant-scoped entities
         modelBuilder.Entity<Branch>().HasQueryFilter(e => _tenantProvider == null || _tenantProvider.CurrentCompanyId == 0 || e.CompanyId == _tenantProvider.CurrentCompanyId);
         modelBuilder.Entity<User>().HasQueryFilter(e => _tenantProvider == null || _tenantProvider.CurrentCompanyId == 0 || e.CompanyId == _tenantProvider.CurrentCompanyId);

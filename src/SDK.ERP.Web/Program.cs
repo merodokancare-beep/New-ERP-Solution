@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using SDK.ERP.Application.Common;
 using SDK.ERP.Infrastructure.Data;
@@ -52,6 +53,11 @@ builder.Services.AddAuthentication("ERP_Auth_Cookie")
 
 var app = builder.Build();
 
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+});
+
 // 5. Configure HTTP Request Pipeline & Security Headers
 if (!app.Environment.IsDevelopment())
 {
@@ -65,7 +71,16 @@ using (var scope = app.Services.CreateScope())
     try
     {
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        db.Database.EnsureCreated();
+        var dbCreator = Microsoft.EntityFrameworkCore.Infrastructure.AccessorExtensions.GetService<Microsoft.EntityFrameworkCore.Storage.IDatabaseCreator>(db.Database) as Microsoft.EntityFrameworkCore.Storage.RelationalDatabaseCreator;
+        if (dbCreator != null)
+        {
+            if (dbCreator.Exists() == false) dbCreator.Create();
+            if (dbCreator.HasTables() == false) dbCreator.CreateTables();
+        }
+        else
+        {
+            db.Database.EnsureCreated();
+        }
 
         // Ensure PAN, GSTIN, Company & User columns accommodate flexible inputs
         try

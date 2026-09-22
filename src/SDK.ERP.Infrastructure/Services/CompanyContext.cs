@@ -103,19 +103,81 @@ public class CompanyContext : ICompanyContext
     {
         if (_cachedUser != null) return _cachedUser;
 
-        var user = await _db.Users
-            .Include(u => u.Role)
-            .AsNoTracking()
-            .FirstOrDefaultAsync();
+        var httpContext = _httpContextAccessor.HttpContext;
+        User? user = null;
+
+        // 1. Resolve from authenticated ClaimsPrincipal
+        if (httpContext?.User?.Identity?.IsAuthenticated == true)
+        {
+            var userIdStr = httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (long.TryParse(userIdStr, out var claimUserId) && claimUserId > 0)
+            {
+                user = await _db.Users
+                    .IgnoreQueryFilters()
+                    .Include(u => u.Role)
+                    .Include(u => u.Branch)
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(u => u.Id == claimUserId);
+            }
+
+            if (user == null)
+            {
+                var username = httpContext.User.Identity.Name;
+                if (!string.IsNullOrEmpty(username))
+                {
+                    user = await _db.Users
+                        .IgnoreQueryFilters()
+                        .Include(u => u.Role)
+                        .Include(u => u.Branch)
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync(u => u.Username.ToLower() == username.ToLower());
+                }
+            }
+        }
+
+        // 2. Resolve from Session ActiveUserId
+        if (user == null && httpContext?.Session != null)
+        {
+            var sessionUserId = httpContext.Session.GetInt32("ActiveUserId");
+            if (sessionUserId.HasValue && sessionUserId.Value > 0)
+            {
+                user = await _db.Users
+                    .IgnoreQueryFilters()
+                    .Include(u => u.Role)
+                    .Include(u => u.Branch)
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(u => u.Id == sessionUserId.Value);
+            }
+        }
+
+        // 3. Fallback to master admin or first active user
+        if (user == null)
+        {
+            user = await _db.Users
+                .IgnoreQueryFilters()
+                .Include(u => u.Role)
+                .Include(u => u.Branch)
+                .AsNoTracking()
+                .OrderBy(u => u.Id)
+                .FirstOrDefaultAsync(u => u.Username == "admin" || (u.Role != null && u.Role.RoleName == "SUPER_ADMIN"))
+                ?? await _db.Users
+                    .IgnoreQueryFilters()
+                    .Include(u => u.Role)
+                    .Include(u => u.Branch)
+                    .AsNoTracking()
+                    .OrderBy(u => u.Id)
+                    .FirstOrDefaultAsync();
+        }
 
         if (user == null)
         {
             user = new User
             {
+                Id = 1,
                 Username = "admin",
                 FullName = "Admin User",
                 Designation = "Administrator",
-                Email = "admin@erp.local",
+                Email = "admin@sdksolutions.com",
                 IsActive = true
             };
         }
@@ -147,8 +209,13 @@ public class CompanyContext : ICompanyContext
     {
         var currentUser = await GetCurrentUserAsync();
 
-        // Platform host super admin (user 'admin' under seed company 1) can view/manage all organizations
-        if (currentUser.Username == "admin" && currentUser.CompanyId == 1)
+        // Strictly check if current user is the master host platform owner:
+        // Either username 'admin' OR root company (CompanyId 1) super admin.
+        // Registered organization owners (like Kamal Adhikari) are NOT the master platform owner.
+        var isMasterPlatformOwner = currentUser.Username.Equals("admin", StringComparison.OrdinalIgnoreCase) 
+                                 || (currentUser.CompanyId == 1 && (currentUser.Role?.RoleName == "SUPER_ADMIN" || currentUser.Id == 1));
+
+        if (isMasterPlatformOwner)
         {
             return await _db.Companies.AsNoTracking().OrderBy(c => c.CompanyName).ToListAsync();
         }

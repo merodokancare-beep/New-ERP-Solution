@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "C5GnPHyzLKc=",
+  "dgSpecHash": "D2Y3V15jfoE=",
   "success": true,
-  "projectFilePath": "D:\\Bhawani Works\\Project All\\Website\\New ERP Solution\\src\\SDK.ERP.Web\\SDK.ERP.Web.csproj",
+  "projectFilePath": "D:\\Bhawani Works\\Project All\\Website\\New-ERP-Solution\\src\\SDK.ERP.Web\\SDK.ERP.Web.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\bbhat\\.nuget\\packages\\automapper\\16.2.0\\automapper.16.2.0.nupkg.sha512",
     "C:\\Users\\bbhat\\.nuget\\packages\\azure.core\\1.35.0\\azure.core.1.35.0.nupkg.sha512",

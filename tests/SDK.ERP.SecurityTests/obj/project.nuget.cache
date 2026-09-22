@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "2cAmre1GZWo=",
+  "dgSpecHash": "9WVAeuWrA+k=",
   "success": true,
-  "projectFilePath": "D:\\Bhawani Works\\Project All\\Website\\New ERP Solution\\tests\\SDK.ERP.SecurityTests\\SDK.ERP.SecurityTests.csproj",
+  "projectFilePath": "D:\\Bhawani Works\\Project All\\Website\\New-ERP-Solution\\tests\\SDK.ERP.SecurityTests\\SDK.ERP.SecurityTests.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\bbhat\\.nuget\\packages\\automapper\\16.2.0\\automapper.16.2.0.nupkg.sha512",
     "C:\\Users\\bbhat\\.nuget\\packages\\azure.core\\1.35.0\\azure.core.1.35.0.nupkg.sha512",

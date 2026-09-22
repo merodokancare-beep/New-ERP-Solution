@@ -46,7 +46,23 @@ public class ProfileController : Controller
             .OrderBy(u => u.FullName)
             .AsNoTracking()
             .ToListAsync();
-        var roles = await _db.Roles.OrderBy(r => r.RoleName).AsNoTracking().ToListAsync();
+
+        var isMasterAdmin = currentUser.Username.Equals("admin", StringComparison.OrdinalIgnoreCase) 
+                         || (currentUser.CompanyId == 1 && (currentUser.Role?.RoleName == "SUPER_ADMIN" || currentUser.Id == 1));
+
+        // Ensure the global Master ERP Owner is present when inspecting other organizations
+        if (isMasterAdmin && !organizationUsers.Any(u => u.Username.Equals(currentUser.Username, StringComparison.OrdinalIgnoreCase)))
+        {
+            organizationUsers.Insert(0, currentUser);
+        }
+
+        var rolesQuery = _db.Roles.AsNoTracking();
+        if (!isMasterAdmin)
+        {
+            // Organization admins cannot assign global SUPER_ADMIN role to their team
+            rolesQuery = rolesQuery.Where(r => r.RoleName != "SUPER_ADMIN");
+        }
+        var roles = await rolesQuery.OrderBy(r => r.RoleName).ToListAsync();
 
         var vm = new ProfileViewModel
         {
@@ -168,9 +184,15 @@ public class ProfileController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> UpdateUser(User model, IFormFile? avatarFile, bool removeAvatar = false)
+    public async Task<IActionResult> UpdateUser(User model, IFormFile? avatarFile, bool removeAvatar = false, string? newPassword = null)
     {
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == model.Id);
+        var currentUser = await _companyContext.GetCurrentUserAsync();
+        var targetId = model.Id > 0 ? model.Id : currentUser.Id;
+
+        // Use IgnoreQueryFilters so the global ERP owner / super user can update their personal profile from any company
+        var user = await _db.Users.IgnoreQueryFilters().Include(u => u.Role).FirstOrDefaultAsync(u => u.Id == targetId)
+                ?? await _db.Users.IgnoreQueryFilters().Include(u => u.Role).FirstOrDefaultAsync(u => u.Username.ToLower() == currentUser.Username.ToLower());
+
         if (user != null)
         {
             if (removeAvatar)
@@ -211,13 +233,184 @@ public class ProfileController : Controller
             user.Email = string.IsNullOrWhiteSpace(model.Email) ? user.Email : model.Email.Trim();
             user.PhoneNumber = model.PhoneNumber?.Trim();
 
+            if (!string.IsNullOrWhiteSpace(model.Username) && !string.Equals(user.Username, model.Username.Trim(), StringComparison.OrdinalIgnoreCase))
+            {
+                var cleanUsername = model.Username.Trim().ToLowerInvariant();
+                var exists = await _db.Users.IgnoreQueryFilters().AnyAsync(u => u.Id != user.Id && u.Username == cleanUsername);
+                if (!exists)
+                {
+                    user.Username = cleanUsername;
+                }
+            }
+
+            if (model.RoleId > 0)
+            {
+                user.RoleId = model.RoleId;
+            }
+
+            if (model.BranchId > 0)
+            {
+                user.BranchId = model.BranchId;
+            }
+
+            if (!string.IsNullOrWhiteSpace(newPassword))
+            {
+                using var sha256 = SHA256.Create();
+                user.PasswordHash = Convert.ToHexString(sha256.ComputeHash(Encoding.UTF8.GetBytes(newPassword.Trim()))).ToLowerInvariant();
+            }
+
+            // If updating ERP super owner, synchronize details across sister company duplicate accounts
+            if (user.Username.Equals("admin", StringComparison.OrdinalIgnoreCase) || (user.Role != null && user.Role.RoleName == "SUPER_ADMIN"))
+            {
+                var siblingUserCopies = await _db.Users.IgnoreQueryFilters()
+                    .Where(u => u.Id != user.Id && u.Username.ToLower() == user.Username.ToLower())
+                    .ToListAsync();
+                foreach (var copy in siblingUserCopies)
+                {
+                    copy.FullName = user.FullName;
+                    copy.Designation = user.Designation;
+                    copy.Email = user.Email;
+                    copy.PhoneNumber = user.PhoneNumber;
+                    copy.AvatarUrl = user.AvatarUrl;
+                    copy.RoleId = user.RoleId;
+                    if (!string.IsNullOrWhiteSpace(newPassword))
+                    {
+                        copy.PasswordHash = user.PasswordHash;
+                    }
+                }
+            }
+
             await _db.SaveChangesAsync();
             _companyContext.ClearCache();
 
             TempData["SuccessMessage"] = $"User profile for <strong>{user.FullName}</strong> ({user.Designation}) updated successfully!";
         }
+        else
+        {
+            TempData["ErrorMessage"] = "Unable to locate user account record to update.";
+        }
 
         return Redirect("/Profile#user");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateTeamUser(
+        long userId, 
+        string fullName, 
+        string? username, 
+        string email, 
+        string? designation, 
+        string? phoneNumber, 
+        int roleId, 
+        long? branchId, 
+        bool isActive = true, 
+        string? newPassword = null)
+    {
+        var currentCompany = await _companyContext.GetCurrentCompanyAsync();
+        var currentUser = await _companyContext.GetCurrentUserAsync();
+        var isMasterAdmin = currentUser.Username.Equals("admin", StringComparison.OrdinalIgnoreCase) 
+                         || (currentUser.CompanyId == 1 && (currentUser.Role?.RoleName == "SUPER_ADMIN" || currentUser.Id == 1));
+
+        // Query with IgnoreQueryFilters so the global owner can be edited from any company workspace
+        var user = await _db.Users.IgnoreQueryFilters()
+            .Include(u => u.Role)
+            .FirstOrDefaultAsync(u => u.Id == userId && (u.CompanyId == currentCompany.Id || (isMasterAdmin && (u.Username == "admin" || (u.Role != null && u.Role.RoleName == "SUPER_ADMIN") || u.Id == currentUser.Id))));
+
+        if (user == null && isMasterAdmin && userId == currentUser.Id)
+        {
+            user = await _db.Users.IgnoreQueryFilters().Include(u => u.Role).FirstOrDefaultAsync(u => u.Id == currentUser.Id);
+        }
+
+        if (user == null)
+        {
+            TempData["ErrorMessage"] = "User not found or does not belong to your organization.";
+            return Redirect("/Profile#team");
+        }
+
+        if (string.IsNullOrWhiteSpace(fullName) || string.IsNullOrWhiteSpace(email))
+        {
+            TempData["ErrorMessage"] = "Full Name and Email Address are required.";
+            return Redirect("/Profile#team");
+        }
+
+        // Prevent organization admins from assigning the platform SUPER_ADMIN role
+        if (!isMasterAdmin && roleId > 0)
+        {
+            var targetRole = await _db.Roles.FirstOrDefaultAsync(r => r.Id == roleId);
+            if (targetRole != null && targetRole.RoleName == "SUPER_ADMIN")
+            {
+                TempData["ErrorMessage"] = "Unauthorized: Only the Master ERP Platform Owner can grant SUPER_ADMIN privileges.";
+                return Redirect("/Profile#team");
+            }
+        }
+
+        // Validate username uniqueness if changed
+        if (!string.IsNullOrWhiteSpace(username) && !string.Equals(user.Username, username.Trim(), StringComparison.OrdinalIgnoreCase))
+        {
+            var cleanUsername = username.Trim().ToLowerInvariant();
+            var exists = await _db.Users.IgnoreQueryFilters().AnyAsync(u => u.CompanyId == user.CompanyId && u.Id != userId && u.Username == cleanUsername);
+            if (exists)
+            {
+                TempData["ErrorMessage"] = $"The username '{cleanUsername}' is already taken by another user.";
+                return Redirect("/Profile#team");
+            }
+            user.Username = cleanUsername;
+        }
+
+        user.FullName = fullName.Trim();
+        user.Email = email.Trim().ToLowerInvariant();
+        user.Designation = string.IsNullOrWhiteSpace(designation) ? "Team Member" : designation.Trim();
+        user.PhoneNumber = phoneNumber?.Trim();
+
+        if (roleId > 0)
+        {
+            user.RoleId = roleId;
+        }
+
+        if (branchId.HasValue && branchId.Value > 0)
+        {
+            user.BranchId = branchId.Value;
+        }
+
+        // Prevent current user or global super admin from disabling their own account
+        if (user.Id != currentUser.Id && !user.Username.Equals("admin", StringComparison.OrdinalIgnoreCase))
+        {
+            user.IsActive = isActive;
+        }
+
+        // Optionally update password if provided
+        if (!string.IsNullOrWhiteSpace(newPassword))
+        {
+            using var sha256 = SHA256.Create();
+            user.PasswordHash = Convert.ToHexString(sha256.ComputeHash(Encoding.UTF8.GetBytes(newPassword.Trim()))).ToLowerInvariant();
+        }
+
+        // If editing the ERP super owner, synchronize details to any sister company records
+        if (user.Username.Equals("admin", StringComparison.OrdinalIgnoreCase) || (user.Role != null && user.Role.RoleName == "SUPER_ADMIN"))
+        {
+            var siblingUserCopies = await _db.Users.IgnoreQueryFilters()
+                .Where(u => u.Id != user.Id && u.Username.ToLower() == user.Username.ToLower())
+                .ToListAsync();
+            foreach (var copy in siblingUserCopies)
+            {
+                copy.FullName = user.FullName;
+                copy.Designation = user.Designation;
+                copy.Email = user.Email;
+                copy.PhoneNumber = user.PhoneNumber;
+                copy.RoleId = user.RoleId;
+                if (!string.IsNullOrWhiteSpace(newPassword))
+                {
+                    copy.PasswordHash = user.PasswordHash;
+                }
+            }
+        }
+
+        await _db.SaveChangesAsync();
+        _companyContext.ClearCache();
+
+        TempData["SuccessMessage"] = $"User <strong>{user.FullName}</strong> and role access updated successfully!";
+        return Redirect("/Profile#team");
     }
 
     [HttpPost]
@@ -238,6 +431,21 @@ public class ProfileController : Controller
         {
             TempData["ErrorMessage"] = $"A user with username '{username}' already exists in your organization.";
             return Redirect("/Profile#team");
+        }
+
+        var currentUser = await _companyContext.GetCurrentUserAsync();
+        var isMasterAdmin = currentUser.Username.Equals("admin", StringComparison.OrdinalIgnoreCase) 
+                         || (currentUser.CompanyId == 1 && (currentUser.Role?.RoleName == "SUPER_ADMIN" || currentUser.Id == 1));
+
+        // Prevent organization admins from assigning the platform SUPER_ADMIN role
+        if (!isMasterAdmin && roleId > 0)
+        {
+            var targetRole = await _db.Roles.FirstOrDefaultAsync(r => r.Id == roleId);
+            if (targetRole != null && targetRole.RoleName == "SUPER_ADMIN")
+            {
+                TempData["ErrorMessage"] = "Unauthorized: Only the Master ERP Platform Owner can grant SUPER_ADMIN privileges.";
+                return Redirect("/Profile#team");
+            }
         }
 
         var defaultBranch = await _db.Branches.FirstOrDefaultAsync(b => b.CompanyId == currentCompany.Id);
@@ -274,11 +482,22 @@ public class ProfileController : Controller
     public async Task<IActionResult> ToggleUserStatus(long userId)
     {
         var currentCompany = await _companyContext.GetCurrentCompanyAsync();
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId && u.CompanyId == currentCompany.Id);
+        var currentUser = await _companyContext.GetCurrentUserAsync();
+        var isSuperAdmin = currentUser.Username.Equals("admin", StringComparison.OrdinalIgnoreCase) 
+                        || (currentUser.Role != null && currentUser.Role.RoleName == "SUPER_ADMIN");
+
+        var user = await _db.Users.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(u => u.Id == userId && (u.CompanyId == currentCompany.Id || isSuperAdmin));
 
         if (user == null)
         {
             TempData["ErrorMessage"] = "User not found or does not belong to your organization.";
+            return Redirect("/Profile#team");
+        }
+
+        if (user.Id == currentUser.Id || user.Username.Equals("admin", StringComparison.OrdinalIgnoreCase))
+        {
+            TempData["ErrorMessage"] = "Cannot deactivate the primary ERP owner or currently logged-in account.";
             return Redirect("/Profile#team");
         }
 

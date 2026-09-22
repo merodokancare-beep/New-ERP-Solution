@@ -227,8 +227,8 @@ public class AccountController : Controller
         _db.Branches.Add(branch);
         await _db.SaveChangesAsync();
 
-        // 3. Create Primary Admin User
-        var adminRole = await _db.Roles.FirstOrDefaultAsync(r => r.RoleName == "SUPER_ADMIN" || r.RoleName == "ADMIN") 
+        // 3. Create Primary Admin User for newly registered organization
+        var adminRole = await _db.Roles.FirstOrDefaultAsync(r => r.RoleName == "COMPANY_ADMIN" || r.RoleName == "ORG_ADMIN" || r.RoleName == "ADMIN") 
                      ?? await _db.Roles.FirstOrDefaultAsync();
 
         using var sha256 = SHA256.Create();
@@ -260,7 +260,7 @@ public class AccountController : Controller
             new("CompanyId", company.Id.ToString()),
             new("CompanyName", company.CompanyName),
             new("BrandShortName", company.BrandShortName),
-            new(ClaimTypes.Role, adminRole?.RoleName ?? "SUPER_ADMIN")
+            new(ClaimTypes.Role, adminRole?.RoleName ?? "COMPANY_ADMIN")
         };
 
         var claimsIdentity = new ClaimsIdentity(claims, "ERP_Auth_Cookie");

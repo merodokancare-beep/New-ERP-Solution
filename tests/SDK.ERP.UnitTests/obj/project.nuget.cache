@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "cm02s8AGl2k=",
+  "dgSpecHash": "hn9POnA0aL4=",
   "success": true,
-  "projectFilePath": "D:\\Bhawani Works\\Project All\\Website\\New ERP Solution\\tests\\SDK.ERP.UnitTests\\SDK.ERP.UnitTests.csproj",
+  "projectFilePath": "D:\\Bhawani Works\\Project All\\Website\\New-ERP-Solution\\tests\\SDK.ERP.UnitTests\\SDK.ERP.UnitTests.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\bbhat\\.nuget\\packages\\automapper\\16.2.0\\automapper.16.2.0.nupkg.sha512",
     "C:\\Users\\bbhat\\.nuget\\packages\\coverlet.collector\\6.0.0\\coverlet.collector.6.0.0.nupkg.sha512",

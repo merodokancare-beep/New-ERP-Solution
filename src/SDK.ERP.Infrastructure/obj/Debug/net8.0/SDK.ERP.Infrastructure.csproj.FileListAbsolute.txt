@@ -36,3 +36,42 @@ D:\Bhawani Works\Project All\Website\New ERP Solution\src\SDK.ERP.Infrastructure
 D:\Bhawani Works\Project All\Website\New ERP Solution\src\SDK.ERP.Infrastructure\obj\Debug\net8.0\SDK.ERP.Infrastructure.pdb
 D:\Bhawani Works\Project All\Website\New ERP Solution\src\SDK.ERP.Infrastructure\obj\Debug\net8.0\SDK.ERP.Infrastructure.genruntimeconfig.cache
 D:\Bhawani Works\Project All\Website\New ERP Solution\src\SDK.ERP.Infrastructure\obj\Debug\net8.0\ref\SDK.ERP.Infrastructure.dll
+D:\Bhawani Works\Project All\Website\New-ERP-Solution\src\SDK.ERP.Infrastructure\bin\Debug\net8.0\LatoFont\Lato-Black.ttf
+D:\Bhawani Works\Project All\Website\New-ERP-Solution\src\SDK.ERP.Infrastructure\bin\Debug\net8.0\LatoFont\Lato-BlackItalic.ttf
+D:\Bhawani Works\Project All\Website\New-ERP-Solution\src\SDK.ERP.Infrastructure\bin\Debug\net8.0\LatoFont\Lato-Bold.ttf
+D:\Bhawani Works\Project All\Website\New-ERP-Solution\src\SDK.ERP.Infrastructure\bin\Debug\net8.0\LatoFont\Lato-BoldItalic.ttf
+D:\Bhawani Works\Project All\Website\New-ERP-Solution\src\SDK.ERP.Infrastructure\bin\Debug\net8.0\LatoFont\Lato-ExtraBold.ttf
+D:\Bhawani Works\Project All\Website\New-ERP-Solution\src\SDK.ERP.Infrastructure\bin\Debug\net8.0\LatoFont\Lato-ExtraBoldItalic.ttf
+D:\Bhawani Works\Project All\Website\New-ERP-Solution\src\SDK.ERP.Infrastructure\bin\Debug\net8.0\LatoFont\Lato-ExtraLight.ttf
+D:\Bhawani Works\Project All\Website\New-ERP-Solution\src\SDK.ERP.Infrastructure\bin\Debug\net8.0\LatoFont\Lato-ExtraLightItalic.ttf
+D:\Bhawani Works\Project All\Website\New-ERP-Solution\src\SDK.ERP.Infrastructure\bin\Debug\net8.0\LatoFont\Lato-Italic.ttf
+D:\Bhawani Works\Project All\Website\New-ERP-Solution\src\SDK.ERP.Infrastructure\bin\Debug\net8.0\LatoFont\Lato-Light.ttf
+D:\Bhawani Works\Project All\Website\New-ERP-Solution\src\SDK.ERP.Infrastructure\bin\Debug\net8.0\LatoFont\Lato-LightItalic.ttf
+D:\Bhawani Works\Project All\Website\New-ERP-Solution\src\SDK.ERP.Infrastructure\bin\Debug\net8.0\LatoFont\Lato-Medium.ttf
+D:\Bhawani Works\Project All\Website\New-ERP-Solution\src\SDK.ERP.Infrastructure\bin\Debug\net8.0\LatoFont\Lato-MediumItalic.ttf
+D:\Bhawani Works\Project All\Website\New-ERP-Solution\src\SDK.ERP.Infrastructure\bin\Debug\net8.0\LatoFont\Lato-Regular.ttf
+D:\Bhawani Works\Project All\Website\New-ERP-Solution\src\SDK.ERP.Infrastructure\bin\Debug\net8.0\LatoFont\Lato-SemiBold.ttf
+D:\Bhawani Works\Project All\Website\New-ERP-Solution\src\SDK.ERP.Infrastructure\bin\Debug\net8.0\LatoFont\Lato-SemiBoldItalic.ttf
+D:\Bhawani Works\Project All\Website\New-ERP-Solution\src\SDK.ERP.Infrastructure\bin\Debug\net8.0\LatoFont\Lato-Thin.ttf
+D:\Bhawani Works\Project All\Website\New-ERP-Solution\src\SDK.ERP.Infrastructure\bin\Debug\net8.0\LatoFont\Lato-ThinItalic.ttf
+D:\Bhawani Works\Project All\Website\New-ERP-Solution\src\SDK.ERP.Infrastructure\bin\Debug\net8.0\LatoFont\OFL.txt
+D:\Bhawani Works\Project All\Website\New-ERP-Solution\src\SDK.ERP.Infrastructure\bin\Debug\net8.0\SDK.ERP.Infrastructure.deps.json
+D:\Bhawani Works\Project All\Website\New-ERP-Solution\src\SDK.ERP.Infrastructure\bin\Debug\net8.0\SDK.ERP.Infrastructure.runtimeconfig.json
+D:\Bhawani Works\Project All\Website\New-ERP-Solution\src\SDK.ERP.Infrastructure\bin\Debug\net8.0\SDK.ERP.Infrastructure.dll
+D:\Bhawani Works\Project All\Website\New-ERP-Solution\src\SDK.ERP.Infrastructure\bin\Debug\net8.0\SDK.ERP.Infrastructure.pdb
+D:\Bhawani Works\Project All\Website\New-ERP-Solution\src\SDK.ERP.Infrastructure\bin\Debug\net8.0\SDK.ERP.Application.dll
+D:\Bhawani Works\Project All\Website\New-ERP-Solution\src\SDK.ERP.Infrastructure\bin\Debug\net8.0\SDK.ERP.Domain.dll
+D:\Bhawani Works\Project All\Website\New-ERP-Solution\src\SDK.ERP.Infrastructure\bin\Debug\net8.0\SDK.ERP.Domain.pdb
+D:\Bhawani Works\Project All\Website\New-ERP-Solution\src\SDK.ERP.Infrastructure\bin\Debug\net8.0\SDK.ERP.Application.pdb
+D:\Bhawani Works\Project All\Website\New-ERP-Solution\src\SDK.ERP.Infrastructure\obj\Debug\net8.0\SDK.ERP.Infrastructure.csproj.AssemblyReference.cache
+D:\Bhawani Works\Project All\Website\New-ERP-Solution\src\SDK.ERP.Infrastructure\obj\Debug\net8.0\SDK.ERP.Infrastructure.GeneratedMSBuildEditorConfig.editorconfig
+D:\Bhawani Works\Project All\Website\New-ERP-Solution\src\SDK.ERP.Infrastructure\obj\Debug\net8.0\SDK.ERP.Infrastructure.AssemblyInfoInputs.cache
+D:\Bhawani Works\Project All\Website\New-ERP-Solution\src\SDK.ERP.Infrastructure\obj\Debug\net8.0\SDK.ERP.Infrastructure.AssemblyInfo.cs
+D:\Bhawani Works\Project All\Website\New-ERP-Solution\src\SDK.ERP.Infrastructure\obj\Debug\net8.0\SDK.ERP.Infrastructure.csproj.CoreCompileInputs.cache
+D:\Bhawani Works\Project All\Website\New-ERP-Solution\src\SDK.ERP.Infrastructure\obj\Debug\net8.0\SDK.ERP.Infrastructure.sourcelink.json
+D:\Bhawani Works\Project All\Website\New-ERP-Solution\src\SDK.ERP.Infrastructure\obj\Debug\net8.0\SDK.ERP..51B9079B.Up2Date
+D:\Bhawani Works\Project All\Website\New-ERP-Solution\src\SDK.ERP.Infrastructure\obj\Debug\net8.0\SDK.ERP.Infrastructure.dll
+D:\Bhawani Works\Project All\Website\New-ERP-Solution\src\SDK.ERP.Infrastructure\obj\Debug\net8.0\refint\SDK.ERP.Infrastructure.dll
+D:\Bhawani Works\Project All\Website\New-ERP-Solution\src\SDK.ERP.Infrastructure\obj\Debug\net8.0\SDK.ERP.Infrastructure.pdb
+D:\Bhawani Works\Project All\Website\New-ERP-Solution\src\SDK.ERP.Infrastructure\obj\Debug\net8.0\SDK.ERP.Infrastructure.genruntimeconfig.cache
+D:\Bhawani Works\Project All\Website\New-ERP-Solution\src\SDK.ERP.Infrastructure\obj\Debug\net8.0\ref\SDK.ERP.Infrastructure.dll
