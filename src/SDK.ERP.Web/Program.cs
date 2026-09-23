@@ -166,6 +166,40 @@ using (var scope = app.Services.CreateScope())
                     ALTER TABLE [admin].[users] ADD [PhoneNumber] NVARCHAR(50) NULL;
                 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[admin].[users]') AND name = 'AvatarUrl')
                     ALTER TABLE [admin].[users] ADD [AvatarUrl] NVARCHAR(500) NULL;
+
+                -- Ensure Project Site Expense Columns
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[ProjectExpenses]') AND name = 'Description')
+                    ALTER TABLE [ProjectExpenses] ADD [Description] NVARCHAR(500) NULL;
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[project].[ProjectExpenses]') AND name = 'Description')
+                    ALTER TABLE [project].[ProjectExpenses] ADD [Description] NVARCHAR(500) NULL;
+
+                -- Ensure ProjectTypes Master Table
+                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ProjectTypes')
+                BEGIN
+                    CREATE TABLE [dbo].[ProjectTypes] (
+                        [Id] BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                        [Code] NVARCHAR(50) NOT NULL,
+                        [Name] NVARCHAR(150) NOT NULL,
+                        [Description] NVARCHAR(500) NULL,
+                        [IsActive] BIT NOT NULL DEFAULT 1
+                    );
+                END
+
+                -- Ensure Project Delivery Challan Columns
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[ProjectDeliveries]') AND name = 'MaterialSummary')
+                    ALTER TABLE [ProjectDeliveries] ADD [MaterialSummary] NVARCHAR(1000) NULL;
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[project].[ProjectDeliveries]') AND name = 'MaterialSummary')
+                    ALTER TABLE [project].[ProjectDeliveries] ADD [MaterialSummary] NVARCHAR(1000) NULL;
+
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[ProjectDeliveries]') AND name = 'AttachmentDocId')
+                    ALTER TABLE [ProjectDeliveries] ADD [AttachmentDocId] BIGINT NULL;
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[project].[ProjectDeliveries]') AND name = 'AttachmentDocId')
+                    ALTER TABLE [project].[ProjectDeliveries] ADD [AttachmentDocId] BIGINT NULL;
+
+                IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[DocumentAttachments]') AND name = 'UploaderId' AND is_nullable = 0)
+                    ALTER TABLE [DocumentAttachments] ALTER COLUMN [UploaderId] BIGINT NULL;
+                IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[DocumentAttachments]') AND name = 'UploadedBy' AND is_nullable = 0)
+                    ALTER TABLE [DocumentAttachments] ALTER COLUMN [UploadedBy] BIGINT NULL;
             ");
         }
         catch { }

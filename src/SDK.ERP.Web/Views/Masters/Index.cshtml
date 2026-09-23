@@ -7,6 +7,7 @@
     var items = Model?.Items ?? new();
     var taxRates = Model?.TaxRates ?? new();
     var accountGroups = Model?.AccountGroups ?? new();
+    var projectTypes = Model?.ProjectTypes ?? new();
 }
 
 <div class="d-flex align-items-center justify-content-between mb-4">
@@ -55,6 +56,11 @@
     <li class="nav-item" role="presentation">
         <button class="nav-link fw-semibold" id="coa-tab" data-bs-toggle="pill" data-bs-target="#coa" type="button" role="tab">
             <i class="fa-solid fa-sitemap me-2"></i>Chart of Accounts (@accountGroups.Count Groups)
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-semibold" id="projecttypes-tab" data-bs-toggle="pill" data-bs-target="#projecttypes" type="button" role="tab">
+            <i class="fa-solid fa-diagram-project me-2"></i>Project Types (@projectTypes.Count)
         </button>
     </li>
 </ul>
@@ -495,6 +501,120 @@
             </div>
         </div>
     </div>
+
+    <!-- 6. Project Types Tab -->
+    <div class="tab-pane fade" id="projecttypes" role="tabpanel">
+        <div class="erp-card">
+            <div class="erp-card-header d-flex justify-content-between align-items-center">
+                <h5 class="erp-card-title"><i class="fa-solid fa-diagram-project me-2"></i>Project Types Master Directory</h5>
+                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#createProjectTypeModal">
+                    <i class="fa-solid fa-plus me-1"></i> Add Project Type
+                </button>
+            </div>
+            <div class="erp-card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr style="font-size: 12px; text-transform: uppercase;">
+                                <th class="ps-4">Code</th>
+                                <th>Project Type Name</th>
+                                <th>Description / Scope</th>
+                                <th>Status</th>
+                                <th class="text-end pe-4">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody style="font-size: 13.5px;">
+                            @if (projectTypes.Any())
+                            {
+                                @foreach (var pt in projectTypes)
+                                {
+                                    <tr>
+                                        <td class="ps-4 fw-bold text-primary">@pt.Code</td>
+                                        <td><strong>@pt.Name</strong></td>
+                                        <td class="text-muted">@(string.IsNullOrWhiteSpace(pt.Description) ? "Standard contract classification" : pt.Description)</td>
+                                        <td>
+                                            @if (pt.IsActive)
+                                            {
+                                                <span class="badge bg-success-subtle text-success">ACTIVE</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-danger-subtle text-danger">INACTIVE</span>
+                                            }
+                                        </td>
+                                        <td class="text-end pe-4">
+                                            <form method="post" asp-controller="Masters" asp-action="ToggleProjectType" style="display:inline;">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="id" value="@pt.Id" />
+                                                <button type="submit" class="btn btn-sm @(pt.IsActive ? "btn-outline-danger" : "btn-outline-success") px-2 py-1" style="font-size: 11.5px;">
+                                                    <i class="fa-solid @(pt.IsActive ? "fa-ban" : "fa-check") me-1"></i> @(pt.IsActive ? "Deactivate" : "Activate")
+                                                </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="5" class="text-center py-5">
+                                        <i class="fa-solid fa-diagram-project mb-3" style="font-size: 40px; color: #CBD5E1;"></i>
+                                        <h6 class="fw-bold text-secondary mb-1">No Project Types Configured</h6>
+                                        <p class="text-muted mb-3" style="font-size: 12.5px;">Add custom project contract classifications for your enterprise.</p>
+                                        <button class="btn btn-primary btn-sm px-3" data-bs-toggle="modal" data-bs-target="#createProjectTypeModal">
+                                            <i class="fa-solid fa-plus me-1"></i> Add First Project Type
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- CREATE PROJECT TYPE MODAL -->
+<!-- ========================================================================= -->
+<div class="modal fade" id="createProjectTypeModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <form method="post" asp-controller="Masters" asp-action="CreateProjectType">
+                @Html.AntiForgeryToken()
+                <div class="modal-header bg-light">
+                    <h5 class="modal-title fw-bold text-primary" style="font-size: 16px;">
+                        <i class="fa-solid fa-diagram-project me-2"></i>Add Project Type Master
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Type Code <span class="text-danger">*</span></label>
+                            <input type="text" name="code" class="form-control text-uppercase" placeholder="e.g. TURNKEY, AMC, EPC, T&amp;M" required />
+                            <small class="text-muted" style="font-size: 11.5px;">Short identifier used across contracts and billing.</small>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Project Type Name <span class="text-danger">*</span></label>
+                            <input type="text" name="name" class="form-control" placeholder="e.g. Engineering Procurement &amp; Construction" required />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Description / Contract Scope</label>
+                            <textarea name="description" class="form-control" rows="2" placeholder="Describe the billing milestone structure or contract characteristics..."></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm px-4 fw-bold">
+                        <i class="fa-solid fa-check me-1"></i> Save Project Type
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 
 <!-- ========================================================================= -->
@@ -540,15 +660,15 @@
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-semibold" style="font-size: 12.5px;">Contact Person</label>
-                            <input type="text" name="contactPerson" class="form-control" placeholder="e.g. Procurement Lead" />
+                            <input type="text" name="contactPerson" id="createClientContactPerson" class="form-control" placeholder="e.g. Procurement Lead" />
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-semibold" style="font-size: 12.5px;">Phone / Mobile</label>
-                            <input type="text" name="phone" class="form-control" placeholder="e.g. +91 98765 43210" />
+                            <input type="text" name="phone" id="createClientPhone" class="form-control" placeholder="e.g. +91 98765 43210" />
                         </div>
                         <div class="col-12">
                             <label class="form-label fw-semibold" style="font-size: 12.5px;">Billing Address <span class="text-danger">*</span></label>
-                            <textarea name="billingAddress" id="createClientAddress" class="form-control" rows="2" placeholder="Complete statutory billing address..." required>Corporate Headquarters, New Delhi</textarea>
+                            <textarea name="billingAddress" id="createClientAddress" class="form-control" rows="2" placeholder="Complete statutory billing address..." required></textarea>
                         </div>
                     </div>
                 </div>
@@ -703,6 +823,8 @@
             const categoryEl = targetType === 'vendor' ? document.getElementById('createVendorCategory') : null;
             const msmeEl = targetType === 'vendor' ? document.getElementById('createVendorMsmeType') : null;
             const addrEl = targetType === 'client' ? document.getElementById('createClientAddress') : null;
+            const contactEl = targetType === 'client' ? document.getElementById('createClientContactPerson') : null;
+            const phoneEl = targetType === 'client' ? document.getElementById('createClientPhone') : null;
 
             if (!cleanGstin || cleanGstin.length !== 15) {
                 if (feedbackEl) {
@@ -749,6 +871,14 @@
                     if (addrEl && data.address) {
                         addrEl.value = data.address;
                         flashField(addrEl);
+                    }
+                    if (contactEl && data.contactPerson) {
+                        contactEl.value = data.contactPerson;
+                        flashField(contactEl);
+                    }
+                    if (phoneEl && data.phone) {
+                        phoneEl.value = data.phone;
+                        flashField(phoneEl);
                     }
 
                     if (feedbackEl) {

@@ -137,6 +137,20 @@ public static class SeedData
             await context.SaveChangesAsync();
         }
 
+        // 4.1 Seed Standard Item Categories
+        if (!await context.ItemCategories.AnyAsync())
+        {
+            var categories = new List<ItemCategory>
+            {
+                new ItemCategory { CategoryName = "Hardware & Equipment", IsActive = true },
+                new ItemCategory { CategoryName = "Cables & Networking", IsActive = true },
+                new ItemCategory { CategoryName = "Office Consumables", IsActive = true },
+                new ItemCategory { CategoryName = "Tools & Safety Gear", IsActive = true }
+            };
+            context.ItemCategories.AddRange(categories);
+            await context.SaveChangesAsync();
+        }
+
         // 5. Seed Standard Units
         if (!await context.ItemUnits.AnyAsync())
         {
@@ -149,6 +163,22 @@ public static class SeedData
                 new ItemUnit { UnitCode = "KGS", UnitName = "Kilograms", IsDecimalAllowed = true }
             };
             context.ItemUnits.AddRange(units);
+            await context.SaveChangesAsync();
+        }
+
+        // 5.1 Seed Standard Project Types Master
+        if (!await context.ProjectTypes.AnyAsync())
+        {
+            var projectTypes = new List<ProjectType>
+            {
+                new ProjectType { Code = "STANDARD", Name = "Standard Turnkey Contract", Description = "Fixed-price supply, installation, testing and commissioning contracts", IsActive = true },
+                new ProjectType { Code = "AMC", Name = "Annual Maintenance Contract (AMC)", Description = "Ongoing operations, service level maintenance and support agreements", IsActive = true },
+                new ProjectType { Code = "CONSULTING", Name = "Consulting & Advisory", Description = "Professional technical advisory, system design and project management", IsActive = true },
+                new ProjectType { Code = "SUPPLY_INSTALL", Name = "Supply & Installation", Description = "Material delivery with onsite installation and sign-off", IsActive = true },
+                new ProjectType { Code = "MANPOWER", Name = "Manpower & Managed Services", Description = "Time and material / rate card based deployment", IsActive = true },
+                new ProjectType { Code = "INTERNAL", Name = "Internal R&D / Capital Project", Description = "Internal organizational infrastructure or R&D initiatives", IsActive = true }
+            };
+            context.ProjectTypes.AddRange(projectTypes);
             await context.SaveChangesAsync();
         }
 

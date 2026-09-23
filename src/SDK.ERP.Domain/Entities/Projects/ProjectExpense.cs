@@ -16,6 +16,7 @@ public class ProjectExpense
     public string Status { get; set; } = "SUBMITTED";
     public long? ApprovedBy { get; set; }
     public long? ReceiptDocId { get; set; }
+    public string? Description { get; set; }
 
     public Project Project { get; set; } = null!;
     public User IncurredByUser { get; set; } = null!;

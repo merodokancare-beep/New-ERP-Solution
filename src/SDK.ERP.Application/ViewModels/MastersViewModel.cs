@@ -10,4 +10,5 @@ public class MastersViewModel
     public List<Item> Items { get; set; } = new();
     public List<TaxRate> TaxRates { get; set; } = new();
     public List<AccountGroup> AccountGroups { get; set; } = new();
+    public List<ProjectType> ProjectTypes { get; set; } = new();
 }

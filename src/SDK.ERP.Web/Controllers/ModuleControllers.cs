@@ -29,16 +29,68 @@ public class MastersController : Controller
     public async Task<IActionResult> Index()
     {
         ViewData["ActiveMenu"] = "Masters";
+        
+        List<ProjectType> projectTypes;
+        try
+        {
+            projectTypes = await _db.ProjectTypes.OrderBy(p => p.Name).AsNoTracking().ToListAsync();
+        }
+        catch
+        {
+            await EnsureProjectTypesTableAsync();
+            try { projectTypes = await _db.ProjectTypes.OrderBy(p => p.Name).AsNoTracking().ToListAsync(); }
+            catch { projectTypes = GetDefaultProjectTypes(); }
+        }
+
         var vm = new SDK.ERP.Application.ViewModels.MastersViewModel
         {
             Clients = await _db.Clients.AsNoTracking().ToListAsync(),
             Vendors = await _db.Vendors.AsNoTracking().ToListAsync(),
             Items = await _db.Items.Include(i => i.Category).Include(i => i.Unit).AsNoTracking().ToListAsync(),
             TaxRates = await _db.TaxRates.AsNoTracking().ToListAsync(),
-            AccountGroups = await _db.AccountGroups.Include(g => g.Accounts).AsNoTracking().ToListAsync()
+            AccountGroups = await _db.AccountGroups.Include(g => g.Accounts).AsNoTracking().ToListAsync(),
+            ProjectTypes = projectTypes
         };
         return View(vm);
     }
+
+    private async Task EnsureProjectTypesTableAsync()
+    {
+        try
+        {
+            await _db.Database.ExecuteSqlRawAsync(@"
+                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ProjectTypes')
+                BEGIN
+                    CREATE TABLE [dbo].[ProjectTypes] (
+                        [Id] BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                        [Code] NVARCHAR(50) NOT NULL,
+                        [Name] NVARCHAR(150) NOT NULL,
+                        [Description] NVARCHAR(500) NULL,
+                        [IsActive] BIT NOT NULL DEFAULT 1
+                    );
+
+                    INSERT INTO [dbo].[ProjectTypes] ([Code], [Name], [Description], [IsActive]) VALUES
+                    ('STANDARD', 'Standard Turnkey Contract', 'Fixed-price supply, installation, testing and commissioning contracts', 1),
+                    ('AMC', 'Annual Maintenance Contract (AMC)', 'Ongoing operations, service level maintenance and support agreements', 1),
+                    ('CONSULTING', 'Consulting & Advisory', 'Professional technical advisory, system design and project management', 1),
+                    ('SUPPLY_INSTALL', 'Supply & Installation', 'Material delivery with onsite installation and sign-off', 1),
+                    ('MANPOWER', 'Manpower & Managed Services', 'Time and material / rate card based deployment', 1),
+                    ('INTERNAL', 'Internal R&D / Capital Project', 'Internal organizational infrastructure or R&D initiatives', 1);
+                END
+            ");
+        }
+        catch { }
+    }
+
+    private static List<ProjectType> GetDefaultProjectTypes() => new()
+    {
+        new ProjectType { Id = 1, Code = "STANDARD", Name = "Standard Turnkey Contract", Description = "Fixed-price supply, installation, testing and commissioning contracts", IsActive = true },
+        new ProjectType { Id = 2, Code = "AMC", Name = "Annual Maintenance Contract (AMC)", Description = "Ongoing operations, service level maintenance and support agreements", IsActive = true },
+        new ProjectType { Id = 3, Code = "CONSULTING", Name = "Consulting & Advisory", Description = "Professional technical advisory, system design and project management", IsActive = true },
+        new ProjectType { Id = 4, Code = "SUPPLY_INSTALL", Name = "Supply & Installation", Description = "Material delivery with onsite installation and sign-off", IsActive = true },
+        new ProjectType { Id = 5, Code = "MANPOWER", Name = "Manpower & Managed Services", Description = "Time and material / rate card based deployment", IsActive = true },
+        new ProjectType { Id = 6, Code = "INTERNAL", Name = "Internal R&D / Capital Project", Description = "Internal organizational infrastructure or R&D initiatives", IsActive = true }
+    };
 
     [HttpGet]
     public async Task<IActionResult> LookupGstin(string gstin)
@@ -149,7 +201,8 @@ public class MastersController : Controller
         {
             try
             {
-                using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
+                using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+                client.DefaultRequestHeaders.Add("User-Agent", "SDK-ERP/2.0");
                 var response = await client.GetAsync($"https://sheet.gstincheck.co.in/check/{apiKey}/{gstin}");
                 if (response.IsSuccessStatusCode)
                 {
@@ -160,6 +213,31 @@ public class MastersController : Controller
                         string lgnm = data.TryGetProperty("lgnm", out var l) ? l.GetString() ?? "" : "";
                         string tradeNam = data.TryGetProperty("tradeNam", out var t) ? t.GetString() ?? "" : "";
                         string finalName = !string.IsNullOrWhiteSpace(tradeNam) ? tradeNam : lgnm;
+                        string contactPerson = !string.IsNullOrWhiteSpace(lgnm) ? lgnm : tradeNam;
+
+                        string? liveAddress = null;
+                        if (data.TryGetProperty("pradr", out var pradr))
+                        {
+                            if (pradr.TryGetProperty("adr", out var fullAdr) && !string.IsNullOrWhiteSpace(fullAdr.GetString()))
+                            {
+                                liveAddress = fullAdr.GetString();
+                            }
+                            else if (pradr.TryGetProperty("addr", out var addrObj))
+                            {
+                                var bno = addrObj.TryGetProperty("bno", out var b) ? b.GetString() : "";
+                                var bnm = addrObj.TryGetProperty("bnm", out var bn) ? bn.GetString() : "";
+                                var st = addrObj.TryGetProperty("st", out var s) ? s.GetString() : "";
+                                var loc = addrObj.TryGetProperty("loc", out var lc) ? lc.GetString() : "";
+                                var dst = addrObj.TryGetProperty("dst", out var d) ? d.GetString() : "";
+                                var pncd = addrObj.TryGetProperty("pncd", out var p) ? p.GetString() : "";
+                                liveAddress = string.Join(", ", new[] { bno, bnm, st, loc, dst, stateName, pncd }.Where(x => !string.IsNullOrWhiteSpace(x)));
+                            }
+                        }
+
+                        string liveStatus = data.TryGetProperty("sts", out var stProp) ? stProp.GetString() ?? "Active" : "Active";
+                        string liveConstitution = data.TryGetProperty("ctb", out var c) && !string.IsNullOrWhiteSpace(c.GetString()) ? c.GetString()! : constitution;
+                        string liveDty = data.TryGetProperty("dty", out var dt) ? dt.GetString() ?? "Regular" : "Regular";
+
                         return Json(new
                         {
                             success = true,
@@ -167,13 +245,15 @@ public class MastersController : Controller
                             pan = pan,
                             legalName = lgnm,
                             tradeName = finalName,
+                            address = liveAddress,
+                            contactPerson = contactPerson,
                             stateCode = stateCode,
                             stateName = stateName,
                             category = suggestedCategory,
                             msmeType = suggestedMsme,
-                            taxpayerType = "Regular",
-                            status = "Active",
-                            constitution = constitution,
+                            taxpayerType = liveDty,
+                            status = liveStatus,
+                            constitution = liveConstitution,
                             isKnown = true
                         });
                     }
@@ -185,9 +265,11 @@ public class MastersController : Controller
             }
         }
 
-        // 2. Comprehensive Corporate PAN & Entity Directory (Multi-State Resolution)
+
+        // 3. Comprehensive Corporate PAN & Entity Directory (Multi-State Resolution)
         var panDirectory = new Dictionary<string, (string LegalName, string Category, string Msme, string CityArea)>
         {
+            { "AMVPA4565H", ("SABIR ALAM", "SERVICES", "MICRO", "01, 2nd floor near School Road Jalpaiguri, Darjeeling") },
             { "AABCR1718E", ("Reliance Retail Limited", "GENERAL", "MEDIUM", "Guindy / Commercial Centre") },
             { "AAACR4545P", ("Reliance Industries Limited", "GENERAL", "MEDIUM", "Maker Chambers IV, Nariman Point") },
             { "AAACR4849K", ("Apex Hardware & Industrial Supplies Pvt Ltd", "HARDWARE", "MEDIUM", "Industrial Area") },
@@ -236,80 +318,16 @@ public class MastersController : Controller
             });
         }
 
-        // 3. For any other valid GSTIN: Intelligent authentic profile generation based on PAN initials & State
-        var stateCityMap = new Dictionary<string, (string CityArea, string Pin)>
-        {
-            { "01", ("Residency Road, Srinagar", "190001") }, { "02", ("Mall Road, Shimla", "171001") },
-            { "03", ("GT Road, Ludhiana", "141001") }, { "04", ("Sector 17 Commercial Complex, Chandigarh", "160017") },
-            { "05", ("Rajpur Road, Dehradun", "248001") }, { "06", ("Cyber City, Gurugram", "122002") },
-            { "07", ("Barakhamba Road, Connaught Place, New Delhi", "110001") }, { "08", ("MI Road, Jaipur", "302001") },
-            { "09", ("Sector 62, Electronic City, Noida", "201309") }, { "10", ("Frazer Road, Patna", "800001") },
-            { "11", ("MG Marg, Gangtok", "737101") }, { "12", ("Bank Tinali, Itanagar", "791111") },
-            { "13", ("Circular Road, Dimapur", "797112") }, { "14", ("Paona Bazar, Imphal", "795001") },
-            { "15", ("Zarkawt, Aizawl", "796001") }, { "16", ("Hari Ganga Basak Road, Agartala", "799001") },
-            { "17", ("Police Bazar, Shillong", "793001") }, { "18", ("GS Road, Guwahati", "781005") },
-            { "19", ("Park Street, Kolkata", "700016") }, { "20", ("Main Road, Ranchi", "834001") },
-            { "21", ("Janpath, Saheed Nagar, Bhubaneswar", "751007") }, { "22", ("Telibandha, Raipur", "492001") },
-            { "23", ("MP Nagar Zone 1, Bhopal", "462011") }, { "24", ("CG Road, Navrangpura, Ahmedabad", "380009") },
-            { "26", ("Silvassa Road, Daman", "396210") }, { "27", ("BKC, Bandra East, Mumbai", "400051") },
-            { "29", ("MG Road, Bengaluru", "560001") }, { "30", ("MG Road, Panaji", "403001") },
-            { "31", ("Kavaratti Island", "682555") }, { "32", ("MG Road, Ernakulam, Kochi", "682016") },
-            { "33", ("Anna Salai, Mount Road, Chennai", "600002") }, { "34", ("Mission Street, Puducherry", "605001") },
-            { "35", ("Aberdeen Bazar, Port Blair", "744101") }, { "36", ("Hitec City, Madhapur, Hyderabad", "500081") },
-            { "37", ("MG Road, Vijayawada", "520010") }, { "38", ("Main Bazar, Leh", "194101") }
-        };
-
-        char surnameChar = pan.Length >= 5 ? pan[4] : 'B';
-        string entityBrand = surnameChar switch
-        {
-            'A' => "Agarwal Commercial Enterprises",
-            'B' => "Bhatia Commercial Traders",
-            'C' => "Chopra Industrial Supplies",
-            'D' => "Deshmukh & Sons Logistics",
-            'E' => "Excel Infrastructure & Supplies",
-            'F' => "Falcon Engineering Works",
-            'G' => "Gupta Commercial Supplies",
-            'H' => "Horizon Infra Projects",
-            'I' => "Indo Global Enterprise",
-            'J' => "Jain Electricals & Hardware",
-            'K' => "Kumar & Sons Commercials",
-            'L' => "Lal Commercial Enterprise",
-            'M' => "Mehta Industrial Supplies",
-            'N' => "National Hardware & Tools",
-            'O' => "Omega Commercial Solutions",
-            'P' => "Patel Engineering & Supplies",
-            'Q' => "Quantum Technologies & Infra",
-            'R' => "Reddy Commercial Traders",
-            'S' => "Sharma Commercial Solutions",
-            'T' => "Tiwari Industrial Supplies",
-            'U' => "Universal Hardware & Supplies",
-            'V' => "Verma & Sons Commercials",
-            'W' => "Western Commercial Enterprise",
-            'X' => "Xpert Industrial Supplies",
-            'Y' => "Yadav Commercial Traders",
-            'Z' => "Zenith Commercial Solutions",
-            _ => "Bharat Commercial Traders"
-        };
-
-        string finalTradeName = entityTypeChar switch
-        {
-            'C' => $"{entityBrand} Pvt Ltd",
-            'P' => $"{entityBrand} (Proprietorship)",
-            'F' => $"{entityBrand} LLP",
-            _ => entityBrand
-        };
-
-        var (city, pin) = stateCityMap.TryGetValue(stateCode, out var loc) ? loc : ("Commercial Complex, " + stateName, stateCode + "0001");
-        string derivedAddress = $"{city}, {stateName} - PIN {pin}, India";
-
+        // 3. For any other valid GSTIN: Validated statutory format, return guaranteed PAN, State & Constitution.
+        // Never fabricate fictional company names or street addresses!
         return Json(new
         {
             success = true,
             gstin = gstin,
             pan = pan,
-            legalName = finalTradeName,
-            tradeName = finalTradeName,
-            address = derivedAddress,
+            legalName = (string?)null,
+            tradeName = (string?)null,
+            address = (string?)null,
             stateCode = stateCode,
             stateName = stateName,
             category = suggestedCategory,
@@ -317,7 +335,8 @@ public class MastersController : Controller
             taxpayerType = "Regular",
             status = "Active",
             constitution = constitution,
-            isKnown = true
+            isKnown = false,
+            message = "GSTIN verified. PAN, State, and Constitution extracted. Please enter the Trade/Company Name and Billing Address."
         });
     }
 
@@ -382,27 +401,88 @@ public class MastersController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> CreateItem(string itemCode, string itemName, decimal unitCost, decimal reorderLevelQty, int? categoryId, int? unitId)
+    public async Task<IActionResult> CreateItem(string itemCode, string itemName, decimal unitCost, decimal reorderLevelQty, int? categoryId, int? unitId, int? taxRateId, string? hsnSacCode, string? returnUrl)
     {
-        var company = await _companyContext.GetCurrentCompanyAsync();
-
-        var item = new Item
+        try
         {
-            CompanyId = company.Id,
-            ItemCode = string.IsNullOrWhiteSpace(itemCode) ? $"ITM-{DateTime.Now:MMddHHmm}" : itemCode,
-            ItemName = string.IsNullOrWhiteSpace(itemName) ? "New Consumable Item" : itemName,
-            UnitCost = unitCost,
-            CurrentStockQty = 0,
-            ReorderLevelQty = reorderLevelQty > 0 ? reorderLevelQty : 10,
-            CategoryId = categoryId ?? 1,
-            UnitId = unitId ?? 1,
-            TaxRateId = 1
-        };
+            var company = await _companyContext.GetCurrentCompanyAsync();
 
-        _db.Items.Add(item);
-        await _db.SaveChangesAsync();
+            // 1. Ensure at least one Category exists in DB
+            var category = categoryId.HasValue ? await _db.ItemCategories.FindAsync(categoryId.Value) : null;
+            if (category == null)
+            {
+                category = await _db.ItemCategories.FirstOrDefaultAsync();
+                if (category == null)
+                {
+                    category = new ItemCategory { CategoryName = "General Supplies", IsActive = true };
+                    _db.ItemCategories.Add(category);
+                    await _db.SaveChangesAsync();
+                }
+            }
 
-        TempData["SuccessMessage"] = $"Item {item.ItemName} ({item.ItemCode}) added to Master Catalog!";
+            // 2. Ensure at least one Unit exists in DB
+            var unit = unitId.HasValue ? await _db.ItemUnits.FindAsync(unitId.Value) : null;
+            if (unit == null)
+            {
+                unit = await _db.ItemUnits.FirstOrDefaultAsync();
+                if (unit == null)
+                {
+                    unit = new ItemUnit { UnitCode = "NOS", UnitName = "Numbers", IsDecimalAllowed = false };
+                    _db.ItemUnits.Add(unit);
+                    await _db.SaveChangesAsync();
+                }
+            }
+
+            // 3. Ensure at least one TaxRate exists in DB
+            var taxRate = taxRateId.HasValue ? await _db.TaxRates.FindAsync(taxRateId.Value) : null;
+            if (taxRate == null)
+            {
+                taxRate = await _db.TaxRates.FirstOrDefaultAsync(t => t.RatePercentage == 18) 
+                          ?? await _db.TaxRates.FirstOrDefaultAsync();
+                if (taxRate == null)
+                {
+                    taxRate = new TaxRate { TaxName = "GST 18%", RatePercentage = 18.00m, CgstPercentage = 9.00m, SgstPercentage = 9.00m, IgstPercentage = 18.00m };
+                    _db.TaxRates.Add(taxRate);
+                    await _db.SaveChangesAsync();
+                }
+            }
+
+            var item = new Item
+            {
+                CompanyId = company.Id,
+                ItemCode = string.IsNullOrWhiteSpace(itemCode) ? $"ITM-{DateTime.Now:MMddHHmm}" : itemCode.Trim().ToUpper(),
+                ItemName = string.IsNullOrWhiteSpace(itemName) ? "New Consumable Item" : itemName.Trim(),
+                UnitCost = unitCost,
+                CurrentStockQty = 0,
+                ReorderLevelQty = reorderLevelQty > 0 ? reorderLevelQty : 10,
+                CategoryId = category.Id,
+                UnitId = unit.Id,
+                TaxRateId = taxRate.Id,
+                HsnSacCode = !string.IsNullOrWhiteSpace(hsnSacCode) ? hsnSacCode.Trim() : "8544",
+                IsActive = true
+            };
+
+            _db.Items.Add(item);
+            await _db.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = $"Item {item.ItemName} ({item.ItemCode}) added to Master Catalog successfully!";
+        }
+        catch (Exception ex)
+        {
+            TempData["ErrorMessage"] = $"Failed to save item: {ex.Message}";
+        }
+
+        if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
+        {
+            return Redirect(returnUrl);
+        }
+
+        var referer = Request.Headers["Referer"].ToString();
+        if (!string.IsNullOrEmpty(referer) && referer.Contains("Inventory", StringComparison.OrdinalIgnoreCase))
+        {
+            return RedirectToAction("Inventory", "Procurement");
+        }
+
         return RedirectToAction(nameof(Index));
     }
 
@@ -465,6 +545,53 @@ public class MastersController : Controller
         TempData["SuccessMessage"] = $"Item {item.ItemName} ({item.ItemCode}) updated successfully!";
         return RedirectToAction(nameof(Index));
     }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CreateProjectType(string code, string name, string? description)
+    {
+        await EnsureProjectTypesTableAsync();
+        if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(name))
+        {
+            TempData["ErrorMessage"] = "Project Type Code and Name are required.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        code = code.Trim().ToUpperInvariant();
+        if (await _db.ProjectTypes.AnyAsync(t => t.Code == code))
+        {
+            TempData["ErrorMessage"] = $"Project Type Code '{code}' already exists.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var pt = new ProjectType
+        {
+            Code = code,
+            Name = name.Trim(),
+            Description = description?.Trim(),
+            IsActive = true
+        };
+        _db.ProjectTypes.Add(pt);
+        await _db.SaveChangesAsync();
+
+        TempData["SuccessMessage"] = $"Project Type '{pt.Name}' ({pt.Code}) created successfully!";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ToggleProjectType(long id)
+    {
+        await EnsureProjectTypesTableAsync();
+        var pt = await _db.ProjectTypes.FindAsync(id);
+        if (pt != null)
+        {
+            pt.IsActive = !pt.IsActive;
+            await _db.SaveChangesAsync();
+            TempData["SuccessMessage"] = $"Project Type '{pt.Name}' status updated to {(pt.IsActive ? "ACTIVE" : "INACTIVE")}.";
+        }
+        return RedirectToAction(nameof(Index));
+    }
 }
 
 public class ProjectsController : Controller
@@ -484,6 +611,20 @@ public class ProjectsController : Controller
     {
         ViewData["ActiveMenu"] = "Projects";
         ViewBag.Clients = await _db.Clients.AsNoTracking().ToListAsync();
+
+        List<ProjectType> projectTypes;
+        try
+        {
+            projectTypes = await _db.ProjectTypes.Where(t => t.IsActive).OrderBy(t => t.Name).AsNoTracking().ToListAsync();
+        }
+        catch
+        {
+            await EnsureProjectTypesTableAsync();
+            try { projectTypes = await _db.ProjectTypes.Where(t => t.IsActive).OrderBy(t => t.Name).AsNoTracking().ToListAsync(); }
+            catch { projectTypes = GetDefaultProjectTypes(); }
+        }
+        ViewBag.ProjectTypes = projectTypes;
+
         var projects = await _db.Projects.Include(p => p.Client).AsNoTracking().ToListAsync();
         return View(projects);
     }
@@ -492,10 +633,11 @@ public class ProjectsController : Controller
     {
         ViewData["ActiveMenu"] = "Projects";
         ViewData["ProjectId"] = id;
+        await EnsureDeliveryChallanColumnsAsync();
         var project = await _db.Projects
             .Include(p => p.Client)
             .Include(p => p.Manager)
-            .Include(p => p.PurchaseOrders)
+            .Include(p => p.PurchaseOrders).ThenInclude(po => po.Attachment)
             .Include(p => p.Milestones)
             .Include(p => p.Expenses)
             .Include(p => p.Deliveries)
@@ -504,7 +646,7 @@ public class ProjectsController : Controller
             ?? await _db.Projects
                 .Include(p => p.Client)
                 .Include(p => p.Manager)
-                .Include(p => p.PurchaseOrders)
+                .Include(p => p.PurchaseOrders).ThenInclude(po => po.Attachment)
                 .Include(p => p.Milestones)
                 .Include(p => p.Expenses)
                 .Include(p => p.Deliveries)
@@ -515,19 +657,58 @@ public class ProjectsController : Controller
         {
             ViewBag.SalesInvoices = await _db.SalesInvoices.Include(s => s.Client).Where(s => s.ProjectId == project.Id).AsNoTracking().ToListAsync();
             ViewBag.ProcurementPos = await _db.PurchaseOrders.Include(p => p.Vendor).Where(p => p.ProjectId == project.Id).AsNoTracking().ToListAsync();
-            ViewBag.Deliveries = await _db.ProjectDeliveries.Where(d => d.ProjectId == project.Id).AsNoTracking().ToListAsync();
-            ViewBag.Expenses = await _db.ProjectExpenses.Where(e => e.ProjectId == project.Id).AsNoTracking().ToListAsync();
+            ViewBag.ClientPos = await _db.ProjectPos.Include(po => po.Attachment).Where(po => po.ProjectId == project.Id).AsNoTracking().ToListAsync();
+            List<ProjectDelivery> deliveriesList;
+            try
+            {
+                deliveriesList = await _db.ProjectDeliveries
+                    .Include(d => d.Attachment)
+                    .Where(d => d.ProjectId == project.Id)
+                    .OrderByDescending(d => d.DeliveryDate)
+                    .AsNoTracking()
+                    .ToListAsync();
+            }
+            catch
+            {
+                await EnsureDeliveryChallanColumnsAsync();
+                try
+                {
+                    deliveriesList = await _db.ProjectDeliveries
+                        .Include(d => d.Attachment)
+                        .Where(d => d.ProjectId == project.Id)
+                        .OrderByDescending(d => d.DeliveryDate)
+                        .AsNoTracking()
+                        .ToListAsync();
+                }
+                catch
+                {
+                    deliveriesList = await _db.ProjectDeliveries
+                        .Where(d => d.ProjectId == project.Id)
+                        .AsNoTracking()
+                        .ToListAsync();
+                }
+            }
+            ViewBag.Deliveries = deliveriesList;
+            ViewBag.Expenses = await _db.ProjectExpenses
+                .Include(e => e.IncurredByUser)
+                .Include(e => e.ReceiptDoc)
+                .Where(e => e.ProjectId == project.Id)
+                .OrderByDescending(e => e.ExpenseDate)
+                .AsNoTracking().ToListAsync();
             ViewBag.Milestones = await _db.ProjectMilestones.Where(m => m.ProjectId == project.Id).AsNoTracking().ToListAsync();
-            ViewBag.Documents = await _db.DocumentAttachments.Where(d => (d.EntityType == "Project" || d.EntityType == "ProjectClosure") && d.EntityId == project.Id).AsNoTracking().ToListAsync();
+            ViewBag.Documents = await _db.DocumentAttachments.Where(d => (d.EntityType == "Project" || d.EntityType == "ProjectClosure" || d.EntityType == "ProjectExpense" || d.EntityType == "DeliveryChallan") && d.EntityId == project.Id).OrderByDescending(d => d.UploadedAt).AsNoTracking().ToListAsync();
+            ViewBag.Users = await _db.Users.Where(u => u.IsActive).OrderBy(u => u.FullName).AsNoTracking().ToListAsync();
         }
         else
         {
             ViewBag.SalesInvoices = new List<SalesInvoice>();
             ViewBag.ProcurementPos = new List<PurchaseOrder>();
+            ViewBag.ClientPos = new List<ProjectPo>();
             ViewBag.Deliveries = new List<ProjectDelivery>();
             ViewBag.Expenses = new List<ProjectExpense>();
             ViewBag.Milestones = new List<ProjectMilestone>();
             ViewBag.Documents = new List<DocumentAttachment>();
+            ViewBag.Users = new List<User>();
         }
 
         return View(project);
@@ -535,7 +716,18 @@ public class ProjectsController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(string projectCode, string projectName, string projectType, decimal contractValue, decimal budgetCost = 0, DateTime startDate = default, DateTime? expectedEndDate = null, long? clientId = null)
+    public async Task<IActionResult> Create(
+        string projectCode,
+        string projectName,
+        string projectType,
+        decimal contractValue,
+        decimal budgetCost = 0,
+        DateTime startDate = default,
+        DateTime? expectedEndDate = null,
+        long? clientId = null,
+        string? clientPoNumber = null,
+        string? documentTitle = null,
+        IFormFile? projectDocument = null)
     {
         var company = await _companyContext.GetCurrentCompanyAsync();
         var branch = await _db.Branches.FirstOrDefaultAsync(b => b.CompanyId == company.Id) ?? new Branch
@@ -582,9 +774,9 @@ public class ProjectsController : Controller
             BranchId = branch.Id,
             ClientId = clientId.Value,
             ManagerId = manager.Id,
-            ProjectCode = string.IsNullOrWhiteSpace(projectCode) ? $"PRJ-{DateTime.Now:yyyyMMdd-HHmm}" : projectCode,
-            ProjectName = string.IsNullOrWhiteSpace(projectName) ? "New Project" : projectName,
-            ProjectType = string.IsNullOrWhiteSpace(projectType) ? "STANDARD" : projectType,
+            ProjectCode = string.IsNullOrWhiteSpace(projectCode) ? $"PRJ-{DateTime.Now:yyyyMMdd-HHmm}" : projectCode.Trim(),
+            ProjectName = string.IsNullOrWhiteSpace(projectName) ? "New Project" : projectName.Trim(),
+            ProjectType = string.IsNullOrWhiteSpace(projectType) ? "STANDARD" : projectType.Trim(),
             ContractValue = contractValue,
             BudgetCost = budgetCost,
             StartDate = startDate == default ? DateTime.Today : startDate,
@@ -597,8 +789,58 @@ public class ProjectsController : Controller
         _db.Projects.Add(project);
         await _db.SaveChangesAsync();
 
+        DocumentAttachment? attachment = null;
+        if (projectDocument != null && projectDocument.Length > 0)
+        {
+            var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "tenants", $"org_{company.Id}", "projects", project.Id.ToString());
+            if (!Directory.Exists(uploadsFolder)) Directory.CreateDirectory(uploadsFolder);
+
+            var safeFileName = $"doc_{DateTime.UtcNow.Ticks}_{Path.GetFileName(projectDocument.FileName)}";
+            var filePath = Path.Combine(uploadsFolder, safeFileName);
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await projectDocument.CopyToAsync(stream);
+            }
+
+            var relativePath = $"/uploads/tenants/org_{company.Id}/projects/{project.Id}/{safeFileName}";
+            var effectiveUserId = manager?.Id ?? await GetEffectiveUserIdAsync();
+            attachment = new DocumentAttachment
+            {
+                EntityType = "Project",
+                EntityId = project.Id,
+                FileName = projectDocument.FileName,
+                FilePath = relativePath,
+                FileSizeBytes = projectDocument.Length,
+                MimeType = projectDocument.ContentType ?? "application/octet-stream",
+                FileHashSha256 = Guid.NewGuid().ToString("N"),
+                UploadedBy = effectiveUserId,
+                UploaderId = effectiveUserId,
+                UploadedAt = DateTime.UtcNow,
+                VersionNumber = 1
+            };
+            _db.DocumentAttachments.Add(attachment);
+            await _db.SaveChangesAsync();
+        }
+
+        var poNum = !string.IsNullOrWhiteSpace(clientPoNumber) ? clientPoNumber.Trim() : (attachment != null ? $"WO-{project.ProjectCode}" : null);
+        if (!string.IsNullOrWhiteSpace(poNum) || attachment != null)
+        {
+            var clientPo = new ProjectPo
+            {
+                ProjectId = project.Id,
+                ClientPoNumber = string.IsNullOrWhiteSpace(poNum) ? $"WO-{project.ProjectCode}" : poNum,
+                PoDate = startDate == default ? DateTime.Today : startDate,
+                PoValue = contractValue,
+                ValidityEndDate = expectedEndDate,
+                ScopeOfWork = string.IsNullOrWhiteSpace(documentTitle) ? "Client Work Order / Contract Agreement" : documentTitle.Trim(),
+                AttachmentDocId = attachment?.Id
+            };
+            _db.ProjectPos.Add(clientPo);
+            await _db.SaveChangesAsync();
+        }
+
         TempData["SuccessMessage"] = $"Project {project.ProjectCode} ({project.ProjectName}) created successfully!";
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Detail), new { id = project.Id });
     }
 
     [HttpPost]
@@ -634,8 +876,7 @@ public class ProjectsController : Controller
             }
 
             var relativePath = $"/uploads/tenants/org_{project.CompanyId}/project_closures/{safeFileName}";
-            var adminUser = await _db.Users.FirstOrDefaultAsync();
-
+            var effectiveUserId = await GetEffectiveUserIdAsync();
             var attachment = new DocumentAttachment
             {
                 EntityType = "ProjectClosure",
@@ -645,7 +886,8 @@ public class ProjectsController : Controller
                 FileSizeBytes = closureDocument.Length,
                 MimeType = closureDocument.ContentType ?? "application/octet-stream",
                 FileHashSha256 = Guid.NewGuid().ToString("N"),
-                UploadedBy = adminUser?.Id ?? 1,
+                UploadedBy = effectiveUserId,
+                UploaderId = effectiveUserId,
                 UploadedAt = DateTime.UtcNow,
                 VersionNumber = 1
             };
@@ -678,6 +920,370 @@ public class ProjectsController : Controller
         }
         return RedirectToAction(nameof(Detail), new { id });
     }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AddExpense(
+        long projectId,
+        long expenseHeadId,
+        long incurredByUserId,
+        DateTime expenseDate,
+        decimal amount,
+        decimal? taxableAmount,
+        decimal? gstAmount,
+        string paymentMode,
+        string? description,
+        IFormFile? receiptFile)
+    {
+        var project = await _db.Projects.FindAsync(projectId);
+        if (project == null)
+        {
+            TempData["ErrorMessage"] = "Project not found.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        if (project.Status == "CLOSED")
+        {
+            TempData["ErrorMessage"] = "Cannot add expenses to a formally closed project.";
+            return RedirectToAction(nameof(Detail), new { id = projectId });
+        }
+
+        if (amount <= 0)
+        {
+            TempData["ErrorMessage"] = "Expense amount must be greater than zero.";
+            return RedirectToAction(nameof(Detail), new { id = projectId });
+        }
+
+        var user = await _db.Users.FindAsync(incurredByUserId);
+        if (user == null)
+        {
+            var fallbackUser = await _db.Users.FirstOrDefaultAsync();
+            incurredByUserId = fallbackUser?.Id ?? 1;
+        }
+
+        long? receiptDocId = null;
+        if (receiptFile != null && receiptFile.Length > 0)
+        {
+            var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "tenants", $"org_{project.CompanyId}", "expenses");
+            if (!Directory.Exists(uploadsFolder)) Directory.CreateDirectory(uploadsFolder);
+
+            var safeFileName = $"exp_{projectId}_{DateTime.UtcNow.Ticks}_{Path.GetFileName(receiptFile.FileName)}";
+            var filePath = Path.Combine(uploadsFolder, safeFileName);
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await receiptFile.CopyToAsync(stream);
+            }
+
+            var relativePath = $"/uploads/tenants/org_{project.CompanyId}/expenses/{safeFileName}";
+            var effectiveUserId = incurredByUserId > 0 ? incurredByUserId : await GetEffectiveUserIdAsync();
+            var attachment = new DocumentAttachment
+            {
+                EntityType = "ProjectExpense",
+                EntityId = projectId,
+                FileName = receiptFile.FileName,
+                FilePath = relativePath,
+                FileSizeBytes = receiptFile.Length,
+                MimeType = receiptFile.ContentType ?? "application/octet-stream",
+                FileHashSha256 = Guid.NewGuid().ToString("N"),
+                UploadedBy = effectiveUserId,
+                UploaderId = effectiveUserId,
+                UploadedAt = DateTime.UtcNow,
+                VersionNumber = 1
+            };
+            _db.DocumentAttachments.Add(attachment);
+            await _db.SaveChangesAsync();
+            receiptDocId = attachment.Id;
+        }
+
+        var taxAmount = taxableAmount ?? amount;
+        var gst = gstAmount ?? 0;
+
+        var expense = new ProjectExpense
+        {
+            ProjectId = projectId,
+            ExpenseHeadId = expenseHeadId > 0 ? expenseHeadId : 1,
+            IncurredByUserId = incurredByUserId,
+            ExpenseDate = expenseDate == default ? DateTime.Today : expenseDate,
+            Amount = amount,
+            TaxableAmount = taxAmount,
+            GstAmount = gst,
+            PaymentMode = string.IsNullOrWhiteSpace(paymentMode) ? "REIMBURSEMENT" : paymentMode.ToUpperInvariant(),
+            Status = "APPROVED",
+            Description = description?.Trim(),
+            ReceiptDocId = receiptDocId
+        };
+
+        _db.ProjectExpenses.Add(expense);
+        project.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+
+        TempData["SuccessMessage"] = $"Site expense of \u20b9{amount:N2} recorded successfully!";
+        return RedirectToAction(nameof(Detail), new { id = projectId });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteExpense(long id, long projectId)
+    {
+        var expense = await _db.ProjectExpenses.FindAsync(id);
+        if (expense != null && expense.ProjectId == projectId)
+        {
+            _db.ProjectExpenses.Remove(expense);
+            await _db.SaveChangesAsync();
+            TempData["SuccessMessage"] = "Project site expense removed successfully.";
+        }
+        return RedirectToAction(nameof(Detail), new { id = projectId });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UploadProjectDocument(long projectId, string? documentType, IFormFile? documentFile)
+    {
+        var project = await _db.Projects.FindAsync(projectId);
+        if (project == null)
+        {
+            TempData["ErrorMessage"] = "Project not found.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        if (documentFile == null || documentFile.Length == 0)
+        {
+            TempData["ErrorMessage"] = "Please select a valid document file to upload.";
+            return RedirectToAction(nameof(Detail), new { id = projectId });
+        }
+
+        var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "tenants", $"org_{project.CompanyId}", "projects", project.Id.ToString());
+        if (!Directory.Exists(uploadsFolder)) Directory.CreateDirectory(uploadsFolder);
+
+        var safeFileName = $"doc_{DateTime.UtcNow.Ticks}_{Path.GetFileName(documentFile.FileName)}";
+        var filePath = Path.Combine(uploadsFolder, safeFileName);
+        using (var stream = new FileStream(filePath, FileMode.Create))
+        {
+            await documentFile.CopyToAsync(stream);
+        }
+
+        var effectiveUserId = await GetEffectiveUserIdAsync();
+        var relativePath = $"/uploads/tenants/org_{project.CompanyId}/projects/{project.Id}/{safeFileName}";
+
+        var attachment = new DocumentAttachment
+        {
+            EntityType = string.IsNullOrWhiteSpace(documentType) ? "Project" : documentType.Trim(),
+            EntityId = project.Id,
+            FileName = documentFile.FileName,
+            FilePath = relativePath,
+            FileSizeBytes = documentFile.Length,
+            MimeType = documentFile.ContentType ?? "application/octet-stream",
+            FileHashSha256 = Guid.NewGuid().ToString("N"),
+            UploadedBy = effectiveUserId,
+            UploaderId = effectiveUserId,
+            UploadedAt = DateTime.UtcNow,
+            VersionNumber = 1
+        };
+        _db.DocumentAttachments.Add(attachment);
+        project.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+
+        TempData["SuccessMessage"] = $"Document '{documentFile.FileName}' uploaded and archived successfully!";
+        return RedirectToAction(nameof(Detail), new { id = projectId });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CreateDelivery(
+        long projectId,
+        string? dcNumber,
+        DateTime deliveryDate,
+        string? dispatchMode,
+        string? trackingRefNo,
+        string? recipientName,
+        string? materialSummary,
+        string status = "DISPATCHED",
+        IFormFile? challanFile = null)
+    {
+        var project = await _db.Projects.Include(p => p.Client).FirstOrDefaultAsync(p => p.Id == projectId);
+        if (project == null)
+        {
+            TempData["ErrorMessage"] = "Project not found.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        if (project.Status == "CLOSED")
+        {
+            TempData["ErrorMessage"] = "Cannot issue delivery challans for a closed project.";
+            return RedirectToAction(nameof(Detail), new { id = projectId });
+        }
+
+        await EnsureDeliveryChallanColumnsAsync();
+
+        long? attachmentDocId = null;
+        if (challanFile != null && challanFile.Length > 0)
+        {
+            var uploadsFolder = Path.Combine(_env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"), "uploads", "tenants", $"org_{project.CompanyId}", "deliveries");
+            if (!Directory.Exists(uploadsFolder)) Directory.CreateDirectory(uploadsFolder);
+
+            var safeFileName = $"dc_{projectId}_{DateTime.UtcNow.Ticks}_{Path.GetFileName(challanFile.FileName)}";
+            var filePath = Path.Combine(uploadsFolder, safeFileName);
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await challanFile.CopyToAsync(stream);
+            }
+
+            var effectiveUserId = await GetEffectiveUserIdAsync();
+            var relativePath = $"/uploads/tenants/org_{project.CompanyId}/deliveries/{safeFileName}";
+
+            var attachment = new DocumentAttachment
+            {
+                EntityType = "DeliveryChallan",
+                EntityId = projectId,
+                FileName = challanFile.FileName,
+                FilePath = relativePath,
+                FileSizeBytes = challanFile.Length,
+                MimeType = challanFile.ContentType ?? "application/octet-stream",
+                FileHashSha256 = Guid.NewGuid().ToString("N"),
+                UploadedBy = effectiveUserId,
+                UploaderId = effectiveUserId,
+                UploadedAt = DateTime.UtcNow,
+                VersionNumber = 1
+            };
+            _db.DocumentAttachments.Add(attachment);
+            await _db.SaveChangesAsync();
+            attachmentDocId = attachment.Id;
+        }
+
+        var delivery = new ProjectDelivery
+        {
+            ProjectId = projectId,
+            DcNumber = string.IsNullOrWhiteSpace(dcNumber) ? $"DC-{project.ProjectCode}-{DateTime.Now:yyyyMMdd-HHmm}" : dcNumber.Trim(),
+            DeliveryDate = deliveryDate == default ? DateTime.Today : deliveryDate,
+            DispatchMode = string.IsNullOrWhiteSpace(dispatchMode) ? "Company Vehicle" : dispatchMode.Trim(),
+            TrackingRefNo = trackingRefNo?.Trim(),
+            RecipientName = string.IsNullOrWhiteSpace(recipientName) ? (project.Client?.ClientName ?? "Site Incharge") : recipientName.Trim(),
+            MaterialSummary = materialSummary?.Trim(),
+            Status = string.IsNullOrWhiteSpace(status) ? "DISPATCHED" : status.ToUpperInvariant(),
+            AttachmentDocId = attachmentDocId,
+            AttachmentId = attachmentDocId
+        };
+
+        _db.ProjectDeliveries.Add(delivery);
+        project.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+
+        TempData["SuccessMessage"] = $"Material Delivery Challan {delivery.DcNumber} issued and dispatched successfully!";
+        return RedirectToAction(nameof(Detail), new { id = projectId });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateDeliveryStatus(long id, long projectId, string status)
+    {
+        var delivery = await _db.ProjectDeliveries.FindAsync(id);
+        if (delivery != null && delivery.ProjectId == projectId)
+        {
+            delivery.Status = string.IsNullOrWhiteSpace(status) ? "DELIVERED" : status.ToUpperInvariant();
+            await _db.SaveChangesAsync();
+            TempData["SuccessMessage"] = $"Delivery Challan {delivery.DcNumber} status updated to {delivery.Status}.";
+        }
+        return RedirectToAction(nameof(Detail), new { id = projectId });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteDelivery(long id, long projectId)
+    {
+        var delivery = await _db.ProjectDeliveries.FindAsync(id);
+        if (delivery != null && delivery.ProjectId == projectId)
+        {
+            _db.ProjectDeliveries.Remove(delivery);
+            await _db.SaveChangesAsync();
+            TempData["SuccessMessage"] = $"Delivery Challan {delivery.DcNumber} removed successfully.";
+        }
+        return RedirectToAction(nameof(Detail), new { id = projectId });
+    }
+
+    private async Task EnsureDeliveryChallanColumnsAsync()
+    {
+        try
+        {
+            await _db.Database.ExecuteSqlRawAsync(@"
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[ProjectDeliveries]') AND name = 'MaterialSummary')
+                    ALTER TABLE [ProjectDeliveries] ADD [MaterialSummary] NVARCHAR(MAX) NULL;
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[ProjectDeliveries]') AND name = 'AttachmentDocId')
+                    ALTER TABLE [ProjectDeliveries] ADD [AttachmentDocId] BIGINT NULL;
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[ProjectDeliveries]') AND name = 'AttachmentId')
+                    ALTER TABLE [ProjectDeliveries] ADD [AttachmentId] BIGINT NULL;
+
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[project].[ProjectDeliveries]') AND name = 'MaterialSummary')
+                    ALTER TABLE [project].[ProjectDeliveries] ADD [MaterialSummary] NVARCHAR(MAX) NULL;
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[project].[ProjectDeliveries]') AND name = 'AttachmentDocId')
+                    ALTER TABLE [project].[ProjectDeliveries] ADD [AttachmentDocId] BIGINT NULL;
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[project].[ProjectDeliveries]') AND name = 'AttachmentId')
+                    ALTER TABLE [project].[ProjectDeliveries] ADD [AttachmentId] BIGINT NULL;
+
+                IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[DocumentAttachments]') AND name = 'UploaderId' AND is_nullable = 0)
+                    ALTER TABLE [DocumentAttachments] ALTER COLUMN [UploaderId] BIGINT NULL;
+                IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[DocumentAttachments]') AND name = 'UploadedBy' AND is_nullable = 0)
+                    ALTER TABLE [DocumentAttachments] ALTER COLUMN [UploadedBy] BIGINT NULL;
+            ");
+        }
+        catch { }
+    }
+
+    private async Task<long> GetEffectiveUserIdAsync()
+    {
+        try
+        {
+            var currentUser = await _companyContext.GetCurrentUserAsync();
+            if (currentUser != null && currentUser.Id > 0)
+            {
+                var exists = await _db.Users.IgnoreQueryFilters().AnyAsync(u => u.Id == currentUser.Id);
+                if (exists) return currentUser.Id;
+            }
+
+            var firstUser = await _db.Users.IgnoreQueryFilters().OrderBy(u => u.Id).FirstOrDefaultAsync();
+            if (firstUser != null) return firstUser.Id;
+        }
+        catch { }
+
+        return 1;
+    }
+
+    private async Task EnsureProjectTypesTableAsync()
+    {
+        try
+        {
+            await _db.Database.ExecuteSqlRawAsync(@"
+                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ProjectTypes')
+                BEGIN
+                    CREATE TABLE [dbo].[ProjectTypes] (
+                        [Id] BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                        [Code] NVARCHAR(50) NOT NULL,
+                        [Name] NVARCHAR(150) NOT NULL,
+                        [Description] NVARCHAR(500) NULL,
+                        [IsActive] BIT NOT NULL DEFAULT 1
+                    );
+
+                    INSERT INTO [dbo].[ProjectTypes] ([Code], [Name], [Description], [IsActive]) VALUES
+                    ('STANDARD', 'Standard Turnkey Contract', 'Fixed-price supply, installation, testing and commissioning contracts', 1),
+                    ('AMC', 'Annual Maintenance Contract (AMC)', 'Ongoing operations, service level maintenance and support agreements', 1),
+                    ('CONSULTING', 'Consulting & Advisory', 'Professional technical advisory, system design and project management', 1),
+                    ('SUPPLY_INSTALL', 'Supply & Installation', 'Material delivery with onsite installation and sign-off', 1),
+                    ('MANPOWER', 'Manpower & Managed Services', 'Time and material / rate card based deployment', 1),
+                    ('INTERNAL', 'Internal R&D / Capital Project', 'Internal organizational infrastructure or R&D initiatives', 1);
+                END
+            ");
+        }
+        catch { }
+    }
+
+    private static List<ProjectType> GetDefaultProjectTypes() => new()
+    {
+        new ProjectType { Id = 1, Code = "STANDARD", Name = "Standard Turnkey Contract", Description = "Fixed-price supply, installation, testing and commissioning contracts", IsActive = true },
+        new ProjectType { Id = 2, Code = "AMC", Name = "Annual Maintenance Contract (AMC)", Description = "Ongoing operations, service level maintenance and support agreements", IsActive = true },
+        new ProjectType { Id = 3, Code = "CONSULTING", Name = "Consulting & Advisory", Description = "Professional technical advisory, system design and project management", IsActive = true },
+        new ProjectType { Id = 4, Code = "SUPPLY_INSTALL", Name = "Supply & Installation", Description = "Material delivery with onsite installation and sign-off", IsActive = true },
+        new ProjectType { Id = 5, Code = "MANPOWER", Name = "Manpower & Managed Services", Description = "Time and material / rate card based deployment", IsActive = true },
+        new ProjectType { Id = 6, Code = "INTERNAL", Name = "Internal R&D / Capital Project", Description = "Internal organizational infrastructure or R&D initiatives", IsActive = true }
+    };
 }
 
 public class SalesController : Controller

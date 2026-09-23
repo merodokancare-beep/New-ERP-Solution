@@ -6,6 +6,7 @@
     var totalContract = projectList.Sum(p => p.ContractValue);
     var activeCount = projectList.Count(p => p.Status == "ACTIVE" || p.Status == "PLANNING");
     var clients = ViewBag.Clients as IEnumerable<SDK.ERP.Domain.Entities.MasterData.Client> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.MasterData.Client>();
+    var projectTypes = ViewBag.ProjectTypes as IEnumerable<SDK.ERP.Domain.Entities.MasterData.ProjectType> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.MasterData.ProjectType>();
 }
 
 <div class="d-flex align-items-center justify-content-between mb-4">
@@ -120,7 +121,7 @@
 <div class="modal fade" id="createProjectModal" tabindex="-1" aria-labelledby="createProjectModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content border-0 shadow">
-            <form method="post" asp-controller="Projects" asp-action="Create">
+            <form method="post" asp-controller="Projects" asp-action="Create" enctype="multipart/form-data">
                 @Html.AntiForgeryToken()
                 <div class="modal-header bg-light">
                     <h5 class="modal-title fw-bold" id="createProjectModalLabel" style="color: var(--erp-primary); font-size: 16px;">
@@ -139,9 +140,9 @@
                             <input type="text" name="projectName" class="form-control" placeholder="e.g. Metro Line Surveillance Infrastructure" required />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Client / Customer</label>
-                            <select name="clientId" class="form-select">
-                                <option value="">-- Select Client (or Auto-Create) --</option>
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Client / Customer <span class="text-danger">*</span></label>
+                            <select name="clientId" class="form-select" required>
+                                <option value="">-- Select Client from Master --</option>
                                 @foreach (var c in clients)
                                 {
                                     <option value="@c.Id">@c.ClientName (@c.ClientCode)</option>
@@ -149,31 +150,80 @@
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Project Type</label>
-                            <select name="projectType" class="form-select">
-                                <option value="STANDARD" selected>Standard Turnkey Contract</option>
-                                <option value="AMC">Annual Maintenance Contract (AMC)</option>
-                                <option value="CONSULTING">Consulting &amp; Advisory</option>
-                                <option value="INTERNAL">Internal R&amp;D</option>
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="form-label fw-semibold mb-0" style="font-size: 12.5px;">Project Type <span class="text-danger">*</span></label>
+                                <a asp-controller="Masters" asp-action="Index" class="text-decoration-none" style="font-size: 11px;" target="_blank">
+                                    <i class="fa-solid fa-gear me-1"></i>Manage in Masters
+                                </a>
+                            </div>
+                            <select name="projectType" class="form-select" required>
+                                @if (projectTypes.Any())
+                                {
+                                    @foreach (var pt in projectTypes)
+                                    {
+                                        <option value="@pt.Code">@pt.Name</option>
+                                    }
+                                }
+                                else
+                                {
+                                    <option value="STANDARD" selected>Standard Turnkey Contract</option>
+                                    <option value="AMC">Annual Maintenance Contract (AMC)</option>
+                                    <option value="CONSULTING">Consulting &amp; Advisory</option>
+                                    <option value="SUPPLY_INSTALL">Supply &amp; Installation</option>
+                                    <option value="MANPOWER">Manpower &amp; Managed Services</option>
+                                    <option value="INTERNAL">Internal R&amp;D</option>
+                                }
                             </select>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <label class="form-label fw-semibold" style="font-size: 12.5px;">Total Contract Value (&#8377;) <span class="text-danger">*</span></label>
-                            <input type="number" step="0.01" min="0" name="contractValue" class="form-control" placeholder="0.00" required />
+                            <input type="number" step="0.01" min="0" name="contractValue" class="form-control fw-bold text-success" placeholder="0.00" required />
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <label class="form-label fw-semibold" style="font-size: 12.5px;">Start Date</label>
                             <input type="date" name="startDate" class="form-control" value="@DateTime.Today.ToString("yyyy-MM-dd")" required />
                         </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Expected Delivery Date <span class="text-danger">*</span></label>
+                            <input type="date" name="expectedEndDate" class="form-control" required />
+                        </div>
+
+                        <!-- PROJECT DOCUMENT & WORK ORDER UPLOAD -->
+                        <div class="col-12 mt-3 pt-2 border-top">
+                            <h6 class="fw-bold text-dark mb-1" style="font-size: 13px;">
+                                <i class="fa-solid fa-file-contract text-primary me-2"></i>Project Document &amp; Client Work Order (WO)
+                            </h6>
+                            <small class="text-muted d-block mb-3" style="font-size: 11.5px;">
+                                Attach client work orders, contract agreements, or tender documents directly upon initialization.
+                            </small>
+                        </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Expected Delivery Date</label>
-                            <input type="date" name="expectedEndDate" class="form-control" value="@DateTime.Today.AddMonths(6).ToString("yyyy-MM-dd")" />
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Client Work Order / PO Ref No.</label>
+                            <input type="text" name="clientPoNumber" class="form-control" placeholder="e.g. WO-2026-9842 or PO/REL/01" />
+                            <small class="text-muted" style="font-size: 11px;">Auto-creates linked Client PO record in the project workspace.</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Document Classification</label>
+                            <select name="documentTitle" class="form-select">
+                                <option value="Client Work Order" selected>Client Work Order (WO)</option>
+                                <option value="Client Purchase Order">Client Purchase Order (PO)</option>
+                                <option value="Contract Agreement">Formal Contract Agreement</option>
+                                <option value="Tender / Scope Document">Tender / Scope Specification</option>
+                                <option value="Letter of Intent (LOI)">Letter of Intent (LOI) / Award Notice</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">
+                                <i class="fa-solid fa-file-arrow-up text-primary me-1"></i>Upload Contract / Work Order File (Optional)
+                            </label>
+                            <input type="file" name="projectDocument" class="form-control" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.zip" />
+                            <small class="text-muted" style="font-size: 11.5px;">Accepted formats: PDF, Word (.docx), Scanned Images (.jpg, .png), Zip archive (Max 25 MB).</small>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer bg-light">
                     <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary btn-sm px-4" style="background: var(--erp-primary);">
+                    <button type="submit" class="btn btn-primary btn-sm px-4 fw-bold" style="background: var(--erp-primary);">
                         <i class="fa-solid fa-save me-1"></i> Save &amp; Initialize Project
                     </button>
                 </div>

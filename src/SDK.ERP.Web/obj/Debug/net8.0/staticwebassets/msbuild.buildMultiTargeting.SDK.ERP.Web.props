@@ -1,3 +1,0 @@
-﻿<Project>
-  <Import Project="..\build\SDK.ERP.Web.props" />
-</Project>

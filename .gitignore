@@ -1,0 +1,31 @@
+## Visual Studio cache & temporary files
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.userprefs
+
+## Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+*.sourcelink.json
+
+## Visual Studio auto-generated
+Generated Files/
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+
+## User uploads / tenant files (keep folder, ignore uploaded files)
+src/SDK.ERP.Web/wwwroot/uploads/tenants/

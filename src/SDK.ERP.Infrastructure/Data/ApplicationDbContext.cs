@@ -48,6 +48,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<TaxRate> TaxRates => Set<TaxRate>();
     public DbSet<HsnSacCode> HsnSacCodes => Set<HsnSacCode>();
     public DbSet<Item> Items => Set<Item>();
+    public DbSet<ProjectType> ProjectTypes => Set<ProjectType>();
 
     // Domain 3: Projects
     public DbSet<Project> Projects => Set<Project>();
