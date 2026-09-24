@@ -1,146 +1,827 @@
 @model IEnumerable<SDK.ERP.Domain.Entities.Projects.Project>
 @{
-    ViewData["Title"] = "Projects Management Hub";
+    ViewData["Title"] = "Project List";
     ViewData["ActiveMenu"] = "Projects";
-    var projectList = Model ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Projects.Project>();
+    var projectList = (Model ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Projects.Project>()).ToList();
     var totalContract = projectList.Sum(p => p.ContractValue);
-    var activeCount = projectList.Count(p => p.Status == "ACTIVE" || p.Status == "PLANNING");
+    
+    // Status counts
+    var openCount = projectList.Count(p => p.Status == "OPEN" || p.Status == "ACTIVE" || p.Status == "PLANNING");
+    var supportCount = projectList.Count(p => p.Status == "SUPPORT" || p.Status == "UNDER_SUPPORT" || p.Status == "UNDER SUPPORT" || p.Status == "MAINTENANCE");
+    var closedCount = projectList.Count(p => p.Status == "CLOSED" || p.Status == "COMPLETED");
+    var scrappedCount = projectList.Count(p => p.Status == "SCRAPPED" || p.Status == "CANCELLED" || p.Status == "CLOSE SCRAPPED" || p.Status == "ON_HOLD");
+
     var clients = ViewBag.Clients as IEnumerable<SDK.ERP.Domain.Entities.MasterData.Client> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.MasterData.Client>();
     var projectTypes = ViewBag.ProjectTypes as IEnumerable<SDK.ERP.Domain.Entities.MasterData.ProjectType> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.MasterData.ProjectType>();
+    var users = ViewBag.Users as IEnumerable<SDK.ERP.Domain.Entities.Admin.User> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Admin.User>();
+    var divisions = ViewBag.Divisions as IEnumerable<string> ?? new List<string> { "HARDWARE DIVISION", "GENERAL SUPPLY", "SOFTWARE & IT", "NETWORKING", "CIVIL & INFRA" };
+    var docCounts = ViewBag.ProjectDocCounts as Dictionary<long, int> ?? new Dictionary<long, int>();
 }
 
-<div class="d-flex align-items-center justify-content-between mb-4">
-    <div>
-        <h3 style="font-weight: 700; color: var(--erp-primary); margin-bottom: 4px;">Projects Management Hub</h3>
-        <p style="color: var(--erp-text-muted); margin: 0; font-size: 13.5px;">Project-Centric Operating Paradigm &bull; Lifecycle, Invoicing, Procurement &amp; Real-Time Margins</p>
-    </div>
-    <div class="d-flex gap-2">
-        <button class="btn btn-primary btn-sm px-3 shadow-sm" style="background: var(--erp-primary); border-color: var(--erp-primary);" data-bs-toggle="modal" data-bs-target="#createProjectModal">
-            <i class="fa-solid fa-plus me-1"></i> Create Project
-        </button>
-    </div>
-</div>
+<!-- Custom Scoped Styling for Attractive & Responsive Project Register -->
+<style>
+    .project-register-container {
+        font-size: 13px;
+        color: #1E293B;
+    }
 
-@if (TempData["SuccessMessage"] != null)
-{
-    <div class="alert alert-success alert-dismissible fade show d-flex align-items-center mb-4 shadow-sm" role="alert">
-        <i class="fa-solid fa-circle-check fs-5 me-2"></i>
-        <div>@Html.Raw(TempData["SuccessMessage"])</div>
-        <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-}
+    /* Top Title Header */
+    .project-header-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
 
-<!-- Project Health Cards (Dynamic Data) -->
-<div class="row g-3 mb-4">
-    <div class="col-md-4">
-        <div class="p-3 bg-white border rounded shadow-sm">
-            <small class="text-muted text-uppercase fw-semibold" style="font-size: 11px;">Active Projects</small>
-            <div class="fs-4 fw-bold text-primary">@activeCount</div>
-            <small class="text-muted">Total Registered in System</small>
+    .project-page-title {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 0;
+        font-size: 22px;
+        font-weight: 800;
+        color: #0F172A;
+        letter-spacing: -0.5px;
+    }
+
+    .project-page-title i {
+        color: var(--erp-primary);
+        font-size: 20px;
+    }
+
+    .btn-add-project-main {
+        background: #0284C7;
+        color: #FFFFFF;
+        border: none;
+        font-weight: 600;
+        font-size: 13.5px;
+        padding: 8px 18px;
+        border-radius: 8px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 6px rgba(2, 132, 199, 0.25);
+    }
+
+    .btn-add-project-main:hover {
+        background: #0369A1;
+        color: #FFFFFF;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(2, 132, 199, 0.35);
+    }
+
+    /* Filter & Search Bar Card */
+    .filter-panel-card {
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 12px;
+        padding: 18px 20px;
+        margin-bottom: 22px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+    }
+
+    .filter-label {
+        font-size: 12px;
+        font-weight: 700;
+        color: #334155;
+        margin-bottom: 6px;
+        display: block;
+    }
+
+    .form-select-filter, .form-input-filter {
+        height: 38px;
+        font-size: 13px;
+        border-radius: 8px;
+        border: 1px solid #CBD5E1;
+        background-color: #F8FAFC;
+        transition: all 0.15s ease;
+    }
+
+    .form-select-filter:focus, .form-input-filter:focus {
+        background-color: #FFFFFF;
+        border-color: #0284C7;
+        box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
+    }
+
+    .search-input-group {
+        position: relative;
+        display: flex;
+    }
+
+    .search-input-group .form-control {
+        border-top-right-radius: 0;
+        border-bottom-right-radius: 0;
+    }
+
+    .btn-search-trigger {
+        background: #F59E0B;
+        border: 1px solid #F59E0B;
+        color: #FFFFFF;
+        padding: 0 16px;
+        border-top-right-radius: 8px;
+        border-bottom-right-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        transition: background 0.15s ease;
+    }
+
+    .btn-search-trigger:hover {
+        background: #D97706;
+        color: #FFFFFF;
+    }
+
+    .btn-clear-filters {
+        background: #10B981;
+        border: 1px solid #10B981;
+        color: #FFFFFF;
+        font-weight: 600;
+        font-size: 13px;
+        height: 38px;
+        padding: 0 18px;
+        border-radius: 8px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        transition: all 0.15s ease;
+        box-shadow: 0 2px 6px rgba(16, 185, 129, 0.2);
+    }
+
+    .btn-clear-filters:hover {
+        background: #059669;
+        color: #FFFFFF;
+        transform: translateY(-1px);
+    }
+
+    /* Status Tab Pills */
+    .status-tab-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+    }
+
+    .status-tab-pill {
+        border: 1px solid #CBD5E1;
+        background: #FFFFFF;
+        color: #475569;
+        padding: 8px 18px;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 13px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s ease;
+        text-decoration: none;
+        user-select: none;
+    }
+
+    .status-tab-pill:hover {
+        background: #F1F5F9;
+        color: #0F172A;
+    }
+
+    .status-tab-pill.active {
+        background: #0D9488;
+        border-color: #0D9488;
+        color: #FFFFFF;
+        box-shadow: 0 2px 8px rgba(13, 148, 136, 0.3);
+    }
+
+    .status-tab-pill.active .badge-pill-count {
+        background: rgba(255, 255, 255, 0.25);
+        color: #FFFFFF;
+    }
+
+    .badge-pill-count {
+        font-size: 11px;
+        font-weight: 700;
+        padding: 2px 7px;
+        border-radius: 12px;
+        background: #E2E8F0;
+        color: #475569;
+        transition: all 0.2s ease;
+    }
+
+    /* Project List Table & Header */
+    .project-table-wrapper {
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
+    }
+
+    .project-table-header {
+        background: linear-gradient(180deg, #94A3B8 0%, #64748B 100%);
+        color: #FFFFFF;
+        padding: 10px 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-weight: 700;
+        font-size: 13.5px;
+        letter-spacing: 0.3px;
+    }
+
+    .project-row-item {
+        padding: 16px 20px;
+        border-bottom: 1px solid #F1F5F9;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        transition: all 0.2s ease;
+        background: #FFFFFF;
+        position: relative;
+    }
+
+    .project-row-item:last-child {
+        border-bottom: none;
+    }
+
+    .project-row-item:hover {
+        background: #F8FAFC;
+    }
+
+    .project-details-grid {
+        flex: 1;
+        display: grid;
+        grid-template-columns: 2.2fr 1fr;
+        gap: 20px;
+    }
+
+    /* Left Details Area */
+    .project-main-meta {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .project-title-link {
+        font-size: 14.5px;
+        font-weight: 700;
+        color: #0284C7;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: baseline;
+        gap: 8px;
+        line-height: 1.35;
+        transition: color 0.15s ease;
+    }
+
+    .project-title-link:hover {
+        color: #0369A1;
+        text-decoration: underline;
+    }
+
+    .project-code-tag {
+        font-size: 11px;
+        font-weight: 700;
+        padding: 2px 7px;
+        border-radius: 4px;
+        background: #E0F2FE;
+        color: #0369A1;
+        border: 1px solid #BAE6FD;
+        display: inline-block;
+    }
+
+    .project-field-row {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 18px;
+        font-size: 12.5px;
+        color: #334155;
+    }
+
+    .field-key {
+        font-weight: 700;
+        color: #0284C7;
+        margin-right: 4px;
+    }
+
+    .field-val-money {
+        font-weight: 800;
+        color: #0F172A;
+    }
+
+    .badge-file-status {
+        font-size: 11px;
+        font-weight: 700;
+        padding: 3px 8px;
+        border-radius: 5px;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .badge-file-notcreated {
+        background: #DC2626;
+        color: #FFFFFF;
+    }
+
+    .badge-file-created {
+        background: #10B981;
+        color: #FFFFFF;
+    }
+
+    .project-desc-row {
+        font-size: 12px;
+        color: #475569;
+        word-break: break-all;
+    }
+
+    .network-path-link {
+        font-family: Consolas, "Courier New", monospace;
+        color: #0369A1;
+        background: #F1F5F9;
+        padding: 2px 6px;
+        border-radius: 4px;
+        border: 1px solid #E2E8F0;
+        font-size: 11.5px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        text-decoration: none;
+    }
+
+    .network-path-link:hover {
+        background: #E2E8F0;
+        color: #0284C7;
+    }
+
+    /* Right Meta Column */
+    .project-side-meta {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 6px;
+        font-size: 12px;
+        border-left: 1px dashed #E2E8F0;
+        padding-left: 18px;
+    }
+
+    .badge-status-pill {
+        font-size: 11px;
+        font-weight: 700;
+        padding: 3px 10px;
+        border-radius: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        display: inline-block;
+        width: fit-content;
+    }
+
+    .badge-status-open {
+        background: #22C55E;
+        color: #FFFFFF;
+    }
+
+    .badge-status-support {
+        background: #0EA5E9;
+        color: #FFFFFF;
+    }
+
+    .badge-status-closed {
+        background: #64748B;
+        color: #FFFFFF;
+    }
+
+    .badge-status-scrapped {
+        background: #EF4444;
+        color: #FFFFFF;
+    }
+
+    /* Action Buttons */
+    .project-actions-cell {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-shrink: 0;
+        min-width: 140px;
+        justify-content: flex-end;
+    }
+
+    .btn-action-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 6px;
+        border: 1px solid transparent;
+        background: transparent;
+        color: #64748B;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        text-decoration: none;
+    }
+
+    .btn-action-icon:hover {
+        transform: scale(1.1);
+    }
+
+    .btn-action-icon.edit:hover {
+        color: #0284C7;
+        background: #E0F2FE;
+        border-color: #BAE6FD;
+    }
+
+    .btn-action-icon.view:hover {
+        color: #0D9488;
+        background: #CCFBF1;
+        border-color: #99F6E4;
+    }
+
+    .btn-action-icon.status:hover {
+        color: #16A34A;
+        background: #DCFCE7;
+        border-color: #BBF7D0;
+    }
+
+    .btn-action-icon.delete:hover {
+        color: #DC2626;
+        background: #FEE2E2;
+        border-color: #FECACA;
+    }
+
+    /* Responsive Breakpoints */
+    @@media (max-width: 992px) {
+        .project-details-grid {
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+        .project-side-meta {
+            border-left: none;
+            padding-left: 0;
+            border-top: 1px dashed #E2E8F0;
+            padding-top: 10px;
+        }
+        .project-row-item {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        .project-actions-cell {
+            width: 100%;
+            justify-content: flex-start;
+            border-top: 1px solid #F1F5F9;
+            padding-top: 10px;
+        }
+    }
+</style>
+
+<div class="project-register-container">
+
+    <!-- Top Page Header -->
+    <div class="project-header-bar">
+        <div>
+            <h2 class="project-page-title">
+                <i class="fa-solid fa-list-check"></i> Project List
+            </h2>
+            <div class="text-muted" style="font-size: 12px; margin-top: 2px;">
+                Active Project Register &bull; Client Work Orders, Physical Documents, Division Mapping &amp; Status
+            </div>
+        </div>
+        <div>
+            <button class="btn-add-project-main" data-bs-toggle="modal" data-bs-target="#createProjectModal">
+                <i class="fa-solid fa-plus"></i> Add Project
+            </button>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="p-3 bg-white border rounded shadow-sm">
-            <small class="text-muted text-uppercase fw-semibold" style="font-size: 11px;">Total Contract Value</small>
-            <div class="fs-4 fw-bold text-success">&#8377; @totalContract.ToString("N2")</div>
-            <small class="text-muted">Aggregated PO / Agreement Values</small>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="p-3 bg-white border rounded shadow-sm">
-            <small class="text-muted text-uppercase fw-semibold" style="font-size: 11px;">Workspace Capabilities</small>
-            <div class="fs-4 fw-bold text-info">11 Tabs</div>
-            <small class="text-success"><i class="fa-solid fa-circle-check me-1"></i>Deliveries, POs, Expenses &amp; Invoices</small>
-        </div>
-    </div>
-</div>
 
-<!-- Projects Table -->
-<div class="erp-card">
-    <div class="erp-card-header d-flex justify-content-between align-items-center">
-        <h5 class="erp-card-title"><i class="fa-solid fa-diagram-project me-2"></i>Active Project Register</h5>
-    </div>
-    <div class="erp-card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0" style="font-size: 13.5px;">
-                <thead class="table-light" style="font-size: 12px; text-transform: uppercase;">
-                    <tr>
-                        <th class="ps-4">Project Code</th>
-                        <th>Project Name</th>
-                        <th>Client</th>
-                        <th>Type</th>
-                        <th>Contract Value</th>
-                        <th>Start Date</th>
-                        <th>Status</th>
-                        <th class="text-end pe-4">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @if (projectList.Any())
+    <!-- Feedback Alerts -->
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show d-flex align-items-center mb-3 shadow-sm" role="alert">
+            <i class="fa-solid fa-circle-check fs-5 me-2 text-success"></i>
+            <div>@Html.Raw(TempData["SuccessMessage"])</div>
+            <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show d-flex align-items-center mb-3 shadow-sm" role="alert">
+            <i class="fa-solid fa-triangle-exclamation fs-5 me-2 text-danger"></i>
+            <div>@Html.Raw(TempData["ErrorMessage"])</div>
+            <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    <!-- ========================================================================= -->
+    <!-- FILTER & SEARCH PANEL (MATCHING USER SCREENSHOT) -->
+    <!-- ========================================================================= -->
+    <div class="filter-panel-card">
+        <div class="row g-3">
+            <!-- Row 1: Client Name & Project Name -->
+            <div class="col-md-6">
+                <label class="filter-label">Client Name:</label>
+                <select id="filterClientSelect" class="form-select form-select-filter">
+                    <option value="">-- Filter By Client --</option>
+                    @foreach (var c in clients)
                     {
-                        @foreach (var p in projectList)
+                        <option value="@c.ClientName">@c.ClientName</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="filter-label">Project Name:</label>
+                <select id="filterProjectSelect" class="form-select form-select-filter">
+                    <option value="">----Select Project List----</option>
+                    @foreach (var p in projectList.OrderBy(p => p.ProjectName))
+                    {
+                        <option value="@p.ProjectName">@p.ProjectName</option>
+                    }
+                </select>
+            </div>
+
+            <!-- Row 2: Search Input, Project Division & Clear Filter -->
+            <div class="col-md-6">
+                <div class="search-input-group mt-2">
+                    <input type="text" id="searchKeywordInput" class="form-control form-input-filter" placeholder="Search by project Name.." />
+                    <button class="btn-search-trigger" id="btnSearchTrigger" type="button" title="Search">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="mt-2">
+                    <select id="filterDivisionSelect" class="form-select form-select-filter">
+                        <option value="">-- Filter By Project Division --</option>
+                        @foreach (var div in divisions)
                         {
-                            <tr>
-                                <td class="ps-4 fw-bold text-primary">@p.ProjectCode</td>
-                                <td><strong>@p.ProjectName</strong></td>
-                                <td>@(p.Client?.ClientName ?? "N/A")</td>
-                                <td><span class="badge bg-light text-dark border">@p.ProjectType</span></td>
-                                <td class="fw-bold text-success">&#8377; @p.ContractValue.ToString("N2")</td>
-                                <td>@p.StartDate.ToString("dd MMM yyyy")</td>
-                                <td><span class="badge bg-success">@p.Status</span></td>
-                                <td class="text-end pe-4">
-                                    <a asp-controller="Projects" asp-action="Detail" asp-route-id="@p.Id" class="btn btn-sm btn-outline-primary">
-                                        <i class="fa-solid fa-folder-open me-1"></i> Open Workspace
-                                    </a>
-                                </td>
-                            </tr>
+                            <option value="@div">@div</option>
                         }
-                    }
-                    else
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-2 text-md-end">
+                <div class="mt-2">
+                    <button type="button" id="btnClearFilters" class="btn-clear-filters w-100">
+                        <i class="fa-solid fa-rotate-right"></i> Clear Filter
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- STATUS TAB PILLS (OPEN, UNDER SUPPORT, CLOSED, SCRAPPED) -->
+    <!-- ========================================================================= -->
+    <div class="status-tab-bar">
+        <div class="status-tab-pill active" data-status-filter="OPEN" id="tabOpenProjects">
+            Open Projects <span class="badge-pill-count" id="countOpen">@openCount</span>
+        </div>
+        <div class="status-tab-pill" data-status-filter="SUPPORT" id="tabSupportProjects">
+            Project Under Support <span class="badge-pill-count" id="countSupport">@supportCount</span>
+        </div>
+        <div class="status-tab-pill" data-status-filter="CLOSED" id="tabClosedProjects">
+            Closed Projects <span class="badge-pill-count" id="countClosed">@closedCount</span>
+        </div>
+        <div class="status-tab-pill" data-status-filter="SCRAPPED" id="tabScrappedProjects">
+            Close Scrapped <span class="badge-pill-count" id="countScrapped">@scrappedCount</span>
+        </div>
+        <div class="status-tab-pill" data-status-filter="ALL" id="tabAllProjects">
+            All Projects <span class="badge-pill-count" id="countAll">@projectList.Count</span>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- PROJECT LISTING ACCORDION / CARD TABLE -->
+    <!-- ========================================================================= -->
+    <div class="project-table-wrapper">
+        <div class="project-table-header">
+            <div><i class="fa-solid fa-folder-tree me-2"></i>Project Details</div>
+            <div>Action</div>
+        </div>
+
+        <div id="projectItemsContainer">
+            @if (projectList.Any())
+            {
+                @foreach (var p in projectList)
+                {
+                    var clientName = p.Client?.ClientName ?? "N/A";
+                    var divisionName = !string.IsNullOrWhiteSpace(p.Division) ? p.Division : (!string.IsNullOrWhiteSpace(p.ProjectType) ? p.ProjectType : "N/A");
+                    var managerName = p.Manager?.FullName ?? (!string.IsNullOrWhiteSpace(p.Manager?.Username) ? p.Manager.Username : "Unassigned");
+                    var rawStatus = (p.Status ?? "OPEN").Trim().ToUpperInvariant();
+                    var desc = !string.IsNullOrWhiteSpace(p.Description) ? p.Description : (!string.IsNullOrWhiteSpace(p.ClosureNotes) ? p.ClosureNotes : "N/A");
+                    
+                    // Physical file status logic
+                    var hasDocs = (docCounts.ContainsKey(p.Id) && docCounts[p.Id] > 0) || p.PurchaseOrders.Any(po => po.AttachmentDocId != null);
+                    var physicalStatus = !string.IsNullOrWhiteSpace(p.PhysicalFileStatus) ? p.PhysicalFileStatus : (hasDocs ? "Created" : "Not Create");
+                    var isCreated = physicalStatus.Equals("Created", StringComparison.OrdinalIgnoreCase) || physicalStatus.Equals("Available", StringComparison.OrdinalIgnoreCase);
+
+                    // Normalize status for filtering
+                    var statusCategory = "OPEN";
+                    var statusBadgeClass = "badge-status-open";
+                    var statusDisplay = "Open";
+
+                    if (rawStatus == "SUPPORT" || rawStatus == "UNDER_SUPPORT" || rawStatus == "UNDER SUPPORT" || rawStatus == "MAINTENANCE")
                     {
-                        <tr>
-                            <td colspan="8" class="text-center py-5">
-                                <i class="fa-solid fa-diagram-project mb-3" style="font-size: 40px; color: #CBD5E1;"></i>
-                                <h6 class="fw-bold text-secondary mb-1">No Projects in Database</h6>
-                                <p class="text-muted mb-3" style="font-size: 12.5px;">No active or pipeline projects exist in the database yet.</p>
-                                <button class="btn btn-primary btn-sm px-3 shadow-sm" style="background: var(--erp-primary);" data-bs-toggle="modal" data-bs-target="#createProjectModal">
-                                    <i class="fa-solid fa-plus me-1"></i> Create First Project
-                                </button>
-                            </td>
-                        </tr>
+                        statusCategory = "SUPPORT";
+                        statusBadgeClass = "badge-status-support";
+                        statusDisplay = "Under Support";
                     }
-                </tbody>
-            </table>
+                    else if (rawStatus == "CLOSED" || rawStatus == "COMPLETED")
+                    {
+                        statusCategory = "CLOSED";
+                        statusBadgeClass = "badge-status-closed";
+                        statusDisplay = "Closed";
+                    }
+                    else if (rawStatus == "SCRAPPED" || rawStatus == "CLOSE SCRAPPED" || rawStatus == "CANCELLED" || rawStatus == "ON_HOLD")
+                    {
+                        statusCategory = "SCRAPPED";
+                        statusBadgeClass = "badge-status-scrapped";
+                        statusDisplay = "Scrapped";
+                    }
+
+                    <div class="project-row-item"
+                         data-project-id="@p.Id"
+                         data-project-code="@p.ProjectCode"
+                         data-project-name="@p.ProjectName"
+                         data-client-name="@clientName"
+                         data-client-id="@p.ClientId"
+                         data-division="@divisionName"
+                         data-project-type="@p.ProjectType"
+                         data-contract-value="@p.ContractValue"
+                         data-start-date="@p.StartDate.ToString("yyyy-MM-dd")"
+                         data-expected-end-date="@(p.ExpectedEndDate?.ToString("yyyy-MM-dd") ?? "")"
+                         data-manager-id="@(p.ManagerId ?? 0)"
+                         data-manager-name="@managerName"
+                         data-status="@rawStatus"
+                         data-status-category="@statusCategory"
+                         data-physical-status="@physicalStatus"
+                         data-description="@desc">
+
+                        <!-- Center / Main Details Grid -->
+                        <div class="project-details-grid">
+                            <div class="project-main-meta">
+                                <div>
+                                    <span class="field-key">Name:</span>
+                                    <a asp-controller="Projects" asp-action="Detail" asp-route-id="@p.Id" class="project-title-link">
+                                        @p.ProjectName
+                                    </a>
+                                    <span class="project-code-tag ms-1">@p.ProjectCode</span>
+                                </div>
+
+                                <div class="project-field-row mt-1">
+                                    <div>
+                                        <span class="field-key">Client Name:</span>
+                                        <span>@clientName</span>
+                                    </div>
+                                    <div>
+                                        <span class="field-key">Physical File:</span>
+                                        <span class="badge-file-status @(isCreated ? "badge-file-created" : "badge-file-notcreated")">
+                                            @physicalStatus
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div class="project-field-row">
+                                    <div>
+                                        <span class="field-key">Total Value:</span>
+                                        <span class="field-val-money">&#8377; @p.ContractValue.ToString("N2")</span>
+                                    </div>
+                                    <div>
+                                        <span class="field-key">Project Division:</span>
+                                        <span class="fw-semibold">@divisionName</span>
+                                    </div>
+                                </div>
+
+                                <div class="project-field-row">
+                                    <div>
+                                        <span class="field-key">Project Incharge:</span>
+                                        <span>@managerName</span>
+                                    </div>
+                                </div>
+
+                                <div class="project-desc-row mt-1">
+                                    <span class="field-key">Description:</span>
+                                    @if (desc.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        <a href="@desc" target="_blank" class="network-path-link">
+                                            <i class="fa-solid fa-link me-1"></i>Open Resource Link
+                                        </a>
+                                    }
+                                    else if (desc.StartsWith("\\\\"))
+                                    {
+                                        <span class="network-path-link" title="Click to copy path" onclick="copyToClipboard('@desc.Replace("\\", "\\\\")')">
+                                            <i class="fa-solid fa-folder-open me-1"></i>@desc
+                                            <i class="fa-regular fa-copy ms-1 text-muted"></i>
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-secondary">@desc</span>
+                                    }
+                                </div>
+                            </div>
+
+                            <!-- Right Side Meta (Status, Type, Date, Added By) -->
+                            <div class="project-side-meta">
+                                <div>
+                                    <span class="field-key">Status:</span>
+                                    <span class="badge-status-pill @statusBadgeClass">@statusDisplay</span>
+                                </div>
+                                <div>
+                                    <span class="field-key">Type:</span>
+                                    <span>@p.ProjectType</span>
+                                </div>
+                                <div>
+                                    <span class="field-key">Date:</span>
+                                    <span>
+                                        @p.StartDate.ToString("dd MMM yyyy") - @(p.ExpectedEndDate?.ToString("dd MMM yyyy") ?? "N/A")
+                                    </span>
+                                </div>
+                                <div>
+                                    <span class="field-key">Added By:</span>
+                                    <span>@(p.Manager?.FullName ?? (!string.IsNullOrWhiteSpace(p.Manager?.Username) ? p.Manager.Username : "Unassigned"))</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Action Icons Column -->
+                        <div class="project-actions-cell">
+                            <!-- Edit -->
+                            <button type="button" class="btn-action-icon edit" title="Edit Project Details" onclick="openEditModal(@p.Id)">
+                                <i class="fa-solid fa-pencil"></i>
+                            </button>
+                            <!-- View Workspace -->
+                            <a asp-controller="Projects" asp-action="Detail" asp-route-id="@p.Id" class="btn-action-icon view" title="Open Project Workspace">
+                                <i class="fa-solid fa-eye"></i>
+                            </a>
+                            <!-- Change Status Toggle -->
+                            <button type="button" class="btn-action-icon status" title="Change Project Status" onclick="openStatusModal(@p.Id, '@rawStatus', '@p.ProjectCode')">
+                                <i class="fa-solid fa-circle-check"></i>
+                            </button>
+                            <!-- Delete -->
+                            <button type="button" class="btn-action-icon delete" title="Delete / Remove Project" onclick="openDeleteModal(@p.Id, '@p.ProjectCode', '@p.ProjectName.Replace("'", "\\'")')">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </div>
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="text-center py-5">
+                    <i class="fa-solid fa-diagram-project mb-3 text-muted" style="font-size: 44px; opacity: 0.5;"></i>
+                    <h5 class="fw-bold text-secondary mb-1">No Projects in Directory</h5>
+                    <p class="text-muted mb-3" style="font-size: 13px;">No projects currently registered in the database.</p>
+                    <button class="btn btn-primary btn-sm px-4 fw-semibold" data-bs-toggle="modal" data-bs-target="#createProjectModal">
+                        <i class="fa-solid fa-plus me-1"></i> Register First Project
+                    </button>
+                </div>
+            }
+
+            <!-- Zero Match State during filtering -->
+            <div id="noMatchMessage" class="text-center py-5 d-none">
+                <i class="fa-solid fa-filter-circle-xmark mb-3 text-muted" style="font-size: 40px; opacity: 0.6;"></i>
+                <h6 class="fw-bold text-secondary mb-1">No Matching Projects Found</h6>
+                <p class="text-muted mb-3" style="font-size: 12.5px;">No projects match the currently selected filter criteria or search keyword.</p>
+                <button type="button" class="btn btn-outline-secondary btn-sm px-3" onclick="resetAllFilters()">
+                    <i class="fa-solid fa-rotate-left me-1"></i> Reset Filters
+                </button>
+            </div>
         </div>
     </div>
 </div>
 
 <!-- ========================================================================= -->
-<!-- CREATE PROJECT MODAL (INTERACTIVE FORM) -->
+<!-- 1. CREATE PROJECT MODAL (COMPLETE REGISTRATION FORM) -->
 <!-- ========================================================================= -->
 <div class="modal fade" id="createProjectModal" tabindex="-1" aria-labelledby="createProjectModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content border-0 shadow">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; overflow: hidden;">
             <form method="post" asp-controller="Projects" asp-action="Create" enctype="multipart/form-data">
                 @Html.AntiForgeryToken()
-                <div class="modal-header bg-light">
-                    <h5 class="modal-title fw-bold" id="createProjectModalLabel" style="color: var(--erp-primary); font-size: 16px;">
-                        <i class="fa-solid fa-diagram-project me-2"></i>Create New Project
+                <div class="modal-header" style="background: linear-gradient(135deg, #0284C7, #0369A1); color: #FFFFFF;">
+                    <h5 class="modal-title fw-bold" id="createProjectModalLabel" style="font-size: 16px;">
+                        <i class="fa-solid fa-folder-plus me-2"></i>Add New Project to Register
                     </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body p-4">
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Project Code <span class="text-danger">*</span></label>
-                            <input type="text" name="projectCode" class="form-control" placeholder="e.g. PRJ-2026-001" value="PRJ-@DateTime.Now.ToString("yyyyMMdd-HHmm")" required />
+                            <label class="form-label fw-bold" style="font-size: 12px;">Project Code <span class="text-danger">*</span></label>
+                            <input type="text" name="projectCode" class="form-control" value="PRJ-@DateTime.Now.ToString("yyyyMMdd-HHmm")" required />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Project Name <span class="text-danger">*</span></label>
-                            <input type="text" name="projectName" class="form-control" placeholder="e.g. Metro Line Surveillance Infrastructure" required />
+                            <label class="form-label fw-bold" style="font-size: 12px;">Project Name <span class="text-danger">*</span></label>
+                            <input type="text" name="projectName" class="form-control" placeholder="e.g. Enterprise Solution Deployment" required />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Client / Customer <span class="text-danger">*</span></label>
+                            <label class="form-label fw-bold" style="font-size: 12px;">Client / Customer <span class="text-danger">*</span></label>
                             <select name="clientId" class="form-select" required>
                                 <option value="">-- Select Client from Master --</option>
                                 @foreach (var c in clients)
@@ -150,84 +831,461 @@
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <div class="d-flex justify-content-between align-items-center mb-1">
-                                <label class="form-label fw-semibold mb-0" style="font-size: 12.5px;">Project Type <span class="text-danger">*</span></label>
-                                <a asp-controller="Masters" asp-action="Index" class="text-decoration-none" style="font-size: 11px;" target="_blank">
-                                    <i class="fa-solid fa-gear me-1"></i>Manage in Masters
-                                </a>
-                            </div>
+                            <label class="form-label fw-bold" style="font-size: 12px;">Project Division <span class="text-danger">*</span></label>
+                            <input type="text" name="division" class="form-control" list="divisionSuggestions" placeholder="e.g. HARDWARE DIVISION" value="HARDWARE DIVISION" required />
+                            <datalist id="divisionSuggestions">
+                                @foreach (var div in divisions)
+                                {
+                                    <option value="@div" />
+                                }
+                            </datalist>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold" style="font-size: 12px;">Project Type <span class="text-danger">*</span></label>
                             <select name="projectType" class="form-select" required>
                                 @if (projectTypes.Any())
                                 {
                                     @foreach (var pt in projectTypes)
                                     {
-                                        <option value="@pt.Code">@pt.Name</option>
+                                        <option value="@pt.Name">@pt.Name</option>
                                     }
                                 }
                                 else
                                 {
-                                    <option value="STANDARD" selected>Standard Turnkey Contract</option>
-                                    <option value="AMC">Annual Maintenance Contract (AMC)</option>
-                                    <option value="CONSULTING">Consulting &amp; Advisory</option>
-                                    <option value="SUPPLY_INSTALL">Supply &amp; Installation</option>
-                                    <option value="MANPOWER">Manpower &amp; Managed Services</option>
-                                    <option value="INTERNAL">Internal R&amp;D</option>
+                                    <option value="Government" selected>Government</option>
+                                    <option value="Standard Turnkey">Standard Turnkey</option>
+                                    <option value="Annual Maintenance Contract (AMC)">Annual Maintenance Contract (AMC)</option>
+                                    <option value="Supply & Installation">Supply &amp; Installation</option>
+                                    <option value="Consulting & Advisory">Consulting &amp; Advisory</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold" style="font-size: 12px;">Project Incharge / Manager</label>
+                            <select name="managerId" class="form-select">
+                                <option value="">-- Select Project Incharge --</option>
+                                @foreach (var u in users)
+                                {
+                                    <option value="@u.Id">@(u.FullName ?? u.Username) (@(u.Designation ?? "Executive"))</option>
                                 }
                             </select>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Total Contract Value (&#8377;) <span class="text-danger">*</span></label>
+                            <label class="form-label fw-bold" style="font-size: 12px;">Total Contract Value (&#8377;) <span class="text-danger">*</span></label>
                             <input type="number" step="0.01" min="0" name="contractValue" class="form-control fw-bold text-success" placeholder="0.00" required />
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Start Date</label>
+                            <label class="form-label fw-bold" style="font-size: 12px;">Start Date <span class="text-danger">*</span></label>
                             <input type="date" name="startDate" class="form-control" value="@DateTime.Today.ToString("yyyy-MM-dd")" required />
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Expected Delivery Date <span class="text-danger">*</span></label>
-                            <input type="date" name="expectedEndDate" class="form-control" required />
+                            <label class="form-label fw-bold" style="font-size: 12px;">Expected End Date</label>
+                            <input type="date" name="expectedEndDate" class="form-control" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold" style="font-size: 12px;">Initial Status</label>
+                            <select name="status" class="form-select">
+                                <option value="OPEN" selected>Open</option>
+                                <option value="SUPPORT">Project Under Support</option>
+                                <option value="CLOSED">Closed</option>
+                                <option value="SCRAPPED">Close Scrapped</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold" style="font-size: 12px;">Physical File Status</label>
+                            <select name="physicalFileStatus" class="form-select">
+                                <option value="Not Create" selected>Not Create</option>
+                                <option value="Created">Created</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold" style="font-size: 12px;">Description / File Path / Share Link</label>
+                            <input type="text" name="description" class="form-control" placeholder="e.g. \\server\share\projects\... or resource URL or scope notes" />
+                            <small class="text-muted" style="font-size: 11px;">Network file path, shared folder URL, or project scope overview notes.</small>
                         </div>
 
-                        <!-- PROJECT DOCUMENT & WORK ORDER UPLOAD -->
-                        <div class="col-12 mt-3 pt-2 border-top">
+                        <!-- Work Order / PO Attachment -->
+                        <div class="col-12 mt-2 pt-2 border-top">
                             <h6 class="fw-bold text-dark mb-1" style="font-size: 13px;">
-                                <i class="fa-solid fa-file-contract text-primary me-2"></i>Project Document &amp; Client Work Order (WO)
+                                <i class="fa-solid fa-file-contract text-primary me-2"></i>Client Work Order &amp; Document Attachment
                             </h6>
-                            <small class="text-muted d-block mb-3" style="font-size: 11.5px;">
-                                Attach client work orders, contract agreements, or tender documents directly upon initialization.
-                            </small>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Client Work Order / PO Ref No.</label>
-                            <input type="text" name="clientPoNumber" class="form-control" placeholder="e.g. WO-2026-9842 or PO/REL/01" />
-                            <small class="text-muted" style="font-size: 11px;">Auto-creates linked Client PO record in the project workspace.</small>
+                            <label class="form-label fw-bold" style="font-size: 12px;">Work Order / PO Number</label>
+                            <input type="text" name="clientPoNumber" class="form-control" placeholder="e.g. WO-2026-001 or PO/CLIENT/01" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Document Classification</label>
+                            <label class="form-label fw-bold" style="font-size: 12px;">Document Classification</label>
                             <select name="documentTitle" class="form-select">
                                 <option value="Client Work Order" selected>Client Work Order (WO)</option>
                                 <option value="Client Purchase Order">Client Purchase Order (PO)</option>
                                 <option value="Contract Agreement">Formal Contract Agreement</option>
-                                <option value="Tender / Scope Document">Tender / Scope Specification</option>
-                                <option value="Letter of Intent (LOI)">Letter of Intent (LOI) / Award Notice</option>
+                                <option value="Tender / Scope Document">Tender / Scope Document</option>
                             </select>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold" style="font-size: 12.5px;">
-                                <i class="fa-solid fa-file-arrow-up text-primary me-1"></i>Upload Contract / Work Order File (Optional)
-                            </label>
+                            <label class="form-label fw-bold" style="font-size: 12px;">Upload Document (Optional)</label>
                             <input type="file" name="projectDocument" class="form-control" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.zip" />
-                            <small class="text-muted" style="font-size: 11.5px;">Accepted formats: PDF, Word (.docx), Scanned Images (.jpg, .png), Zip archive (Max 25 MB).</small>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer bg-light">
                     <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary btn-sm px-4 fw-bold" style="background: var(--erp-primary);">
-                        <i class="fa-solid fa-save me-1"></i> Save &amp; Initialize Project
+                    <button type="submit" class="btn btn-primary btn-sm px-4 fw-bold" style="background: #0284C7;">
+                        <i class="fa-solid fa-save me-1"></i> Register Project
                     </button>
                 </div>
             </form>
         </div>
     </div>
 </div>
+
+<!-- ========================================================================= -->
+<!-- 2. EDIT PROJECT MODAL -->
+<!-- ========================================================================= -->
+<div class="modal fade" id="editProjectModal" tabindex="-1" aria-labelledby="editProjectModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; overflow: hidden;">
+            <form method="post" asp-controller="Projects" asp-action="Edit">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" id="editProjectId" />
+                <div class="modal-header" style="background: linear-gradient(135deg, #0284C7, #0F172A); color: #FFFFFF;">
+                    <h5 class="modal-title fw-bold" id="editProjectModalLabel" style="font-size: 16px;">
+                        <i class="fa-solid fa-pencil me-2"></i>Edit Project Details
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold" style="font-size: 12px;">Project Code <span class="text-danger">*</span></label>
+                            <input type="text" name="projectCode" id="editProjectCode" class="form-control" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold" style="font-size: 12px;">Project Name <span class="text-danger">*</span></label>
+                            <input type="text" name="projectName" id="editProjectName" class="form-control" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold" style="font-size: 12px;">Client <span class="text-danger">*</span></label>
+                            <select name="clientId" id="editClientId" class="form-select" required>
+                                @foreach (var c in clients)
+                                {
+                                    <option value="@c.Id">@c.ClientName</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold" style="font-size: 12px;">Division <span class="text-danger">*</span></label>
+                            <input type="text" name="division" id="editDivision" class="form-control" list="divisionSuggestions" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold" style="font-size: 12px;">Project Type <span class="text-danger">*</span></label>
+                            <input type="text" name="projectType" id="editProjectType" class="form-control" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold" style="font-size: 12px;">Project Incharge / Manager</label>
+                            <select name="managerId" id="editManagerId" class="form-select">
+                                <option value="">-- Select Incharge --</option>
+                                @foreach (var u in users)
+                                {
+                                    <option value="@u.Id">@(u.FullName ?? u.Username)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold" style="font-size: 12px;">Total Value (&#8377;) <span class="text-danger">*</span></label>
+                            <input type="number" step="0.01" min="0" name="contractValue" id="editContractValue" class="form-control fw-bold text-success" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold" style="font-size: 12px;">Start Date</label>
+                            <input type="date" name="startDate" id="editStartDate" class="form-control" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold" style="font-size: 12px;">Expected End Date</label>
+                            <input type="date" name="expectedEndDate" id="editExpectedEndDate" class="form-control" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold" style="font-size: 12px;">Status</label>
+                            <select name="status" id="editStatus" class="form-select">
+                                <option value="OPEN">Open</option>
+                                <option value="SUPPORT">Project Under Support</option>
+                                <option value="CLOSED">Closed</option>
+                                <option value="SCRAPPED">Close Scrapped</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold" style="font-size: 12px;">Physical File Status</label>
+                            <select name="physicalFileStatus" id="editPhysicalFileStatus" class="form-select">
+                                <option value="Not Create">Not Create</option>
+                                <option value="Created">Created</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold" style="font-size: 12px;">Description / File Path / Link</label>
+                            <input type="text" name="description" id="editDescription" class="form-control" />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm px-4 fw-bold" style="background: #0284C7;">
+                        <i class="fa-solid fa-save me-1"></i> Update Project
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- 3. QUICK STATUS CHANGE MODAL -->
+<!-- ========================================================================= -->
+<div class="modal fade" id="statusChangeModal" tabindex="-1" aria-labelledby="statusChangeModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow">
+            <form method="post" asp-controller="Projects" asp-action="UpdateStatus">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" id="statusProjectId" />
+                <div class="modal-header py-2 bg-light">
+                    <h6 class="modal-title fw-bold" id="statusChangeModalLabel" style="font-size: 13.5px;">
+                        <i class="fa-solid fa-arrows-rotate me-1 text-primary"></i> Change Status
+                    </h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-3">
+                    <p class="text-muted mb-2" style="font-size: 12px;" id="statusProjectText">Select new status:</p>
+                    <select name="status" id="quickStatusSelect" class="form-select form-select-sm mb-3">
+                        <option value="OPEN">Open</option>
+                        <option value="SUPPORT">Project Under Support</option>
+                        <option value="CLOSED">Closed</option>
+                        <option value="SCRAPPED">Close Scrapped</option>
+                    </select>
+                </div>
+                <div class="modal-footer py-2 bg-light">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success btn-sm px-3 fw-semibold">Save Status</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- 4. DELETE CONFIRMATION MODAL -->
+<!-- ========================================================================= -->
+<div class="modal fade" id="deleteProjectModal" tabindex="-1" aria-labelledby="deleteProjectModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow">
+            <form method="post" asp-controller="Projects" asp-action="Delete">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" id="deleteProjectId" />
+                <div class="modal-header py-2 bg-danger text-white">
+                    <h6 class="modal-title fw-bold" id="deleteProjectModalLabel" style="font-size: 13.5px;">
+                        <i class="fa-solid fa-triangle-exclamation me-1"></i> Delete Project
+                    </h6>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-3">
+                    <p class="text-secondary mb-1" style="font-size: 12.5px;">Are you sure you want to delete this project?</p>
+                    <p class="fw-bold text-danger mb-0" id="deleteProjectName" style="font-size: 13px;"></p>
+                    <small class="text-muted d-block mt-2" style="font-size: 11px;">This will remove project records and related links permanently.</small>
+                </div>
+                <div class="modal-footer py-2 bg-light">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger btn-sm px-3 fw-bold">Confirm Delete</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- JAVASCRIPT: INSTANT LIVE FILTERING, TAB LOGIC, AND MODAL DATA BINDING -->
+<!-- ========================================================================= -->
+@section Scripts {
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const clientFilter = document.getElementById("filterClientSelect");
+        const projectFilter = document.getElementById("filterProjectSelect");
+        const searchInput = document.getElementById("searchKeywordInput");
+        const divisionFilter = document.getElementById("filterDivisionSelect");
+        const btnClear = document.getElementById("btnClearFilters");
+        const btnSearch = document.getElementById("btnSearchTrigger");
+        const tabPills = document.querySelectorAll(".status-tab-pill");
+        const items = document.querySelectorAll(".project-row-item");
+        const noMatchMsg = document.getElementById("noMatchMessage");
+
+        let activeTab = "OPEN"; // Default to Open Projects like reference
+
+        function applyAllFilters() {
+            const selectedClient = clientFilter.value.trim().toLowerCase();
+            const selectedProject = projectFilter.value.trim().toLowerCase();
+            const keyword = searchInput.value.trim().toLowerCase();
+            const selectedDivision = divisionFilter.value.trim().toLowerCase();
+
+            let visibleCount = 0;
+
+            // Recalculate dynamic counts based on current filters (except tab filter)
+            let tabOpen = 0, tabSupport = 0, tabClosed = 0, tabScrapped = 0, tabAll = 0;
+
+            items.forEach(item => {
+                const pName = (item.dataset.projectName || "").toLowerCase();
+                const pCode = (item.dataset.projectCode || "").toLowerCase();
+                const cName = (item.dataset.clientName || "").toLowerCase();
+                const divName = (item.dataset.division || "").toLowerCase();
+                const desc = (item.dataset.description || "").toLowerCase();
+                const manager = (item.dataset.managerName || "").toLowerCase();
+                const statusCategory = (item.dataset.statusCategory || "").toUpperCase();
+
+                // Match against filter dropdowns & keyword
+                const matchesClient = !selectedClient || cName === selectedClient;
+                const matchesProject = !selectedProject || pName === selectedProject;
+                const matchesDivision = !selectedDivision || divName === selectedDivision;
+                const matchesKeyword = !keyword || (
+                    pName.includes(keyword) ||
+                    pCode.includes(keyword) ||
+                    cName.includes(keyword) ||
+                    desc.includes(keyword) ||
+                    manager.includes(keyword)
+                );
+
+                const passesCommonFilters = matchesClient && matchesProject && matchesDivision && matchesKeyword;
+
+                if (passesCommonFilters) {
+                    tabAll++;
+                    if (statusCategory === "OPEN") tabOpen++;
+                    else if (statusCategory === "SUPPORT") tabSupport++;
+                    else if (statusCategory === "CLOSED") tabClosed++;
+                    else if (statusCategory === "SCRAPPED") tabScrapped++;
+                }
+
+                // Match against active status tab
+                const matchesTab = (activeTab === "ALL") || (statusCategory === activeTab);
+
+                if (passesCommonFilters && matchesTab) {
+                    item.style.display = "flex";
+                    visibleCount++;
+                } else {
+                    item.style.display = "none";
+                }
+            });
+
+            // Update badge counts on tabs
+            const elOpen = document.getElementById("countOpen");
+            const elSupport = document.getElementById("countSupport");
+            const elClosed = document.getElementById("countClosed");
+            const elScrapped = document.getElementById("countScrapped");
+            const elAll = document.getElementById("countAll");
+
+            if (elOpen) elOpen.textContent = tabOpen;
+            if (elSupport) elSupport.textContent = tabSupport;
+            if (elClosed) elClosed.textContent = tabClosed;
+            if (elScrapped) elScrapped.textContent = tabScrapped;
+            if (elAll) elAll.textContent = tabAll;
+
+            if (noMatchMsg) {
+                if (visibleCount === 0 && items.length > 0) {
+                    noMatchMsg.classList.remove("d-none");
+                } else {
+                    noMatchMsg.classList.add("d-none");
+                }
+            }
+        }
+
+        // Event listeners for filters
+        clientFilter.addEventListener("change", applyAllFilters);
+        projectFilter.addEventListener("change", function () {
+            if (projectFilter.value) {
+                searchInput.value = projectFilter.value;
+            }
+            applyAllFilters();
+        });
+        divisionFilter.addEventListener("change", applyAllFilters);
+        searchInput.addEventListener("input", applyAllFilters);
+        if (btnSearch) btnSearch.addEventListener("click", applyAllFilters);
+
+        // Status Tabs Click Event
+        tabPills.forEach(pill => {
+            pill.addEventListener("click", function () {
+                tabPills.forEach(p => p.classList.remove("active"));
+                this.classList.add("active");
+                activeTab = this.dataset.statusFilter || "ALL";
+                applyAllFilters();
+            });
+        });
+
+        // Clear Filters Handler
+        function resetFilters() {
+            clientFilter.value = "";
+            projectFilter.value = "";
+            divisionFilter.value = "";
+            searchInput.value = "";
+            activeTab = "OPEN";
+            tabPills.forEach(p => {
+                if (p.dataset.statusFilter === "OPEN") p.classList.add("active");
+                else p.classList.remove("active");
+            });
+            applyAllFilters();
+        }
+
+        if (btnClear) btnClear.addEventListener("click", resetFilters);
+        window.resetAllFilters = resetFilters;
+
+        // Run filter initially to show Open Projects by default
+        applyAllFilters();
+    });
+
+    // Helper: Copy Path or URL to Clipboard
+    function copyToClipboard(text) {
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(text).then(function() {
+                alert("File path copied to clipboard:\n" + text);
+            }).catch(function() {
+                prompt("Copy path below:", text);
+            });
+        } else {
+            prompt("Copy path below:", text);
+        }
+    }
+
+    // Modal Handlers: Open Edit Modal
+    function openEditModal(projectId) {
+        const item = document.querySelector(`.project-row-item[data-project-id="${projectId}"]`);
+        if (!item) return;
+
+        document.getElementById("editProjectId").value = projectId;
+        document.getElementById("editProjectCode").value = item.dataset.projectCode || "";
+        document.getElementById("editProjectName").value = item.dataset.projectName || "";
+        document.getElementById("editClientId").value = item.dataset.clientId || "";
+        document.getElementById("editDivision").value = item.dataset.division || "";
+        document.getElementById("editProjectType").value = item.dataset.projectType || "";
+        document.getElementById("editManagerId").value = item.dataset.managerId || "";
+        document.getElementById("editContractValue").value = item.dataset.contractValue || "0";
+        document.getElementById("editStartDate").value = item.dataset.startDate || "";
+        document.getElementById("editExpectedEndDate").value = item.dataset.expectedEndDate || "";
+        document.getElementById("editStatus").value = item.dataset.status || "OPEN";
+        document.getElementById("editPhysicalFileStatus").value = item.dataset.physicalStatus || "Not Create";
+        document.getElementById("editDescription").value = item.dataset.description || "";
+
+        const modal = new bootstrap.Modal(document.getElementById("editProjectModal"));
+        modal.show();
+    }
+
+    // Modal Handlers: Open Status Change Modal
+    function openStatusModal(projectId, currentStatus, projectCode) {
+        document.getElementById("statusProjectId").value = projectId;
+        document.getElementById("statusProjectText").textContent = `Update status for ${projectCode}:`;
+        document.getElementById("quickStatusSelect").value = currentStatus || "OPEN";
+        const modal = new bootstrap.Modal(document.getElementById("statusChangeModal"));
+        modal.show();
+    }
+
+    // Modal Handlers: Open Delete Modal
+    function openDeleteModal(projectId, projectCode, projectName) {
+        document.getElementById("deleteProjectId").value = projectId;
+        document.getElementById("deleteProjectName").textContent = `${projectCode} - ${projectName}`;
+        const modal = new bootstrap.Modal(document.getElementById("deleteProjectModal"));
+        modal.show();
+    }
+</script>
+}

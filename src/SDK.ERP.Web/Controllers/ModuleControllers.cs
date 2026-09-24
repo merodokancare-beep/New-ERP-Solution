@@ -610,7 +610,9 @@ public class ProjectsController : Controller
     public async Task<IActionResult> Index()
     {
         ViewData["ActiveMenu"] = "Projects";
-        ViewBag.Clients = await _db.Clients.AsNoTracking().ToListAsync();
+        await EnsureProjectColumnsAsync();
+
+        ViewBag.Clients = await _db.Clients.OrderBy(c => c.ClientName).AsNoTracking().ToListAsync();
 
         List<ProjectType> projectTypes;
         try
@@ -624,11 +626,82 @@ public class ProjectsController : Controller
             catch { projectTypes = GetDefaultProjectTypes(); }
         }
         ViewBag.ProjectTypes = projectTypes;
+        ViewBag.Users = await _db.Users.Where(u => u.IsActive).OrderBy(u => u.FullName).AsNoTracking().ToListAsync();
 
-        var projects = await _db.Projects.Include(p => p.Client).AsNoTracking().ToListAsync();
+        var projects = await _db.Projects
+            .Include(p => p.Client)
+            .Include(p => p.Manager)
+            .Include(p => p.PurchaseOrders).ThenInclude(po => po.Attachment)
+            .Include(p => p.Deliveries)
+            .OrderByDescending(p => p.Id)
+            .AsNoTracking()
+            .ToListAsync();
+
+        try
+        {
+            var projectDocCounts = await _db.DocumentAttachments
+                .Where(d => d.EntityType == "Project" || d.EntityType == "ClientPo" || d.EntityType == "ProjectClosure")
+                .GroupBy(d => d.EntityId)
+                .Select(g => new { ProjectId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.ProjectId, x => x.Count);
+            ViewBag.ProjectDocCounts = projectDocCounts;
+        }
+        catch
+        {
+            ViewBag.ProjectDocCounts = new Dictionary<long, int>();
+        }
+
+        var divisions = projects
+            .Where(p => !string.IsNullOrWhiteSpace(p.Division))
+            .Select(p => p.Division!.Trim())
+            .Distinct()
+            .ToList();
+
+        if (!divisions.Contains("HARDWARE DIVISION")) divisions.Add("HARDWARE DIVISION");
+        if (!divisions.Contains("GENERAL SUPPLY")) divisions.Add("GENERAL SUPPLY");
+        if (!divisions.Contains("SOFTWARE & IT")) divisions.Add("SOFTWARE & IT");
+        if (!divisions.Contains("NETWORKING")) divisions.Add("NETWORKING");
+        if (!divisions.Contains("CIVIL & INFRA")) divisions.Add("CIVIL & INFRA");
+
+        ViewBag.Divisions = divisions;
+
         return View(projects);
     }
 
+    private async Task EnsureProjectColumnsAsync()
+    {
+        try
+        {
+            await _db.Database.ExecuteSqlRawAsync(@"
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[project].[projects]') AND name = 'Description')
+                    ALTER TABLE [project].[projects] ADD [Description] NVARCHAR(MAX) NULL;
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[project].[projects]') AND name = 'Division')
+                    ALTER TABLE [project].[projects] ADD [Division] NVARCHAR(200) NULL;
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[project].[projects]') AND name = 'PhysicalFileStatus')
+                    ALTER TABLE [project].[projects] ADD [PhysicalFileStatus] NVARCHAR(100) NULL;
+
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[Projects]') AND name = 'Description')
+                    ALTER TABLE [Projects] ADD [Description] NVARCHAR(MAX) NULL;
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[Projects]') AND name = 'Division')
+                    ALTER TABLE [Projects] ADD [Division] NVARCHAR(200) NULL;
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[Projects]') AND name = 'PhysicalFileStatus')
+                    ALTER TABLE [Projects] ADD [PhysicalFileStatus] NVARCHAR(100) NULL;
+
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[projects].[projects]') AND name = 'Description')
+                    ALTER TABLE [projects].[projects] ADD [Description] NVARCHAR(MAX) NULL;
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[projects].[projects]') AND name = 'Division')
+                    ALTER TABLE [projects].[projects] ADD [Division] NVARCHAR(200) NULL;
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[projects].[projects]') AND name = 'PhysicalFileStatus')
+                    ALTER TABLE [projects].[projects] ADD [PhysicalFileStatus] NVARCHAR(100) NULL;
+            ");
+        }
+        catch { }
+    }
+
+    [HttpGet]
+    [Route("Projects/Detail/{id?}")]
+    [Route("Projects/ViewProjectDetails/{id?}")]
+    [Route("Projects/Project/ViewProjectDetails/{id?}")]
     public async Task<IActionResult> Detail(long id = 1)
     {
         ViewData["ActiveMenu"] = "Projects";
@@ -725,10 +798,16 @@ public class ProjectsController : Controller
         DateTime startDate = default,
         DateTime? expectedEndDate = null,
         long? clientId = null,
+        long? managerId = null,
+        string? division = null,
+        string? description = null,
+        string? physicalFileStatus = null,
+        string status = "OPEN",
         string? clientPoNumber = null,
         string? documentTitle = null,
         IFormFile? projectDocument = null)
     {
+        await EnsureProjectColumnsAsync();
         var company = await _companyContext.GetCurrentCompanyAsync();
         var branch = await _db.Branches.FirstOrDefaultAsync(b => b.CompanyId == company.Id) ?? new Branch
         {
@@ -749,7 +828,10 @@ public class ProjectsController : Controller
             return RedirectToAction(nameof(Index));
         }
 
-        var manager = await _db.Users.FirstOrDefaultAsync();
+        var manager = managerId.HasValue && managerId.Value > 0
+            ? await _db.Users.FindAsync(managerId.Value)
+            : await _db.Users.FirstOrDefaultAsync();
+
         if (manager == null)
         {
             var role = await _db.Roles.FirstOrDefaultAsync() ?? new Role { RoleName = "SUPER_ADMIN", Description = "Admin", IsSystemRole = true };
@@ -773,15 +855,18 @@ public class ProjectsController : Controller
             CompanyId = company.Id,
             BranchId = branch.Id,
             ClientId = clientId.Value,
-            ManagerId = manager.Id,
+            ManagerId = manager?.Id,
             ProjectCode = string.IsNullOrWhiteSpace(projectCode) ? $"PRJ-{DateTime.Now:yyyyMMdd-HHmm}" : projectCode.Trim(),
             ProjectName = string.IsNullOrWhiteSpace(projectName) ? "New Project" : projectName.Trim(),
             ProjectType = string.IsNullOrWhiteSpace(projectType) ? "STANDARD" : projectType.Trim(),
+            Division = string.IsNullOrWhiteSpace(division) ? "GENERAL SUPPLY" : division.Trim(),
+            Description = description?.Trim(),
+            PhysicalFileStatus = string.IsNullOrWhiteSpace(physicalFileStatus) ? (projectDocument != null ? "Created" : "Not Create") : physicalFileStatus.Trim(),
             ContractValue = contractValue,
             BudgetCost = budgetCost,
             StartDate = startDate == default ? DateTime.Today : startDate,
             ExpectedEndDate = expectedEndDate,
-            Status = "ACTIVE",
+            Status = string.IsNullOrWhiteSpace(status) ? "OPEN" : status.Trim().ToUpperInvariant(),
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -839,8 +924,95 @@ public class ProjectsController : Controller
             await _db.SaveChangesAsync();
         }
 
-        TempData["SuccessMessage"] = $"Project {project.ProjectCode} ({project.ProjectName}) created successfully!";
-        return RedirectToAction(nameof(Detail), new { id = project.Id });
+        TempData["SuccessMessage"] = $"Project {project.ProjectCode} ({project.ProjectName}) registered successfully!";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Edit(
+        long id,
+        string projectCode,
+        string projectName,
+        long clientId,
+        string projectType,
+        string? division,
+        decimal contractValue,
+        DateTime startDate,
+        DateTime? expectedEndDate,
+        long? managerId,
+        string status,
+        string? physicalFileStatus,
+        string? description)
+    {
+        await EnsureProjectColumnsAsync();
+        var project = await _db.Projects.FindAsync(id);
+        if (project == null)
+        {
+            TempData["ErrorMessage"] = "Project not found.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        project.ProjectCode = string.IsNullOrWhiteSpace(projectCode) ? project.ProjectCode : projectCode.Trim();
+        project.ProjectName = string.IsNullOrWhiteSpace(projectName) ? project.ProjectName : projectName.Trim();
+        project.ClientId = clientId;
+        project.ProjectType = string.IsNullOrWhiteSpace(projectType) ? project.ProjectType : projectType.Trim();
+        project.Division = string.IsNullOrWhiteSpace(division) ? project.Division : division.Trim();
+        project.ContractValue = contractValue;
+        project.StartDate = startDate == default ? project.StartDate : startDate;
+        project.ExpectedEndDate = expectedEndDate;
+        project.ManagerId = managerId.HasValue && managerId.Value > 0 ? managerId.Value : project.ManagerId;
+        project.Status = string.IsNullOrWhiteSpace(status) ? project.Status : status.Trim().ToUpperInvariant();
+        project.PhysicalFileStatus = string.IsNullOrWhiteSpace(physicalFileStatus) ? project.PhysicalFileStatus : physicalFileStatus.Trim();
+        project.Description = description?.Trim();
+        project.UpdatedAt = DateTime.UtcNow;
+
+        await _db.SaveChangesAsync();
+        TempData["SuccessMessage"] = $"Project {project.ProjectCode} ({project.ProjectName}) updated successfully!";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Delete(long id)
+    {
+        var project = await _db.Projects
+            .Include(p => p.PurchaseOrders)
+            .Include(p => p.Milestones)
+            .Include(p => p.Expenses)
+            .Include(p => p.Deliveries)
+            .FirstOrDefaultAsync(p => p.Id == id);
+
+        if (project == null)
+        {
+            TempData["ErrorMessage"] = "Project not found.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var code = project.ProjectCode;
+        _db.Projects.Remove(project);
+        await _db.SaveChangesAsync();
+        TempData["SuccessMessage"] = $"Project {code} removed successfully.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateStatus(long id, string status)
+    {
+        var project = await _db.Projects.FindAsync(id);
+        if (project != null)
+        {
+            project.Status = string.IsNullOrWhiteSpace(status) ? "OPEN" : status.Trim().ToUpperInvariant();
+            if (project.Status == "CLOSED")
+            {
+                project.ActualClosedDate = DateTime.Today;
+            }
+            project.UpdatedAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync();
+            TempData["SuccessMessage"] = $"Status of Project {project.ProjectCode} updated to {project.Status}.";
+        }
+        return RedirectToAction(nameof(Index));
     }
 
     [HttpPost]

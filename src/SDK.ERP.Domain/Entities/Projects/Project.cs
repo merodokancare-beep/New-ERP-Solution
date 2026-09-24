@@ -22,6 +22,9 @@ public class Project : ITenantEntity
     public string Status { get; set; } = "PIPELINE";
     public long? ClosureApprovedBy { get; set; }
     public string? ClosureNotes { get; set; }
+    public string? Description { get; set; }
+    public string? Division { get; set; }
+    public string? PhysicalFileStatus { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 

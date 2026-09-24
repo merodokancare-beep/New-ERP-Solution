@@ -200,6 +200,28 @@ using (var scope = app.Services.CreateScope())
                     ALTER TABLE [DocumentAttachments] ALTER COLUMN [UploaderId] BIGINT NULL;
                 IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[DocumentAttachments]') AND name = 'UploadedBy' AND is_nullable = 0)
                     ALTER TABLE [DocumentAttachments] ALTER COLUMN [UploadedBy] BIGINT NULL;
+
+                -- Ensure Project Division, Description & PhysicalFileStatus Columns
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[project].[projects]') AND name = 'Division')
+                    ALTER TABLE [project].[projects] ADD [Division] NVARCHAR(200) NULL;
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[projects].[projects]') AND name = 'Division')
+                    ALTER TABLE [projects].[projects] ADD [Division] NVARCHAR(200) NULL;
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[Projects]') AND name = 'Division')
+                    ALTER TABLE [Projects] ADD [Division] NVARCHAR(200) NULL;
+
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[project].[projects]') AND name = 'Description')
+                    ALTER TABLE [project].[projects] ADD [Description] NVARCHAR(MAX) NULL;
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[projects].[projects]') AND name = 'Description')
+                    ALTER TABLE [projects].[projects] ADD [Description] NVARCHAR(MAX) NULL;
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[Projects]') AND name = 'Description')
+                    ALTER TABLE [Projects] ADD [Description] NVARCHAR(MAX) NULL;
+
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[project].[projects]') AND name = 'PhysicalFileStatus')
+                    ALTER TABLE [project].[projects] ADD [PhysicalFileStatus] NVARCHAR(100) NULL;
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[projects].[projects]') AND name = 'PhysicalFileStatus')
+                    ALTER TABLE [projects].[projects] ADD [PhysicalFileStatus] NVARCHAR(100) NULL;
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[Projects]') AND name = 'PhysicalFileStatus')
+                    ALTER TABLE [Projects] ADD [PhysicalFileStatus] NVARCHAR(100) NULL;
             ");
         }
         catch { }
