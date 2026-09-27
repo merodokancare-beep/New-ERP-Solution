@@ -42,6 +42,18 @@ public class MastersController : Controller
             catch { projectTypes = GetDefaultProjectTypes(); }
         }
 
+        List<ExpenseType> expenseTypes;
+        try
+        {
+            expenseTypes = await _db.ExpenseTypes.OrderBy(p => p.Name).AsNoTracking().ToListAsync();
+        }
+        catch
+        {
+            await EnsureExpenseTypesTableAsync();
+            try { expenseTypes = await _db.ExpenseTypes.OrderBy(p => p.Name).AsNoTracking().ToListAsync(); }
+            catch { expenseTypes = GetDefaultExpenseTypes(); }
+        }
+
         var vm = new SDK.ERP.Application.ViewModels.MastersViewModel
         {
             Clients = await _db.Clients.AsNoTracking().ToListAsync(),
@@ -49,7 +61,8 @@ public class MastersController : Controller
             Items = await _db.Items.Include(i => i.Category).Include(i => i.Unit).AsNoTracking().ToListAsync(),
             TaxRates = await _db.TaxRates.AsNoTracking().ToListAsync(),
             AccountGroups = await _db.AccountGroups.Include(g => g.Accounts).AsNoTracking().ToListAsync(),
-            ProjectTypes = projectTypes
+            ProjectTypes = projectTypes,
+            ExpenseTypes = expenseTypes
         };
         return View(vm);
     }
@@ -91,6 +104,61 @@ public class MastersController : Controller
         new ProjectType { Id = 5, Code = "MANPOWER", Name = "Manpower & Managed Services", Description = "Time and material / rate card based deployment", IsActive = true },
         new ProjectType { Id = 6, Code = "INTERNAL", Name = "Internal R&D / Capital Project", Description = "Internal organizational infrastructure or R&D initiatives", IsActive = true }
     };
+
+    private async Task EnsureExpenseTypesTableAsync()
+    {
+        try
+        {
+            await _db.Database.ExecuteSqlRawAsync(@"
+                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ExpenseTypes')
+                BEGIN
+                    CREATE TABLE [dbo].[ExpenseTypes] (
+                        [Id] BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                        [Name] NVARCHAR(250) NOT NULL,
+                        [Description] NVARCHAR(1000) NULL,
+                        [IsProjectRelated] BIT NOT NULL DEFAULT 0,
+                        [ReceiveDirectPayments] BIT NOT NULL DEFAULT 0,
+                        [OpeningAmount] DECIMAL(18,2) NULL,
+                        [IsActive] BIT NOT NULL DEFAULT 1,
+                        [CreatedAt] DATETIME2 NOT NULL DEFAULT GETUTCDATE()
+                    );
+
+                    INSERT INTO [dbo].[ExpenseTypes] ([Name], [Description], [IsProjectRelated], [ReceiveDirectPayments], [OpeningAmount], [IsActive])
+                    VALUES
+                    (N'BUSINESS DEVELOPMENT (DEPARTMENTAL & PROJECT)', N'BUSINESS DEVELOPMENT (DEPARTMENTAL & PROJECT)', 0, 0, NULL, 1),
+                    (N'OFFICE EXPENSES', N'All the expenses incurred for the office.', 0, 0, NULL, 1),
+                    (N'PROJECT EXPESNES', N'EXPENSES RELATED TO PROJECT', 1, 0, NULL, 1),
+                    (N'Proprietor Drawings A/c.', N'Proprietor Drawings A/c.', 0, 0, NULL, 1),
+                    (N'Salary & Allowance', N'Salary & Allowance', 0, 0, NULL, 1),
+                    (N'SDK Solution Gangtok Loan A/c.', N'SDK Solution Gangtok Loan A/c.', 0, 0, NULL, 1),
+                    (N'TAXES AND GST PAYMENT', N'ALL THE TAXES AND GST PAYMENT FOR THE COMPANY', 0, 0, NULL, 1),
+                    (N'Transportation Charges.', N'Transportation Charges.', 0, 0, NULL, 1),
+                    (N'Milestone / Mobilization Advance', N'Advance received for project or milestone mobilisation', 1, 1, NULL, 1),
+                    (N'Direct Engineering & Service Revenue', N'Direct consulting and service revenue receipts', 0, 1, NULL, 1),
+                    (N'Site Expense Reimbursement / Refund', N'Refunds and reimbursement of site advances', 1, 1, NULL, 1),
+                    (N'Sundry Direct Receipts', N'Miscellaneous direct payments and nominal receipts', 0, 1, NULL, 1);
+                END
+            ");
+        }
+        catch { }
+    }
+
+    private static List<ExpenseType> GetDefaultExpenseTypes() => new()
+    {
+        new ExpenseType { Id = 1, Name = "BUSINESS DEVELOPMENT (DEPARTMENTAL & PROJECT)", Description = "BUSINESS DEVELOPMENT (DEPARTMENTAL & PROJECT)", IsProjectRelated = false, ReceiveDirectPayments = false, IsActive = true },
+        new ExpenseType { Id = 2, Name = "OFFICE EXPENSES", Description = "All the expenses incurred for the office.", IsProjectRelated = false, ReceiveDirectPayments = false, IsActive = true },
+        new ExpenseType { Id = 3, Name = "PROJECT EXPESNES", Description = "EXPENSES RELATED TO PROJECT", IsProjectRelated = true, ReceiveDirectPayments = false, IsActive = true },
+        new ExpenseType { Id = 4, Name = "Proprietor Drawings A/c.", Description = "Proprietor Drawings A/c.", IsProjectRelated = false, ReceiveDirectPayments = false, IsActive = true },
+        new ExpenseType { Id = 5, Name = "Salary & Allowance", Description = "Salary & Allowance", IsProjectRelated = false, ReceiveDirectPayments = false, IsActive = true },
+        new ExpenseType { Id = 6, Name = "SDK Solution Gangtok Loan A/c.", Description = "SDK Solution Gangtok Loan A/c.", IsProjectRelated = false, ReceiveDirectPayments = false, IsActive = true },
+        new ExpenseType { Id = 7, Name = "TAXES AND GST PAYMENT", Description = "ALL THE TAXES AND GST PAYMENT FOR THE COMPANY", IsProjectRelated = false, ReceiveDirectPayments = false, IsActive = true },
+        new ExpenseType { Id = 8, Name = "Transportation Charges.", Description = "Transportation Charges.", IsProjectRelated = false, ReceiveDirectPayments = false, IsActive = true },
+        new ExpenseType { Id = 9, Name = "Milestone / Mobilization Advance", Description = "Advance received for project or milestone mobilisation", IsProjectRelated = true, ReceiveDirectPayments = true, IsActive = true },
+        new ExpenseType { Id = 10, Name = "Direct Engineering & Service Revenue", Description = "Direct consulting and service revenue receipts", IsProjectRelated = false, ReceiveDirectPayments = true, IsActive = true },
+        new ExpenseType { Id = 11, Name = "Site Expense Reimbursement / Refund", Description = "Refunds and reimbursement of site advances", IsProjectRelated = true, ReceiveDirectPayments = true, IsActive = true },
+        new ExpenseType { Id = 12, Name = "Sundry Direct Receipts", Description = "Miscellaneous direct payments and nominal receipts", IsProjectRelated = false, ReceiveDirectPayments = true, IsActive = true }
+    };
+
 
     [HttpGet]
     public async Task<IActionResult> LookupGstin(string gstin)
@@ -591,6 +659,113 @@ public class MastersController : Controller
             TempData["SuccessMessage"] = $"Project Type '{pt.Name}' status updated to {(pt.IsActive ? "ACTIVE" : "INACTIVE")}.";
         }
         return RedirectToAction(nameof(Index));
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> ExpenseTypes(string? search)
+    {
+        ViewData["ActiveMenu"] = "ExpenseTypes";
+        await EnsureExpenseTypesTableAsync();
+
+        var query = _db.ExpenseTypes.AsNoTracking().AsQueryable();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            search = search.Trim();
+            query = query.Where(e => e.Name.Contains(search) || (e.Description != null && e.Description.Contains(search)));
+            ViewBag.Search = search;
+        }
+
+        var list = await query.OrderBy(e => e.Name).ToListAsync();
+        return View(list);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CreateExpenseType(string name, string? description, bool isProjectRelated, bool receiveDirectPayments, decimal? openingAmount)
+    {
+        await EnsureExpenseTypesTableAsync();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            TempData["ErrorMessage"] = "Expense Type Name is required.";
+            return RedirectToAction(nameof(ExpenseTypes));
+        }
+
+        name = name.Trim();
+        if (await _db.ExpenseTypes.AnyAsync(e => e.Name.ToLower() == name.ToLower()))
+        {
+            TempData["ErrorMessage"] = $"Expense Type '{name}' already exists.";
+            return RedirectToAction(nameof(ExpenseTypes));
+        }
+
+        var exp = new ExpenseType
+        {
+            Name = name,
+            Description = description?.Trim(),
+            IsProjectRelated = isProjectRelated,
+            ReceiveDirectPayments = receiveDirectPayments,
+            OpeningAmount = openingAmount,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        };
+        _db.ExpenseTypes.Add(exp);
+        await _db.SaveChangesAsync();
+
+        TempData["SuccessMessage"] = $"Expense Type '{exp.Name}' created successfully!";
+        return RedirectToAction(nameof(ExpenseTypes));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateExpenseType(long id, string name, string? description, bool isProjectRelated, bool receiveDirectPayments, decimal? openingAmount)
+    {
+        await EnsureExpenseTypesTableAsync();
+        var exp = await _db.ExpenseTypes.FindAsync(id);
+        if (exp == null)
+        {
+            TempData["ErrorMessage"] = "Expense Type not found.";
+            return RedirectToAction(nameof(ExpenseTypes));
+        }
+
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            TempData["ErrorMessage"] = "Expense Type Name is required.";
+            return RedirectToAction(nameof(ExpenseTypes));
+        }
+
+        exp.Name = name.Trim();
+        exp.Description = description?.Trim();
+        exp.IsProjectRelated = isProjectRelated;
+        exp.ReceiveDirectPayments = receiveDirectPayments;
+        exp.OpeningAmount = openingAmount;
+        await _db.SaveChangesAsync();
+
+        TempData["SuccessMessage"] = $"Expense Type '{exp.Name}' updated successfully!";
+        return RedirectToAction(nameof(ExpenseTypes));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteExpenseType(long id)
+    {
+        await EnsureExpenseTypesTableAsync();
+        var exp = await _db.ExpenseTypes.FindAsync(id);
+        if (exp != null)
+        {
+            bool isUsed = await _db.CustomerReceipts.AnyAsync(r => r.ExpenseHead == exp.Name);
+            if (isUsed)
+            {
+                exp.IsActive = false;
+                await _db.SaveChangesAsync();
+                TempData["SuccessMessage"] = $"Expense Type '{exp.Name}' is referenced in receipts and was deactivated instead of deleted.";
+            }
+            else
+            {
+                _db.ExpenseTypes.Remove(exp);
+                await _db.SaveChangesAsync();
+                TempData["SuccessMessage"] = $"Expense Type '{exp.Name}' deleted successfully!";
+            }
+        }
+        return RedirectToAction(nameof(ExpenseTypes));
     }
 }
 
@@ -1472,14 +1647,35 @@ public class SalesController : Controller
     public async Task<IActionResult> Index()
     {
         ViewData["ActiveMenu"] = "Sales";
+        var company = await _companyContext.GetCurrentCompanyAsync();
+        ViewBag.Company = company;
         ViewBag.Clients = await _db.Clients.AsNoTracking().ToListAsync();
         ViewBag.Projects = await _db.Projects.AsNoTracking().ToListAsync();
+
         var invoices = await _db.SalesInvoices
             .Include(i => i.Client)
             .Include(i => i.Project)
+            .OrderByDescending(i => i.InvoiceDate)
+            .ThenByDescending(i => i.Id)
             .AsNoTracking()
             .ToListAsync();
+
+        ViewBag.TotalDbCount = await _db.SalesInvoices.CountAsync();
         return View(invoices);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CancelInvoice(long id)
+    {
+        var inv = await _db.SalesInvoices.FindAsync(id);
+        if (inv != null)
+        {
+            inv.Status = "CANCELLED";
+            await _db.SaveChangesAsync();
+            TempData["SuccessMessage"] = $"Invoice <strong>{inv.InvoiceNumber}</strong> has been cancelled.";
+        }
+        return RedirectToAction(nameof(Index));
     }
 
     public IActionResult Invoices() => RedirectToAction(nameof(Index));
@@ -1551,7 +1747,8 @@ public class SalesController : Controller
             TotalDebit = amountReceived,
             TotalCredit = amountReceived,
             IsBalanced = true,
-            CreatedBy = user?.Id ?? 1
+            CreatedBy = user?.Id ?? 1,
+            Creator = user!
         };
         _db.JournalEntries.Add(jv);
         await _db.SaveChangesAsync();
@@ -1560,70 +1757,146 @@ public class SalesController : Controller
         return RedirectToAction(nameof(Index));
     }
 
+    [HttpGet]
+    public async Task<IActionResult> DirectPayment()
+    {
+        ViewData["ActiveMenu"] = "Sales";
+        var company = await _companyContext.GetCurrentCompanyAsync();
+        ViewBag.Company = company;
+        ViewBag.BankAccounts = await _db.BankAccounts.Where(b => b.IsActive).AsNoTracking().ToListAsync();
+
+        List<ExpenseType> expenseTypes;
+        try
+        {
+            expenseTypes = await _db.ExpenseTypes
+                .Where(e => e.IsActive)
+                .OrderBy(e => e.Name)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+        catch
+        {
+            expenseTypes = new List<ExpenseType>();
+        }
+
+        ViewBag.ExpenseTypes = expenseTypes;
+        ViewBag.ExpenseHeads = expenseTypes.Select(e => e.Name).ToList();
+
+        var directReceipts = await _db.CustomerReceipts
+            .Where(r => r.ExpenseHead != null)
+            .OrderByDescending(r => r.ReceiptDate)
+            .ThenByDescending(r => r.Id)
+            .Take(20)
+            .AsNoTracking()
+            .ToListAsync();
+
+        ViewBag.RecentDirectReceipts = directReceipts;
+        return View();
+    }
+
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(string invoiceNumber, DateTime invoiceDate, DateTime dueDate, decimal taxableAmount, decimal gstRate, long? clientId, long? projectId)
+    public async Task<IActionResult> DirectPayment(
+        string expenseHead,
+        DateTime? paymentReceiveDate,
+        decimal paymentReceiveAmount,
+        string paymentReceiveMode,
+        string paymentReceiveRemarks,
+        long? bankAccountId,
+        string? transactionRefNo,
+        IFormFile? uploadFile)
     {
+        if (paymentReceiveAmount <= 0)
+        {
+            TempData["ErrorMessage"] = "Payment Receive Amount must be greater than zero.";
+            return RedirectToAction(nameof(DirectPayment));
+        }
+
+        if (string.IsNullOrWhiteSpace(expenseHead))
+        {
+            TempData["ErrorMessage"] = "Please select a valid Expense / Income Head.";
+            return RedirectToAction(nameof(DirectPayment));
+        }
+
         var company = await _companyContext.GetCurrentCompanyAsync();
-        var branch = await _db.Branches.FirstOrDefaultAsync(b => b.CompanyId == company.Id) ?? new Branch
-        {
-            CompanyId = company.Id, BranchCode = "HQ", BranchName = "Main Branch"
-        };
-        if (branch.Id == 0) { _db.Branches.Add(branch); await _db.SaveChangesAsync(); }
+        var branch = await _db.Branches.FirstOrDefaultAsync(b => b.CompanyId == company.Id);
+        var user = await _db.Users.FirstOrDefaultAsync();
+        var fy = await _db.FinancialYears.FirstOrDefaultAsync(f => !f.IsClosed);
 
-        if (!clientId.HasValue || clientId.Value == 0)
+        var bank = await _db.BankAccounts.FindAsync(bankAccountId ?? 0) ?? await _db.BankAccounts.FirstOrDefaultAsync(b => b.IsActive);
+        if (bank != null)
         {
-            TempData["ErrorMessage"] = "Please select a valid Client to generate a Tax Invoice.";
-            return RedirectToAction(nameof(Index));
+            bank.BookBalance += paymentReceiveAmount;
         }
 
-        if (!projectId.HasValue || projectId.Value == 0)
+        long? docId = null;
+        if (uploadFile != null && uploadFile.Length > 0)
         {
-            TempData["ErrorMessage"] = "Please select a valid Project to generate a Tax Invoice.";
-            return RedirectToAction(nameof(Index));
+            try
+            {
+                var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "tenants", $"org_{company.Id}", "receipts");
+                if (!Directory.Exists(uploadsFolder)) Directory.CreateDirectory(uploadsFolder);
+
+                var safeFileName = $"receipt_{DateTime.UtcNow.Ticks}_{Path.GetFileName(uploadFile.FileName)}";
+                var filePath = Path.Combine(uploadsFolder, safeFileName);
+                using (var stream = new FileStream(filePath, FileMode.Create))
+                {
+                    await uploadFile.CopyToAsync(stream);
+                }
+
+                var relativePath = $"/uploads/tenants/org_{company.Id}/receipts/{safeFileName}";
+                var attachment = new DocumentAttachment
+                {
+                    EntityType = "DirectPaymentReceive",
+                    EntityId = 0,
+                    FileName = uploadFile.FileName,
+                    FilePath = relativePath,
+                    FileSizeBytes = uploadFile.Length,
+                    MimeType = uploadFile.ContentType ?? "application/octet-stream",
+                    FileHashSha256 = Guid.NewGuid().ToString("N"),
+                    UploadedBy = user?.Id ?? 1,
+                    UploaderId = user?.Id ?? 1,
+                    UploadedAt = DateTime.UtcNow,
+                    VersionNumber = 1
+                };
+                _db.DocumentAttachments.Add(attachment);
+                await _db.SaveChangesAsync();
+                docId = attachment.Id;
+            }
+            catch { }
         }
 
-        var client = await _db.Clients.FindAsync(clientId.Value);
-        var project = await _db.Projects.FindAsync(projectId.Value);
-        if (client == null || project == null)
-        {
-            TempData["ErrorMessage"] = "Selected Client or Project was not found in the database.";
-            return RedirectToAction(nameof(Index));
-        }
+        var count = await _db.CustomerReceipts.CountAsync() + 1;
+        var rcptNo = $"RCPT-DIR-{DateTime.Today:yyMM}-{count:D4}";
 
-        decimal cgst = 0, sgst = 0, igst = 0;
-        if (gstRate > 0)
-        {
-            cgst = Math.Round(taxableAmount * (gstRate / 200m), 2);
-            sgst = Math.Round(taxableAmount * (gstRate / 200m), 2);
-        }
-        decimal total = taxableAmount + cgst + sgst + igst;
-
-        var inv = new SalesInvoice
+        var receipt = new CustomerReceipt
         {
             CompanyId = company.Id,
-            BranchId = branch.Id,
-            ClientId = clientId.Value,
-            ProjectId = projectId.Value,
-            InvoiceNumber = string.IsNullOrWhiteSpace(invoiceNumber) ? $"INV/{DateTime.Now:yy-MM}/{DateTime.Now:HHmmss}" : invoiceNumber,
-            InvoiceDate = invoiceDate == default ? DateTime.Today : invoiceDate,
-            DueDate = dueDate == default ? DateTime.Today.AddDays(30) : dueDate,
-            TaxableAmount = taxableAmount,
-            CgstAmount = cgst,
-            SgstAmount = sgst,
-            IgstAmount = igst,
-            TotalInvoiceValue = total,
-            PaidAmount = 0,
-            OutstandingBalance = total,
-            Status = "SENT",
-            PlaceOfSupply = "07"
+            BankAccountId = bank?.Id ?? 1,
+            ReceiptNumber = rcptNo,
+            ReceiptDate = paymentReceiveDate ?? DateTime.Today,
+            AmountReceived = paymentReceiveAmount,
+            UnallocatedAmount = paymentReceiveAmount,
+            PaymentMode = string.IsNullOrWhiteSpace(paymentReceiveMode) ? "Cheque" : paymentReceiveMode,
+            TransactionRefNo = transactionRefNo,
+            Status = "POSTED",
+            ExpenseHead = expenseHead,
+            Remarks = paymentReceiveRemarks,
+            ReceiptDocId = docId
         };
-
-        _db.SalesInvoices.Add(inv);
+        _db.CustomerReceipts.Add(receipt);
         await _db.SaveChangesAsync();
 
-        var user = await _db.Users.FirstOrDefaultAsync();
-        var fy = await _db.FinancialYears.FirstOrDefaultAsync();
+        if (docId.HasValue)
+        {
+            var att = await _db.DocumentAttachments.FindAsync(docId.Value);
+            if (att != null)
+            {
+                att.EntityId = receipt.Id;
+                await _db.SaveChangesAsync();
+            }
+        }
+
         if (fy == null)
         {
             fy = new FinancialYear
@@ -1641,19 +1914,555 @@ public class SalesController : Controller
         var jv = new JournalEntry
         {
             CompanyId = company.Id,
-            BranchId = branch.Id,
+            BranchId = branch?.Id ?? 1,
             FyId = fy.Id,
+            VoucherNo = $"JV-DIR-RCPT-{DateTime.Now:yyyyMMdd-HHmmss}",
+            VoucherDate = receipt.ReceiptDate,
+            VoucherType = "RECEIPT",
+            SourceEntityType = "DirectPaymentReceive",
+            SourceEntityId = receipt.Id,
+            Narration = $"Direct Payment Received: {expenseHead} via {receipt.PaymentMode} (Ref: {transactionRefNo ?? "N/A"}) - {paymentReceiveRemarks}",
+            TotalDebit = paymentReceiveAmount,
+            TotalCredit = paymentReceiveAmount,
+            IsBalanced = true,
+            CreatedBy = user?.Id ?? 1,
+            Creator = user!
+        };
+        _db.JournalEntries.Add(jv);
+        await _db.SaveChangesAsync();
+
+        receipt.JournalEntryId = jv.Id;
+        await _db.SaveChangesAsync();
+
+        TempData["SuccessMessage"] = $"Direct Payment of <strong>&#8377; {paymentReceiveAmount:N2}</strong> received and posted to General Ledger! (Receipt No: {rcptNo})";
+        return RedirectToAction(nameof(DirectPayment));
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> ProjectPayment(long? projectId)
+    {
+        ViewData["ActiveMenu"] = "Sales";
+        var company = await _companyContext.GetCurrentCompanyAsync();
+        ViewBag.Company = company;
+
+        ViewBag.Projects = await _db.Projects
+            .Include(p => p.Client)
+            .OrderByDescending(p => p.Id)
+            .AsNoTracking()
+            .ToListAsync();
+
+        ViewBag.BankAccounts = await _db.BankAccounts
+            .Where(b => b.IsActive)
+            .AsNoTracking()
+            .ToListAsync();
+
+        ViewBag.SelectedProjectId = projectId ?? 0;
+
+        var invoices = await _db.SalesInvoices
+            .Include(i => i.Project)
+            .Where(i => i.OutstandingBalance > 0)
+            .OrderByDescending(i => i.InvoiceDate)
+            .AsNoTracking()
+            .ToListAsync();
+
+        ViewBag.Invoices = invoices;
+
+        var recentReceipts = await _db.CustomerReceipts
+            .Include(r => r.Project)
+            .Include(r => r.Invoice)
+            .Where(r => r.ProjectId != null)
+            .OrderByDescending(r => r.ReceiptDate)
+            .ThenByDescending(r => r.Id)
+            .Take(20)
+            .AsNoTracking()
+            .ToListAsync();
+
+        ViewBag.RecentProjectReceipts = recentReceipts;
+        return View();
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GetInvoicesByProject(long projectId)
+    {
+        var invoices = await _db.SalesInvoices
+            .Where(i => i.ProjectId == projectId && i.OutstandingBalance > 0)
+            .Select(i => new
+            {
+                id = i.Id,
+                invoiceNumber = i.InvoiceNumber,
+                invoiceDate = i.InvoiceDate.ToString("dd MMM yyyy"),
+                outstandingBalance = i.OutstandingBalance,
+                totalValue = i.TotalInvoiceValue
+            })
+            .ToListAsync();
+
+        return Json(invoices);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ProjectPayment(
+        long projectId,
+        DateTime? paymentReceiveDate,
+        string paymentReceiveMode,
+        bool isAdvanceReceived,
+        long? invoiceId,
+        decimal tdsAmount,
+        decimal gstAmount,
+        decimal securityDepositAmount,
+        decimal otherDeductionAmount,
+        decimal netAmountReceive,
+        decimal totalAmountReceive,
+        string paymentReceiveRemarks,
+        long? bankAccountId)
+    {
+        var project = await _db.Projects.Include(p => p.Client).FirstOrDefaultAsync(p => p.Id == projectId);
+        if (project == null)
+        {
+            TempData["ErrorMessage"] = "Please select a valid Project.";
+            return RedirectToAction(nameof(ProjectPayment));
+        }
+
+        if (totalAmountReceive <= 0 && netAmountReceive <= 0)
+        {
+            TempData["ErrorMessage"] = "Received amount must be greater than zero.";
+            return RedirectToAction(nameof(ProjectPayment));
+        }
+
+        if (totalAmountReceive <= 0)
+        {
+            totalAmountReceive = netAmountReceive + tdsAmount + gstAmount + securityDepositAmount + otherDeductionAmount;
+        }
+
+        var company = await _companyContext.GetCurrentCompanyAsync();
+        var branch = await _db.Branches.FirstOrDefaultAsync(b => b.CompanyId == company.Id);
+        var user = await _db.Users.FirstOrDefaultAsync();
+        var fy = await _db.FinancialYears.FirstOrDefaultAsync(f => !f.IsClosed);
+
+        var bank = await _db.BankAccounts.FindAsync(bankAccountId ?? 0) ?? await _db.BankAccounts.FirstOrDefaultAsync(b => b.IsActive);
+        if (bank != null && netAmountReceive > 0)
+        {
+            bank.BookBalance += netAmountReceive;
+        }
+
+        SalesInvoice? invoice = null;
+        if (invoiceId.HasValue && invoiceId.Value > 0)
+        {
+            invoice = await _db.SalesInvoices.FindAsync(invoiceId.Value);
+            if (invoice != null)
+            {
+                var allocAmt = Math.Min(totalAmountReceive, invoice.OutstandingBalance);
+                invoice.PaidAmount += allocAmt;
+                invoice.OutstandingBalance = Math.Max(0, invoice.TotalInvoiceValue - invoice.PaidAmount);
+                invoice.Status = invoice.OutstandingBalance == 0 ? "PAID" : "PARTIAL";
+            }
+        }
+
+        var count = await _db.CustomerReceipts.CountAsync() + 1;
+        var rcptNo = $"RCPT-PRJ-{DateTime.Today:yyMM}-{count:D4}";
+
+        var receipt = new CustomerReceipt
+        {
+            CompanyId = company.Id,
+            ClientId = project.ClientId,
+            BankAccountId = bank?.Id ?? 1,
+            ReceiptNumber = rcptNo,
+            ReceiptDate = paymentReceiveDate ?? DateTime.Today,
+            AmountReceived = netAmountReceive > 0 ? netAmountReceive : totalAmountReceive,
+            UnallocatedAmount = 0,
+            PaymentMode = string.IsNullOrWhiteSpace(paymentReceiveMode) ? "Netbanking" : paymentReceiveMode,
+            Status = "POSTED",
+            ProjectId = project.Id,
+            InvoiceId = invoice?.Id,
+            IsAdvance = isAdvanceReceived,
+            TdsAmount = tdsAmount,
+            GstTdsAmount = gstAmount,
+            SecurityDepositAmount = securityDepositAmount,
+            OtherDeductionAmount = otherDeductionAmount,
+            NetAmountReceived = netAmountReceive,
+            TotalAmountReceived = totalAmountReceive,
+            ExpenseHead = isAdvanceReceived ? "Mobilization Advance" : "Project Milestone Billing",
+            Remarks = paymentReceiveRemarks
+        };
+        _db.CustomerReceipts.Add(receipt);
+        await _db.SaveChangesAsync();
+
+        if (invoice != null)
+        {
+            var alloc = new ReceiptAllocation
+            {
+                ReceiptId = receipt.Id,
+                InvoiceId = invoice.Id,
+                AllocatedAmount = totalAmountReceive,
+                TdsDeductedByClient = tdsAmount
+            };
+            _db.ReceiptAllocations.Add(alloc);
+            await _db.SaveChangesAsync();
+        }
+
+        if (fy == null)
+        {
+            fy = new FinancialYear
+            {
+                CompanyId = company.Id,
+                FyCode = $"FY-{DateTime.Today.Year}-{(DateTime.Today.Year + 1) % 100}",
+                StartDate = new DateTime(DateTime.Today.Year, 4, 1),
+                EndDate = new DateTime(DateTime.Today.Year + 1, 3, 31),
+                IsClosed = false
+            };
+            _db.FinancialYears.Add(fy);
+            await _db.SaveChangesAsync();
+        }
+
+        var jv = new JournalEntry
+        {
+            CompanyId = company.Id,
+            BranchId = branch?.Id ?? 1,
+            FyId = fy.Id,
+            VoucherNo = $"JV-PRJ-RCPT-{DateTime.Now:yyyyMMdd-HHmmss}",
+            VoucherDate = receipt.ReceiptDate,
+            VoucherType = "RECEIPT",
+            SourceEntityType = "ProjectPaymentReceived",
+            SourceEntityId = receipt.Id,
+            ProjectId = project.Id,
+            Narration = $"Project Payment: {project.ProjectName} (Invoice: {invoice?.InvoiceNumber ?? "Advance"}) - Net ₹{netAmountReceive:N2} (Total ₹{totalAmountReceive:N2}) - {paymentReceiveRemarks}",
+            TotalDebit = totalAmountReceive,
+            TotalCredit = totalAmountReceive,
+            IsBalanced = true,
+            CreatedBy = user?.Id ?? 1,
+            Creator = user!
+        };
+        _db.JournalEntries.Add(jv);
+        await _db.SaveChangesAsync();
+
+        receipt.JournalEntryId = jv.Id;
+        await _db.SaveChangesAsync();
+
+        TempData["SuccessMessage"] = $"Project payment of <strong>&#8377; {totalAmountReceive:N2}</strong> recorded successfully! (Receipt No: {rcptNo})";
+        return RedirectToAction(nameof(ProjectPayment));
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> Create()
+    {
+        ViewData["ActiveMenu"] = "Sales";
+        var company = await _companyContext.GetCurrentCompanyAsync();
+        ViewBag.Company = company;
+
+        var fy = await _db.FinancialYears.FirstOrDefaultAsync(f => !f.IsClosed);
+        var today = DateTime.Today;
+        var startYear = today.Month >= 4 ? today.Year : today.Year - 1;
+        var endYear = (startYear + 1) % 100;
+        ViewBag.FinancialYearCode = fy != null ? fy.FyCode : $"FY {startYear}-{endYear}";
+
+        var count = await _db.SalesInvoices.CountAsync() + 1;
+        ViewBag.AutoInvoiceNumber = $"INV/{startYear % 100}-{endYear}/{count:D4}";
+
+        ViewBag.Projects = await _db.Projects
+            .Include(p => p.Client)
+            .AsNoTracking()
+            .ToListAsync();
+
+        ViewBag.Clients = await _db.Clients
+            .AsNoTracking()
+            .ToListAsync();
+
+        return View();
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Create(
+        string? invoiceNumber,
+        DateTime? invoiceDate,
+        DateTime? dueDate,
+        string? workOrderNo,
+        DateTime? workOrderDate,
+        long? projectId,
+        long? clientId,
+        string? billingAttention,
+        string? remarks,
+        string? deductionRemarks,
+        decimal? deductionAmount,
+        decimal? taxableAmount,
+        decimal? gstRate,
+        IFormCollection form)
+    {
+        var company = await _companyContext.GetCurrentCompanyAsync();
+        var branch = await _db.Branches.FirstOrDefaultAsync(b => b.CompanyId == company.Id) ?? new Branch
+        {
+            CompanyId = company.Id, BranchCode = "HQ", BranchName = "Main Branch"
+        };
+        if (branch.Id == 0) { _db.Branches.Add(branch); await _db.SaveChangesAsync(); }
+
+        Project? project = null;
+        Client? client = null;
+
+        if (projectId.HasValue && projectId.Value > 0)
+        {
+            project = await _db.Projects.Include(p => p.Client).FirstOrDefaultAsync(p => p.Id == projectId.Value);
+            if (project != null)
+            {
+                client = project.Client ?? await _db.Clients.FindAsync(project.ClientId);
+                if (clientId == null || clientId.Value == 0)
+                {
+                    clientId = project.ClientId;
+                }
+            }
+        }
+
+        if (client == null && clientId.HasValue && clientId.Value > 0)
+        {
+            client = await _db.Clients.FindAsync(clientId.Value);
+        }
+
+        if (project == null)
+        {
+            project = await _db.Projects.Include(p => p.Client).FirstOrDefaultAsync();
+            if (project != null)
+            {
+                projectId = project.Id;
+                client ??= project.Client ?? await _db.Clients.FindAsync(project.ClientId);
+                clientId ??= project.ClientId;
+            }
+        }
+
+        if (client == null)
+        {
+            client = await _db.Clients.FirstOrDefaultAsync();
+            if (client != null)
+            {
+                clientId = client.Id;
+            }
+            else
+            {
+                // Create a fallback client
+                client = new Client
+                {
+                    CompanyId = company.Id,
+                    ClientCode = "CUST-001",
+                    ClientName = !string.IsNullOrWhiteSpace(billingAttention) ? billingAttention : "Corporate Client",
+                    BillingAddress = "Corporate Office",
+                    StateCode = "07"
+                };
+                _db.Clients.Add(client);
+                await _db.SaveChangesAsync();
+                clientId = client.Id;
+            }
+        }
+
+        if (project == null)
+        {
+            project = new Project
+            {
+                CompanyId = company.Id,
+                BranchId = branch.Id,
+                ClientId = client.Id,
+                ProjectCode = "PRJ-GEN-01",
+                ProjectName = "Commercial Engineering Services",
+                StartDate = DateTime.Today
+            };
+            _db.Projects.Add(project);
+            await _db.SaveChangesAsync();
+            projectId = project.Id;
+        }
+
+        // Parse line items from form collections
+        var descriptions = form["itemDescription[]"].Count > 0 ? form["itemDescription[]"].ToList() : form["itemDescription"].ToList();
+        var hsnCodes = form["itemHsn[]"].Count > 0 ? form["itemHsn[]"].ToList() : form["itemHsn"].ToList();
+        var itemGsts = form["itemGst[]"].Count > 0 ? form["itemGst[]"].ToList() : form["itemGst"].ToList();
+        var itemIgsts = form["itemIgst[]"].Count > 0 ? form["itemIgst[]"].ToList() : form["itemIgst"].ToList();
+        var itemCgsts = form["itemCgst[]"].Count > 0 ? form["itemCgst[]"].ToList() : form["itemCgst"].ToList();
+        var itemSgsts = form["itemSgst[]"].Count > 0 ? form["itemSgst[]"].ToList() : form["itemSgst"].ToList();
+        var qtys = form["itemQty[]"].Count > 0 ? form["itemQty[]"].ToList() : form["itemQty"].ToList();
+        var rates = form["itemRate[]"].Count > 0 ? form["itemRate[]"].ToList() : form["itemRate"].ToList();
+
+        var invoiceItems = new List<SalesInvoiceItem>();
+        decimal calculatedTaxable = 0;
+        decimal calculatedCgst = 0;
+        decimal calculatedSgst = 0;
+        decimal calculatedIgst = 0;
+
+        int rowCount = descriptions.Count;
+        for (int i = 0; i < rowCount; i++)
+        {
+            var desc = descriptions[i]?.Trim();
+            if (string.IsNullOrWhiteSpace(desc)) continue;
+
+            decimal qty = 1.0m;
+            if (i < qtys.Count && decimal.TryParse(qtys[i], out var parsedQty) && parsedQty > 0)
+                qty = parsedQty;
+
+            decimal rate = 0;
+            if (i < rates.Count && decimal.TryParse(rates[i], out var parsedRate) && parsedRate >= 0)
+                rate = parsedRate;
+
+            var hsn = (i < hsnCodes.Count && !string.IsNullOrWhiteSpace(hsnCodes[i])) ? hsnCodes[i].Trim() : "998313";
+
+            decimal gRate = 18m;
+            if (i < itemGsts.Count && decimal.TryParse(itemGsts[i], out var pGst)) gRate = pGst;
+
+            decimal igstR = 0m, cgstR = 0m, sgstR = 0m;
+            if (i < itemIgsts.Count && decimal.TryParse(itemIgsts[i], out var pIgst)) igstR = pIgst;
+            if (i < itemCgsts.Count && decimal.TryParse(itemCgsts[i], out var pCgst)) cgstR = pCgst;
+            if (i < itemSgsts.Count && decimal.TryParse(itemSgsts[i], out var pSgst)) sgstR = pSgst;
+
+            // If component rates were not specifically provided, split based on gRate
+            if (igstR == 0 && cgstR == 0 && sgstR == 0 && gRate > 0)
+            {
+                var isInterState = !string.IsNullOrEmpty(client.StateCode) && !string.IsNullOrEmpty(company.StateCode) && client.StateCode != company.StateCode;
+                if (isInterState)
+                {
+                    igstR = gRate;
+                }
+                else
+                {
+                    cgstR = Math.Round(gRate / 2m, 2);
+                    sgstR = Math.Round(gRate / 2m, 2);
+                }
+            }
+
+            var lineTaxable = Math.Round(qty * rate, 2);
+            var lineCgst = Math.Round(lineTaxable * (cgstR / 100m), 2);
+            var lineSgst = Math.Round(lineTaxable * (sgstR / 100m), 2);
+            var lineIgst = Math.Round(lineTaxable * (igstR / 100m), 2);
+            var lineTotal = lineTaxable + lineCgst + lineSgst + lineIgst;
+
+            calculatedTaxable += lineTaxable;
+            calculatedCgst += lineCgst;
+            calculatedSgst += lineSgst;
+            calculatedIgst += lineIgst;
+
+            invoiceItems.Add(new SalesInvoiceItem
+            {
+                ItemDescription = desc,
+                HsnSacCode = hsn,
+                Quantity = qty,
+                UnitRate = rate,
+                TaxableValue = lineTaxable,
+                GstRate = gRate,
+                IgstRate = igstR,
+                CgstRate = cgstR,
+                SgstRate = sgstR,
+                CgstAmount = lineCgst,
+                SgstAmount = lineSgst,
+                IgstAmount = lineIgst,
+                LineTotal = lineTotal
+            });
+        }
+
+        // Fallback for modal or direct single taxableAmount submission
+        if (!invoiceItems.Any())
+        {
+            var fallbackTaxable = taxableAmount ?? 0m;
+            var fallbackGst = gstRate ?? 18m;
+            var fallbackCgst = Math.Round(fallbackTaxable * (fallbackGst / 200m), 2);
+            var fallbackSgst = Math.Round(fallbackTaxable * (fallbackGst / 200m), 2);
+            var fallbackTotal = fallbackTaxable + fallbackCgst + fallbackSgst;
+
+            calculatedTaxable = fallbackTaxable;
+            calculatedCgst = fallbackCgst;
+            calculatedSgst = fallbackSgst;
+            calculatedIgst = 0;
+
+            invoiceItems.Add(new SalesInvoiceItem
+            {
+                ItemDescription = $"{project.ProjectName} - Execution & Milestone Delivery",
+                HsnSacCode = "998313",
+                Quantity = 1.00m,
+                UnitRate = fallbackTaxable,
+                TaxableValue = fallbackTaxable,
+                GstRate = fallbackGst,
+                CgstRate = fallbackGst / 2m,
+                SgstRate = fallbackGst / 2m,
+                CgstAmount = fallbackCgst,
+                SgstAmount = fallbackSgst,
+                IgstAmount = 0,
+                LineTotal = fallbackTotal
+            });
+        }
+
+        decimal grossTotal = calculatedTaxable + calculatedCgst + calculatedSgst + calculatedIgst;
+        decimal deduction = deductionAmount ?? 0m;
+        decimal netPayable = Math.Max(0, grossTotal - deduction);
+
+        if (string.IsNullOrWhiteSpace(invoiceNumber))
+        {
+            var count = await _db.SalesInvoices.CountAsync() + 1;
+            var startYear = DateTime.Today.Month >= 4 ? DateTime.Today.Year : DateTime.Today.Year - 1;
+            var endYear = (startYear + 1) % 100;
+            invoiceNumber = $"INV/{startYear % 100}-{endYear}/{count:D4}";
+        }
+
+        var inv = new SalesInvoice
+        {
+            CompanyId = company.Id,
+            BranchId = branch.Id,
+            ClientId = client.Id,
+            ProjectId = project.Id,
+            InvoiceNumber = invoiceNumber,
+            InvoiceDate = invoiceDate ?? DateTime.Today,
+            DueDate = dueDate ?? (invoiceDate ?? DateTime.Today).AddDays(30),
+            WorkOrderNo = workOrderNo,
+            WorkOrderDate = workOrderDate,
+            BillingAttention = billingAttention ?? client.ContactPerson ?? client.ClientName,
+            Remarks = remarks,
+            DeductionRemarks = deductionRemarks,
+            DeductionAmount = deduction,
+            TaxableAmount = calculatedTaxable,
+            CgstAmount = calculatedCgst,
+            SgstAmount = calculatedSgst,
+            IgstAmount = calculatedIgst,
+            TotalInvoiceValue = netPayable,
+            PaidAmount = 0,
+            OutstandingBalance = netPayable,
+            Status = "SENT",
+            PlaceOfSupply = client.StateCode ?? "07"
+        };
+
+        _db.SalesInvoices.Add(inv);
+        await _db.SaveChangesAsync();
+
+        foreach (var item in invoiceItems)
+        {
+            item.InvoiceId = inv.Id;
+            _db.SalesInvoiceItems.Add(item);
+        }
+        await _db.SaveChangesAsync();
+
+        var user = await _db.Users.FirstOrDefaultAsync();
+        var fyRecord = await _db.FinancialYears.FirstOrDefaultAsync();
+        if (fyRecord == null)
+        {
+            fyRecord = new FinancialYear
+            {
+                CompanyId = company.Id,
+                FyCode = $"FY-{DateTime.Today.Year}-{(DateTime.Today.Year + 1) % 100}",
+                StartDate = new DateTime(DateTime.Today.Year, 4, 1),
+                EndDate = new DateTime(DateTime.Today.Year + 1, 3, 31),
+                IsClosed = false
+            };
+            _db.FinancialYears.Add(fyRecord);
+            await _db.SaveChangesAsync();
+        }
+
+        var jv = new JournalEntry
+        {
+            CompanyId = company.Id,
+            BranchId = branch.Id,
+            FyId = fyRecord.Id,
             VoucherNo = $"JV-SALES-{DateTime.Now:yyyyMMdd-HHmmss}",
             VoucherDate = inv.InvoiceDate,
             VoucherType = "SALES",
             SourceEntityType = "SalesInvoice",
             SourceEntityId = inv.Id,
-            ProjectId = projectId.Value,
-            Narration = $"Tax Invoice {inv.InvoiceNumber} auto-posted to Ledger",
-            TotalDebit = total,
-            TotalCredit = total,
+            ProjectId = project.Id,
+            Narration = $"Tax Invoice {inv.InvoiceNumber} auto-posted to General Ledger",
+            TotalDebit = netPayable,
+            TotalCredit = netPayable,
             IsBalanced = true,
-            CreatedBy = user?.Id ?? 1
+            CreatedBy = user?.Id ?? 1,
+            Creator = user!
         };
         _db.JournalEntries.Add(jv);
         await _db.SaveChangesAsync();
@@ -1663,34 +2472,18 @@ public class SalesController : Controller
             CompanyId = company.Id,
             VoucherId = jv.Id,
             TransactionType = "OUTPUT",
-            TaxableValue = taxableAmount,
-            TaxRatePercentage = gstRate,
-            CgstAmount = cgst,
-            SgstAmount = sgst,
-            IgstAmount = igst,
+            TaxableValue = calculatedTaxable,
+            TaxRatePercentage = invoiceItems.Any() ? invoiceItems.First().GstRate : 18m,
+            CgstAmount = calculatedCgst,
+            SgstAmount = calculatedSgst,
+            IgstAmount = calculatedIgst,
             ReturnPeriod = DateTime.Today.ToString("MM-yyyy"),
-            PlaceOfSupply = "07"
+            PlaceOfSupply = inv.PlaceOfSupply
         };
-        // Add default line item if none exist
-        var item = new SalesInvoiceItem
-        {
-            InvoiceId = inv.Id,
-            ItemDescription = $"{project.ProjectName} - Execution & Statutory Milestone Services",
-            HsnSacCode = "998313",
-            Quantity = 1.00m,
-            UnitRate = taxableAmount,
-            TaxableValue = taxableAmount,
-            TaxRateId = 1,
-            CgstAmount = cgst,
-            SgstAmount = sgst,
-            IgstAmount = igst,
-            LineTotal = total
-        };
-        _db.SalesInvoiceItems.Add(item);
-
+        _db.GstTransactions.Add(gst);
         await _db.SaveChangesAsync();
 
-        TempData["SuccessMessage"] = $"Tax Invoice {inv.InvoiceNumber} created successfully for &#8377; {total:N2}!";
+        TempData["SuccessMessage"] = $"Tax Invoice <strong>{inv.InvoiceNumber}</strong> created successfully for &#8377; {netPayable:N2}!";
         return RedirectToAction(nameof(Index));
     }
 

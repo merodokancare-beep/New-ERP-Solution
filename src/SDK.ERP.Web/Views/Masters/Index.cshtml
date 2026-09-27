@@ -8,6 +8,7 @@
     var taxRates = Model?.TaxRates ?? new();
     var accountGroups = Model?.AccountGroups ?? new();
     var projectTypes = Model?.ProjectTypes ?? new();
+    var expenseTypes = Model?.ExpenseTypes ?? new();
 }
 
 <div class="d-flex align-items-center justify-content-between mb-4">
@@ -62,6 +63,11 @@
         <button class="nav-link fw-semibold" id="projecttypes-tab" data-bs-toggle="pill" data-bs-target="#projecttypes" type="button" role="tab">
             <i class="fa-solid fa-diagram-project me-2"></i>Project Types (@projectTypes.Count)
         </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <a class="nav-link fw-semibold" asp-controller="Masters" asp-action="ExpenseTypes">
+            <i class="fa-solid fa-receipt me-2"></i>Expense Types (@expenseTypes.Count)
+        </a>
     </li>
 </ul>
 

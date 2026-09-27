@@ -52,6 +52,10 @@
                     <span class="nav-icon-badge blue"><i class="fa-solid fa-sliders"></i></span>
                     <span class="flex-grow-1">Master Catalogs</span>
                 </a>
+                <a class="nav-item-link @(activeMenu == "ExpenseTypes" ? "active" : "")" asp-controller="Masters" asp-action="ExpenseTypes" title="Expense Type List" data-bs-toggle="tooltip" data-bs-placement="right">
+                    <span class="nav-icon-badge orange"><i class="fa-solid fa-receipt"></i></span>
+                    <span class="flex-grow-1">Expense Types</span>
+                </a>
 
                 <!-- PROJECT MANAGEMENT -->
                 <div class="nav-section-title">OPERATIONS &amp; PROJECTS</div>

@@ -1,0 +1,344 @@
+@{
+    ViewData["Title"] = "Direct Payment Receive";
+    ViewData["ActiveMenu"] = "Sales";
+    var bankAccounts = ViewBag.BankAccounts as IEnumerable<SDK.ERP.Domain.Entities.Banking.BankAccount> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Banking.BankAccount>();
+    var expenseTypes = ViewBag.ExpenseTypes as IEnumerable<SDK.ERP.Domain.Entities.MasterData.ExpenseType> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.MasterData.ExpenseType>();
+    var expenseHeads = ViewBag.ExpenseHeads as IEnumerable<string> ?? Enumerable.Empty<string>();
+    var recentReceipts = ViewBag.RecentDirectReceipts as IEnumerable<SDK.ERP.Domain.Entities.Sales.CustomerReceipt> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Sales.CustomerReceipt>();
+}
+
+<style>
+    .direct-card {
+        background: #ffffff;
+        border: 1px solid #E2E8F0;
+        border-radius: 12px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+        margin-bottom: 24px;
+    }
+    .direct-card-header {
+        padding: 16px 24px;
+        border-bottom: 1px solid #F1F5F9;
+    }
+    .direct-card-title {
+        font-size: 15px;
+        font-weight: 700;
+        color: #1E293B;
+        margin: 0;
+    }
+    .direct-card-body {
+        padding: 24px;
+    }
+    .form-label-custom {
+        font-size: 12.5px;
+        font-weight: 600;
+        color: #334155;
+        margin-bottom: 6px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .form-label-custom .text-danger {
+        font-size: 12px;
+    }
+    .input-custom {
+        font-size: 13.5px;
+        border: 1px solid #CBD5E1;
+        border-radius: 8px;
+        padding: 9px 14px;
+        color: #1E293B;
+        transition: all 0.15s ease-in-out;
+    }
+    .input-custom:focus {
+        border-color: #7C3AED;
+        box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12);
+        outline: none;
+    }
+    .btn-save-purple {
+        background: #7C3AED;
+        color: #ffffff;
+        border: none;
+        padding: 8px 24px;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 13.5px;
+        transition: background 0.15s ease;
+    }
+    .btn-save-purple:hover {
+        background: #6D28D9;
+        color: #ffffff;
+    }
+    .btn-cancel-purple {
+        background: #ffffff;
+        color: #7C3AED;
+        border: 1px solid #7C3AED;
+        padding: 8px 24px;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 13.5px;
+        text-decoration: none;
+        transition: all 0.15s ease;
+    }
+    .btn-cancel-purple:hover {
+        background: #F5F3FF;
+        color: #6D28D9;
+    }
+    .tab-nav-link {
+        font-size: 13.5px;
+        font-weight: 600;
+        color: #64748B;
+        padding: 8px 18px;
+        border-radius: 9999px;
+        text-decoration: none;
+        transition: all 0.15s ease;
+    }
+    .tab-nav-link.active {
+        background: #7C3AED;
+        color: #ffffff;
+    }
+    .tab-nav-link:hover:not(.active) {
+        background: #F1F5F9;
+        color: #1E293B;
+    }
+</style>
+
+<!-- Top Breadcrumbs & Tab Bar -->
+<div class="mb-3">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-1" style="font-size: 12.5px;">
+            <li class="breadcrumb-item">
+                <a asp-controller="Home" asp-action="Index" class="text-decoration-none text-muted">
+                    <i class="fa-solid fa-house me-1 text-primary"></i> Home
+                </a>
+            </li>
+            <li class="breadcrumb-item text-muted">Sales &amp; Receivables</li>
+            <li class="breadcrumb-item active fw-semibold text-dark" aria-current="page">Direct Payment Receive</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <h4 class="mb-0 fw-bold" style="color: #0F172A; font-size: 21px; letter-spacing: -0.3px;">Direct Payment Receive</h4>
+        <div class="d-flex align-items-center gap-1 bg-white p-1 rounded-pill border shadow-sm">
+            <a asp-controller="Sales" asp-action="AllocatePayment" class="tab-nav-link">
+                <i class="fa-solid fa-coins me-1"></i> Multi-Invoice Allocation
+            </a>
+            <a asp-controller="Sales" asp-action="ProjectPayment" class="tab-nav-link">
+                <i class="fa-solid fa-diagram-project me-1"></i> Project Payment Received
+            </a>
+            <a asp-controller="Sales" asp-action="DirectPayment" class="tab-nav-link active">
+                <i class="fa-solid fa-hand-holding-dollar me-1"></i> Direct Payment Receive
+            </a>
+        </div>
+    </div>
+</div>
+
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show d-flex align-items-center mb-3 shadow-sm" role="alert" style="border-radius: 10px;">
+        <i class="fa-solid fa-circle-check fs-5 me-2 text-success"></i>
+        <div>@Html.Raw(TempData["SuccessMessage"])</div>
+        <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show d-flex align-items-center mb-3 shadow-sm" role="alert" style="border-radius: 10px;">
+        <i class="fa-solid fa-circle-exclamation fs-5 me-2 text-danger"></i>
+        <div>@Html.Raw(TempData["ErrorMessage"])</div>
+        <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+<!-- Direct Payment Form Card (Matches Sample Screenshot Pixel-for-Pixel) -->
+<div class="direct-card">
+    <div class="direct-card-header">
+        <h5 class="direct-card-title">Add Direct Payment Details</h5>
+    </div>
+    <div class="direct-card-body">
+        <form method="post" asp-action="DirectPayment" enctype="multipart/form-data">
+            @Html.AntiForgeryToken()
+
+            <!-- Row 1: Expense Head & Date -->
+            <div class="row g-4 mb-4">
+                <div class="col-md-6">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label-custom mb-0">
+                            Expense Head <span class="text-danger">*</span>
+                        </label>
+                        <a href="/Masters/ExpenseTypes" target="_blank" class="text-decoration-none" style="font-size: 11px; color: #7c3aed; font-weight: 600;">
+                            <i class="fa-solid fa-gear me-1"></i>Expense Types Master
+                        </a>
+                    </div>
+                    <select name="expenseHead" class="form-select input-custom" required>
+                        <option value="">-- Select Expense Head --</option>
+                        @if (expenseTypes.Any())
+                        {
+                            var directHeads = expenseTypes.Where(e => e.ReceiveDirectPayments).ToList();
+                            var otherHeads = expenseTypes.Where(e => !e.ReceiveDirectPayments).ToList();
+
+                            if (directHeads.Any())
+                            {
+                                <optgroup label="Direct Payment Heads (Enabled)">
+                                    @foreach (var head in directHeads)
+                                    {
+                                        <option value="@head.Name">@head.Name</option>
+                                    }
+                                </optgroup>
+                            }
+                            if (otherHeads.Any())
+                            {
+                                <optgroup label="All Master Expense Heads">
+                                    @foreach (var head in otherHeads)
+                                    {
+                                        <option value="@head.Name">@head.Name</option>
+                                    }
+                                </optgroup>
+                            }
+                        }
+                        else
+                        {
+                            @foreach (var head in expenseHeads)
+                            {
+                                <option value="@head">@head</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label-custom">
+                        Payment Receive Date <span class="text-danger">*</span>
+                    </label>
+                    <input type="date" name="paymentReceiveDate" class="form-control input-custom" value="@DateTime.Today.ToString("yyyy-MM-dd")" required />
+                </div>
+            </div>
+
+            <!-- Row 2: Amount & Mode -->
+            <div class="row g-4 mb-4">
+                <div class="col-md-6">
+                    <label class="form-label-custom">
+                        Payment Receive Amount <span class="text-danger">*</span>
+                    </label>
+                    <input type="number" step="0.01" min="0.01" name="paymentReceiveAmount" class="form-control input-custom" placeholder="" required />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label-custom">
+                        Payment Receive Mode <span class="text-danger">*</span>
+                    </label>
+                    <select name="paymentReceiveMode" class="form-select input-custom" required>
+                        <option value="">-- Select Mode --</option>
+                        <option value="Cash">Cash</option>
+                        <option value="Cheque" selected>Cheque</option>
+                        <option value="Netbanking">Netbanking</option>
+                        <option value="Others">Others</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Row 3: Remarks -->
+            <div class="row g-4 mb-4">
+                <div class="col-md-12">
+                    <label class="form-label-custom">
+                        Payment Receive Remarks <span class="text-danger">*</span>
+                    </label>
+                    <textarea name="paymentReceiveRemarks" class="form-control input-custom" rows="3" placeholder="" required></textarea>
+                </div>
+            </div>
+
+            <!-- Row 4: Bank, Cheque/Txn No & File Upload -->
+            <div class="row g-4 mb-4">
+                <div class="col-md-4">
+                    <label class="form-label-custom">
+                        Bank Name 
+                        <i class="fa-solid fa-circle-info text-muted ms-1" style="font-size: 11px;" title="Select company deposit bank account"></i>
+                        <span class="text-danger">*</span>
+                    </label>
+                    <select name="bankAccountId" class="form-select input-custom" required>
+                        <option value="">-- Select Bank --</option>
+                        @foreach (var b in bankAccounts)
+                        {
+                            <option value="@b.Id">@b.BankName - @b.AccountNumber</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label-custom">
+                        Cheque/Transaction No. <span class="text-danger">*</span>
+                    </label>
+                    <input type="text" name="transactionRefNo" class="form-control input-custom" placeholder="" required />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label-custom">
+                        Upload File (allowed formats: image/pdf)
+                    </label>
+                    <input type="file" name="uploadFile" class="form-control input-custom" accept=".pdf,.jpg,.jpeg,.png" />
+                </div>
+            </div>
+
+            <!-- Bottom Action Buttons -->
+            <div class="d-flex align-items-center justify-content-end gap-2 pt-2">
+                <a asp-controller="Sales" asp-action="AllocatePayment" class="btn-cancel-purple">
+                    Cancel
+                </a>
+                <button type="submit" class="btn-save-purple">
+                    Save
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Recent Direct Receipts History -->
+@if (recentReceipts.Any())
+{
+    <div class="direct-card">
+        <div class="direct-card-header d-flex justify-content-between align-items-center">
+            <h5 class="direct-card-title">
+                <i class="fa-solid fa-clock-rotate-left text-primary me-2"></i>Recent Direct Receipts
+            </h5>
+            <span class="badge rounded-pill px-3 py-1.5" style="background: #EFF6FF; color: #1D4ED8; font-size: 11.5px; font-weight: 600;">
+                General Ledger Auto-Posted
+            </span>
+        </div>
+        <div class="direct-card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0" style="font-size: 13px;">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-4">Receipt No</th>
+                            <th>Date</th>
+                            <th>Expense / Revenue Head</th>
+                            <th>Mode &amp; Ref No</th>
+                            <th>Remarks</th>
+                            <th class="text-end">Amount (&#8377;)</th>
+                            <th class="text-center pe-4">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in recentReceipts)
+                        {
+                            <tr>
+                                <td class="ps-4 fw-bold text-primary">@r.ReceiptNumber</td>
+                                <td>@r.ReceiptDate.ToString("dd MMM yyyy")</td>
+                                <td><span class="badge bg-light text-dark border">@(r.ExpenseHead ?? "Direct Receipt")</span></td>
+                                <td>
+                                    <strong>@r.PaymentMode</strong>
+                                    @if (!string.IsNullOrEmpty(r.TransactionRefNo))
+                                    {
+                                        <small class="text-muted d-block">Ref: @r.TransactionRefNo</small>
+                                    }
+                                </td>
+                                <td class="text-muted text-truncate" style="max-width: 250px;">@r.Remarks</td>
+                                <td class="text-end fw-bold text-success">&#8377; @r.AmountReceived.ToString("N2")</td>
+                                <td class="text-center pe-4">
+                                    <span class="badge rounded-pill bg-success-subtle text-success border border-success-subtle px-2.5 py-1">
+                                        <i class="fa-solid fa-circle-check me-1"></i> Posted
+                                    </span>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}

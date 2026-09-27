@@ -1,0 +1,486 @@
+@{
+    ViewData["Title"] = "Project's Payment Received";
+    ViewData["ActiveMenu"] = "Sales";
+
+    var projects = ViewBag.Projects as IEnumerable<SDK.ERP.Domain.Entities.Projects.Project> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Projects.Project>();
+    var bankAccounts = ViewBag.BankAccounts as IEnumerable<SDK.ERP.Domain.Entities.Banking.BankAccount> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Banking.BankAccount>();
+    var invoices = ViewBag.Invoices as IEnumerable<SDK.ERP.Domain.Entities.Sales.SalesInvoice> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Sales.SalesInvoice>();
+    var recentReceipts = ViewBag.RecentProjectReceipts as IEnumerable<SDK.ERP.Domain.Entities.Sales.CustomerReceipt> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Sales.CustomerReceipt>();
+    var selectedProjectId = ViewBag.SelectedProjectId != null ? (long)ViewBag.SelectedProjectId : 0;
+}
+
+<style>
+    .direct-card {
+        background: #ffffff;
+        border: 1px solid #E2E8F0;
+        border-radius: 12px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+        margin-bottom: 24px;
+    }
+    .direct-card-header {
+        padding: 16px 24px;
+        border-bottom: 1px solid #F1F5F9;
+    }
+    .direct-card-title {
+        font-size: 15px;
+        font-weight: 700;
+        color: #1E293B;
+        margin: 0;
+    }
+    .direct-card-body {
+        padding: 24px;
+    }
+    .form-label-custom {
+        font-size: 12.5px;
+        font-weight: 600;
+        color: #334155;
+        margin-bottom: 6px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .form-label-custom .text-danger {
+        font-size: 12px;
+    }
+    .input-custom {
+        font-size: 13.5px;
+        border: 1px solid #CBD5E1;
+        border-radius: 8px;
+        padding: 9px 14px;
+        color: #1E293B;
+        transition: all 0.15s ease-in-out;
+    }
+    .input-custom:focus {
+        border-color: #7C3AED;
+        box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12);
+        outline: none;
+    }
+    .btn-save-purple {
+        background: #7C3AED;
+        color: #ffffff;
+        border: none;
+        padding: 8px 26px;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 13.5px;
+        transition: background 0.15s ease;
+    }
+    .btn-save-purple:hover {
+        background: #6D28D9;
+        color: #ffffff;
+    }
+    .btn-cancel-purple {
+        background: #ffffff;
+        color: #7C3AED;
+        border: 1px solid #7C3AED;
+        padding: 8px 26px;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 13.5px;
+        text-decoration: none;
+        transition: all 0.15s ease;
+    }
+    .btn-cancel-purple:hover {
+        background: #F5F3FF;
+        color: #6D28D9;
+    }
+    .tab-nav-link {
+        font-size: 13px;
+        font-weight: 600;
+        color: #64748B;
+        padding: 7px 16px;
+        border-radius: 9999px;
+        text-decoration: none;
+        transition: all 0.15s ease;
+    }
+    .tab-nav-link.active {
+        background: #7C3AED;
+        color: #ffffff;
+    }
+    .tab-nav-link:hover:not(.active) {
+        background: #F1F5F9;
+        color: #1E293B;
+    }
+    .advance-banner-box {
+        background: #E0F2FE;
+        border: 1px solid #BAE6FD;
+        border-radius: 8px;
+        padding: 10px 16px;
+        height: 44px;
+        display: flex;
+        align-items: center;
+    }
+</style>
+
+<!-- Top Breadcrumbs & Tab Bar -->
+<div class="mb-3">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-1" style="font-size: 12.5px;">
+            <li class="breadcrumb-item">
+                <a asp-controller="Home" asp-action="Index" class="text-decoration-none text-muted">
+                    <i class="fa-solid fa-house me-1 text-primary"></i> Home
+                </a>
+            </li>
+            <li class="breadcrumb-item text-muted">Sales &amp; Receivables</li>
+            <li class="breadcrumb-item active fw-semibold text-dark" aria-current="page">Project's Payment Received</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <h4 class="mb-0 fw-bold" style="color: #0F172A; font-size: 21px; letter-spacing: -0.3px;">Project's Payment Received</h4>
+        <div class="d-flex align-items-center gap-1 bg-white p-1 rounded-pill border shadow-sm">
+            <a asp-controller="Sales" asp-action="AllocatePayment" class="tab-nav-link">
+                <i class="fa-solid fa-coins me-1"></i> Multi-Invoice Allocation
+            </a>
+            <a asp-controller="Sales" asp-action="ProjectPayment" class="tab-nav-link active">
+                <i class="fa-solid fa-diagram-project me-1"></i> Project Payment Received
+            </a>
+            <a asp-controller="Sales" asp-action="DirectPayment" class="tab-nav-link">
+                <i class="fa-solid fa-hand-holding-dollar me-1"></i> Direct Payment Receive
+            </a>
+        </div>
+    </div>
+</div>
+
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show d-flex align-items-center mb-3 shadow-sm" role="alert" style="border-radius: 10px;">
+        <i class="fa-solid fa-circle-check fs-5 me-2 text-success"></i>
+        <div>@Html.Raw(TempData["SuccessMessage"])</div>
+        <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show d-flex align-items-center mb-3 shadow-sm" role="alert" style="border-radius: 10px;">
+        <i class="fa-solid fa-circle-exclamation fs-5 me-2 text-danger"></i>
+        <div>@Html.Raw(TempData["ErrorMessage"])</div>
+        <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+<!-- Project's Payment Form Card (Matches Sample Screenshot Pixel-for-Pixel) -->
+<div class="direct-card">
+    <div class="direct-card-header">
+        <h5 class="direct-card-title">Add/Edit Project's Payment Details</h5>
+    </div>
+    <div class="direct-card-body">
+        <form method="post" asp-action="ProjectPayment" id="projectPaymentForm">
+            @Html.AntiForgeryToken()
+
+            <!-- Row 1: Project Name (Full Width) -->
+            <div class="row g-4 mb-4">
+                <div class="col-md-12">
+                    <label class="form-label-custom">
+                        Project Name <span class="text-danger">*</span>
+                    </label>
+                    <select name="projectId" id="projectSelect" class="form-select input-custom" required onchange="onProjectSelected()">
+                        <option value="">-- Select Project Name --</option>
+                        @foreach (var p in projects)
+                        {
+                            var isSelected = (selectedProjectId > 0 && selectedProjectId == p.Id);
+                            if (isSelected)
+                            {
+                                <option value="@p.Id" selected="selected">@p.ProjectCode - @p.ProjectName (@(p.Client?.ClientName ?? "N/A"))</option>
+                            }
+                            else
+                            {
+                                <option value="@p.Id">@p.ProjectCode - @p.ProjectName (@(p.Client?.ClientName ?? "N/A"))</option>
+                            }
+                        }
+                    </select>
+                </div>
+            </div>
+
+            <!-- Row 2: Date & Payment Mode -->
+            <div class="row g-4 mb-4">
+                <div class="col-md-6">
+                    <label class="form-label-custom">
+                        Payment Receive Date <span class="text-danger">*</span>
+                    </label>
+                    <input type="date" name="paymentReceiveDate" class="form-control input-custom" value="@DateTime.Today.ToString("yyyy-MM-dd")" required />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label-custom">
+                        Payment Receive Mode <span class="text-danger">*</span>
+                    </label>
+                    <select name="paymentReceiveMode" class="form-select input-custom" required>
+                        <option value="">-- Select Mode --</option>
+                        <option value="Cheque">Cheque</option>
+                        <option value="Netbanking" selected>Netbanking</option>
+                        <option value="Cash">Cash</option>
+                        <option value="Others">Others</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Row 3: Is Advance Received? & Sale Invoice -->
+            <div class="row g-4 mb-4 align-items-end">
+                <div class="col-md-6">
+                    <div class="advance-banner-box">
+                        <div class="form-check d-flex align-items-center gap-2 mb-0">
+                            <input type="checkbox" name="isAdvanceReceived" value="true" id="chkIsAdvance" class="form-check-input" style="cursor: pointer;" onchange="toggleAdvanceMode()" />
+                            <label for="chkIsAdvance" class="form-check-label fw-bold mb-0" style="color: #0284C7; font-size: 13.5px; cursor: pointer;">
+                                Is Advance Received?
+                            </label>
+                            <i class="fa-solid fa-circle-info text-primary ms-1" style="font-size: 13px;" title="Check this if payment is an advance received without linking to an existing invoice"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label-custom" id="lblInvoiceSelect">
+                        Sale Invoice <span class="text-danger">*</span>
+                    </label>
+                    <select name="invoiceId" id="invoiceSelect" class="form-select input-custom" onchange="onInvoiceSelected()">
+                        <option value="">--- Select Invoice ---</option>
+                        @foreach (var inv in invoices)
+                        {
+                            <option value="@inv.Id" data-project-id="@inv.ProjectId" data-outstanding="@inv.OutstandingBalance" data-total="@inv.TotalInvoiceValue">
+                                @inv.InvoiceNumber (@inv.InvoiceDate.ToString("dd MMM yyyy")) - Bal: &#8377; @inv.OutstandingBalance.ToString("N2")
+                            </option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            <!-- Row 4: TDS Amount, GST Amount, Security Deposit Amount -->
+            <div class="row g-4 mb-4">
+                <div class="col-md-4">
+                    <label class="form-label-custom">
+                        TDS Amount <span class="text-danger">*</span>
+                    </label>
+                    <input type="number" step="0.01" min="0" name="tdsAmount" id="txtTds" class="form-control input-custom" value="0" oninput="calculateTotals()" required />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label-custom">
+                        GST Amount <span class="text-danger">*</span>
+                    </label>
+                    <input type="number" step="0.01" min="0" name="gstAmount" id="txtGst" class="form-control input-custom" value="0" oninput="calculateTotals()" required />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label-custom">
+                        Security Deposit Amount <span class="text-danger">*</span>
+                    </label>
+                    <input type="number" step="0.01" min="0" name="securityDepositAmount" id="txtSecurity" class="form-control input-custom" value="0" oninput="calculateTotals()" required />
+                </div>
+            </div>
+
+            <!-- Row 5: Other Deduction, Net Amount Receive, Total Amount Receive -->
+            <div class="row g-4 mb-4">
+                <div class="col-md-4">
+                    <label class="form-label-custom">
+                        Other Deduction Amount <span class="text-danger">*</span>
+                    </label>
+                    <input type="number" step="0.01" min="0" name="otherDeductionAmount" id="txtOther" class="form-control input-custom" value="0" oninput="calculateTotals()" required />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label-custom">
+                        Net Amount Receive <span class="text-danger">*</span>
+                    </label>
+                    <input type="number" step="0.01" min="0" name="netAmountReceive" id="txtNet" class="form-control input-custom" value="0" oninput="calculateTotals()" required />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label-custom">
+                        Total Amount Receive <span class="text-danger">*</span>
+                    </label>
+                    <input type="number" step="0.01" min="0" name="totalAmountReceive" id="txtTotal" class="form-control input-custom fw-bold text-dark" value="0.00" oninput="onTotalChanged()" required />
+                </div>
+            </div>
+
+            <!-- Row 6: Remarks -->
+            <div class="row g-4 mb-4">
+                <div class="col-md-12">
+                    <label class="form-label-custom">
+                        Payment Receive Remarks <span class="text-danger">*</span>
+                    </label>
+                    <textarea name="paymentReceiveRemarks" class="form-control input-custom" rows="3" placeholder="" required></textarea>
+                </div>
+            </div>
+
+            <!-- Row 7: Deposit Bank Selection (Optional / Default to Active Bank) -->
+            <div class="row g-4 mb-4">
+                <div class="col-md-6">
+                    <label class="form-label-custom">
+                        Deposit Bank Account
+                        <i class="fa-solid fa-circle-info text-muted ms-1" style="font-size: 11px;" title="Account where payment is credited"></i>
+                    </label>
+                    <select name="bankAccountId" class="form-select input-custom">
+                        @foreach (var b in bankAccounts)
+                        {
+                            <option value="@b.Id">@b.BankName - @b.AccountNumber</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            <!-- Bottom Actions -->
+            <div class="d-flex align-items-center justify-content-end gap-2 pt-2">
+                <a asp-controller="Sales" asp-action="AllocatePayment" class="btn-cancel-purple">
+                    Cancel
+                </a>
+                <button type="submit" class="btn-save-purple">
+                    Save
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Recent Project Payments Received Grid -->
+@if (recentReceipts.Any())
+{
+    <div class="direct-card">
+        <div class="direct-card-header d-flex justify-content-between align-items-center">
+            <h5 class="direct-card-title">
+                <i class="fa-solid fa-clock-rotate-left text-primary me-2"></i>Recent Project Receipts &amp; Deductions
+            </h5>
+            <span class="badge rounded-pill px-3 py-1.5" style="background: #EFF6FF; color: #1D4ED8; font-size: 11.5px; font-weight: 600;">
+                Ledger Balanced
+            </span>
+        </div>
+        <div class="direct-card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0" style="font-size: 13px;">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-4">Receipt No</th>
+                            <th>Date</th>
+                            <th>Project</th>
+                            <th>Invoice / Ref</th>
+                            <th class="text-end">TDS (&#8377;)</th>
+                            <th class="text-end">Deductions (&#8377;)</th>
+                            <th class="text-end">Net Received (&#8377;)</th>
+                            <th class="text-end">Total (&#8377;)</th>
+                            <th class="text-center pe-4">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in recentReceipts)
+                        {
+                            var totalDeductions = r.TdsAmount + r.GstTdsAmount + r.SecurityDepositAmount + r.OtherDeductionAmount;
+                            <tr>
+                                <td class="ps-4 fw-bold text-primary">@r.ReceiptNumber</td>
+                                <td>@r.ReceiptDate.ToString("dd MMM yyyy")</td>
+                                <td>
+                                    <strong>@(r.Project?.ProjectCode ?? "PRJ")</strong>
+                                    <small class="text-muted d-block text-truncate" style="max-width: 180px;">@(r.Project?.ProjectName ?? "N/A")</small>
+                                </td>
+                                <td>
+                                    @if (r.Invoice != null)
+                                    {
+                                        <span class="badge bg-primary-subtle text-primary">@r.Invoice.InvoiceNumber</span>
+                                    }
+                                    else if (r.IsAdvance)
+                                    {
+                                        <span class="badge bg-info-subtle text-info">Advance Received</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">Direct</span>
+                                    }
+                                </td>
+                                <td class="text-end text-danger">&#8377; @r.TdsAmount.ToString("N2")</td>
+                                <td class="text-end text-danger">&#8377; @totalDeductions.ToString("N2")</td>
+                                <td class="text-end fw-bold text-success">&#8377; @r.NetAmountReceived.ToString("N2")</td>
+                                <td class="text-end fw-bold">&#8377; @r.TotalAmountReceived.ToString("N2")</td>
+                                <td class="text-center pe-4">
+                                    <span class="badge rounded-pill bg-success-subtle text-success border border-success-subtle px-2.5 py-1">
+                                        <i class="fa-solid fa-circle-check me-1"></i> Posted
+                                    </span>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
+<script>
+    function toggleAdvanceMode() {
+        const isAdvance = document.getElementById("chkIsAdvance").checked;
+        const invoiceSelect = document.getElementById("invoiceSelect");
+        const lblInvoiceSelect = document.getElementById("lblInvoiceSelect");
+
+        if (isAdvance) {
+            invoiceSelect.disabled = true;
+            invoiceSelect.value = "";
+            lblInvoiceSelect.innerHTML = 'Sale Invoice <span class="text-muted fw-normal">(Optional for Advance)</span>';
+        } else {
+            invoiceSelect.disabled = false;
+            lblInvoiceSelect.innerHTML = 'Sale Invoice <span class="text-danger">*</span>';
+        }
+    }
+
+    async function onProjectSelected() {
+        const projectSelect = document.getElementById("projectSelect");
+        const projectId = projectSelect.value;
+        const invoiceSelect = document.getElementById("invoiceSelect");
+
+        if (!projectId) {
+            // Show all or clear
+            return;
+        }
+
+        try {
+            const resp = await fetch(`/Sales/GetInvoicesByProject?projectId=${projectId}`);
+            if (resp.ok) {
+                const invoices = await resp.json();
+                invoiceSelect.innerHTML = '<option value="">--- Select Invoice ---</option>';
+                invoices.forEach(inv => {
+                    const opt = document.createElement("option");
+                    opt.value = inv.id;
+                    opt.setAttribute("data-outstanding", inv.outstandingBalance);
+                    opt.setAttribute("data-total", inv.totalValue);
+                    opt.innerText = `${inv.invoiceNumber} (${inv.invoiceDate}) - Bal: ₹ ${inv.outstandingBalance.toFixed(2)}`;
+                    invoiceSelect.appendChild(opt);
+                });
+            }
+        } catch (e) {
+            console.error("Failed to load project invoices", e);
+        }
+    }
+
+    function onInvoiceSelected() {
+        const invoiceSelect = document.getElementById("invoiceSelect");
+        const selectedOpt = invoiceSelect.options[invoiceSelect.selectedIndex];
+        if (!selectedOpt || !selectedOpt.value) return;
+
+        const outstanding = parseFloat(selectedOpt.getAttribute("data-outstanding")) || 0;
+        if (outstanding > 0) {
+            document.getElementById("txtNet").value = outstanding.toFixed(2);
+            calculateTotals();
+        }
+    }
+
+    function calculateTotals() {
+        const tds = parseFloat(document.getElementById("txtTds").value) || 0;
+        const gst = parseFloat(document.getElementById("txtGst").value) || 0;
+        const security = parseFloat(document.getElementById("txtSecurity").value) || 0;
+        const other = parseFloat(document.getElementById("txtOther").value) || 0;
+        const net = parseFloat(document.getElementById("txtNet").value) || 0;
+
+        const total = net + tds + gst + security + other;
+        document.getElementById("txtTotal").value = total.toFixed(2);
+    }
+
+    function onTotalChanged() {
+        const total = parseFloat(document.getElementById("txtTotal").value) || 0;
+        const tds = parseFloat(document.getElementById("txtTds").value) || 0;
+        const gst = parseFloat(document.getElementById("txtGst").value) || 0;
+        const security = parseFloat(document.getElementById("txtSecurity").value) || 0;
+        const other = parseFloat(document.getElementById("txtOther").value) || 0;
+
+        const net = Math.max(0, total - (tds + gst + security + other));
+        document.getElementById("txtNet").value = net.toFixed(2);
+    }
+
+    document.addEventListener("DOMContentLoaded", function() {
+        const projectSelect = document.getElementById("projectSelect");
+        if (projectSelect.value) {
+            onProjectSelected();
+        }
+    });
+</script>

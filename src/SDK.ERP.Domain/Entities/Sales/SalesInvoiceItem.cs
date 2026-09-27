@@ -13,7 +13,11 @@ public class SalesInvoiceItem
     public decimal UnitRate { get; set; }
     public decimal DiscountPercent { get; set; }
     public decimal TaxableValue { get; set; }
-    public int TaxRateId { get; set; }
+    public decimal GstRate { get; set; }
+    public decimal IgstRate { get; set; }
+    public decimal CgstRate { get; set; }
+    public decimal SgstRate { get; set; }
+    public int? TaxRateId { get; set; }
     public decimal CgstAmount { get; set; }
     public decimal SgstAmount { get; set; }
     public decimal IgstAmount { get; set; }
@@ -21,5 +25,5 @@ public class SalesInvoiceItem
 
     public SalesInvoice Invoice { get; set; } = null!;
     public ItemUnit? Unit { get; set; }
-    public TaxRate TaxRate { get; set; } = null!;
+    public TaxRate? TaxRate { get; set; }
 }

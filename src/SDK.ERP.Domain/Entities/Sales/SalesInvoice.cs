@@ -29,6 +29,12 @@ public class SalesInvoice : ITenantEntity
     public string? IrnNumber { get; set; }
     public string? QrCodePayload { get; set; }
     public long? JournalEntryId { get; set; }
+    public string? WorkOrderNo { get; set; }
+    public DateTime? WorkOrderDate { get; set; }
+    public string? BillingAttention { get; set; }
+    public string? Remarks { get; set; }
+    public string? DeductionRemarks { get; set; }
+    public decimal DeductionAmount { get; set; }
 
     public Company Company { get; set; } = null!;
     public Branch Branch { get; set; } = null!;
