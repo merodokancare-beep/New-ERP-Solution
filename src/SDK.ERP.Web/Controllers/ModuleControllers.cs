@@ -1740,6 +1740,46 @@ public class SalesController : Controller
                         ALTER TABLE [SalesInvoiceItems] ADD [SgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
                 END
             ");
+            await EnsureCustomerReceiptColumnsAsync();
+        }
+        catch { }
+    }
+
+    private async Task EnsureCustomerReceiptColumnsAsync()
+    {
+        try
+        {
+            await _db.Database.ExecuteSqlRawAsync(@"
+                IF OBJECT_ID('[CustomerReceipts]') IS NOT NULL OR OBJECT_ID('[dbo].[CustomerReceipts]') IS NOT NULL
+                BEGIN
+                    IF EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[CustomerReceipts]') OR object_id = OBJECT_ID('[dbo].[CustomerReceipts]')) AND name = 'ClientId' AND is_nullable = 0)
+                        ALTER TABLE [CustomerReceipts] ALTER COLUMN [ClientId] BIGINT NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[CustomerReceipts]') OR object_id = OBJECT_ID('[dbo].[CustomerReceipts]')) AND name = 'ExpenseHead')
+                        ALTER TABLE [CustomerReceipts] ADD [ExpenseHead] NVARCHAR(200) NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[CustomerReceipts]') OR object_id = OBJECT_ID('[dbo].[CustomerReceipts]')) AND name = 'Remarks')
+                        ALTER TABLE [CustomerReceipts] ADD [Remarks] NVARCHAR(MAX) NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[CustomerReceipts]') OR object_id = OBJECT_ID('[dbo].[CustomerReceipts]')) AND name = 'ReceiptDocId')
+                        ALTER TABLE [CustomerReceipts] ADD [ReceiptDocId] BIGINT NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[CustomerReceipts]') OR object_id = OBJECT_ID('[dbo].[CustomerReceipts]')) AND name = 'ProjectId')
+                        ALTER TABLE [CustomerReceipts] ADD [ProjectId] BIGINT NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[CustomerReceipts]') OR object_id = OBJECT_ID('[dbo].[CustomerReceipts]')) AND name = 'InvoiceId')
+                        ALTER TABLE [CustomerReceipts] ADD [InvoiceId] BIGINT NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[CustomerReceipts]') OR object_id = OBJECT_ID('[dbo].[CustomerReceipts]')) AND name = 'IsAdvance')
+                        ALTER TABLE [CustomerReceipts] ADD [IsAdvance] BIT NOT NULL DEFAULT 0;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[CustomerReceipts]') OR object_id = OBJECT_ID('[dbo].[CustomerReceipts]')) AND name = 'TdsAmount')
+                        ALTER TABLE [CustomerReceipts] ADD [TdsAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[CustomerReceipts]') OR object_id = OBJECT_ID('[dbo].[CustomerReceipts]')) AND name = 'GstTdsAmount')
+                        ALTER TABLE [CustomerReceipts] ADD [GstTdsAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[CustomerReceipts]') OR object_id = OBJECT_ID('[dbo].[CustomerReceipts]')) AND name = 'SecurityDepositAmount')
+                        ALTER TABLE [CustomerReceipts] ADD [SecurityDepositAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[CustomerReceipts]') OR object_id = OBJECT_ID('[dbo].[CustomerReceipts]')) AND name = 'OtherDeductionAmount')
+                        ALTER TABLE [CustomerReceipts] ADD [OtherDeductionAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[CustomerReceipts]') OR object_id = OBJECT_ID('[dbo].[CustomerReceipts]')) AND name = 'NetAmountReceived')
+                        ALTER TABLE [CustomerReceipts] ADD [NetAmountReceived] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[CustomerReceipts]') OR object_id = OBJECT_ID('[dbo].[CustomerReceipts]')) AND name = 'TotalAmountReceived')
+                        ALTER TABLE [CustomerReceipts] ADD [TotalAmountReceived] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                END
+            ");
         }
         catch { }
     }
@@ -1862,13 +1902,35 @@ public class SalesController : Controller
         ViewBag.ExpenseTypes = expenseTypes;
         ViewBag.ExpenseHeads = expenseTypes.Select(e => e.Name).ToList();
 
-        var directReceipts = await _db.CustomerReceipts
-            .Where(r => r.ExpenseHead != null)
-            .OrderByDescending(r => r.ReceiptDate)
-            .ThenByDescending(r => r.Id)
-            .Take(20)
-            .AsNoTracking()
-            .ToListAsync();
+        List<CustomerReceipt> directReceipts;
+        try
+        {
+            directReceipts = await _db.CustomerReceipts
+                .Where(r => r.ExpenseHead != null)
+                .OrderByDescending(r => r.ReceiptDate)
+                .ThenByDescending(r => r.Id)
+                .Take(20)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+        catch
+        {
+            await EnsureCustomerReceiptColumnsAsync();
+            try
+            {
+                directReceipts = await _db.CustomerReceipts
+                    .Where(r => r.ExpenseHead != null)
+                    .OrderByDescending(r => r.ReceiptDate)
+                    .ThenByDescending(r => r.Id)
+                    .Take(20)
+                    .AsNoTracking()
+                    .ToListAsync();
+            }
+            catch
+            {
+                directReceipts = new List<CustomerReceipt>();
+            }
+        }
 
         ViewBag.RecentDirectReceipts = directReceipts;
         return View();
@@ -2047,15 +2109,39 @@ public class SalesController : Controller
 
         ViewBag.Invoices = invoices;
 
-        var recentReceipts = await _db.CustomerReceipts
-            .Include(r => r.Project)
-            .Include(r => r.Invoice)
-            .Where(r => r.ProjectId != null)
-            .OrderByDescending(r => r.ReceiptDate)
-            .ThenByDescending(r => r.Id)
-            .Take(20)
-            .AsNoTracking()
-            .ToListAsync();
+        List<CustomerReceipt> recentReceipts;
+        try
+        {
+            recentReceipts = await _db.CustomerReceipts
+                .Include(r => r.Project)
+                .Include(r => r.Invoice)
+                .Where(r => r.ProjectId != null)
+                .OrderByDescending(r => r.ReceiptDate)
+                .ThenByDescending(r => r.Id)
+                .Take(20)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+        catch
+        {
+            await EnsureCustomerReceiptColumnsAsync();
+            try
+            {
+                recentReceipts = await _db.CustomerReceipts
+                    .Include(r => r.Project)
+                    .Include(r => r.Invoice)
+                    .Where(r => r.ProjectId != null)
+                    .OrderByDescending(r => r.ReceiptDate)
+                    .ThenByDescending(r => r.Id)
+                    .Take(20)
+                    .AsNoTracking()
+                    .ToListAsync();
+            }
+            catch
+            {
+                recentReceipts = new List<CustomerReceipt>();
+            }
+        }
 
         ViewBag.RecentProjectReceipts = recentReceipts;
         return View();
