@@ -1652,16 +1652,96 @@ public class SalesController : Controller
         ViewBag.Clients = await _db.Clients.AsNoTracking().ToListAsync();
         ViewBag.Projects = await _db.Projects.AsNoTracking().ToListAsync();
 
-        var invoices = await _db.SalesInvoices
-            .Include(i => i.Client)
-            .Include(i => i.Project)
-            .OrderByDescending(i => i.InvoiceDate)
-            .ThenByDescending(i => i.Id)
-            .AsNoTracking()
-            .ToListAsync();
+        List<SalesInvoice> invoices;
+        try
+        {
+            invoices = await _db.SalesInvoices
+                .Include(i => i.Client)
+                .Include(i => i.Project)
+                .OrderByDescending(i => i.InvoiceDate)
+                .ThenByDescending(i => i.Id)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+        catch
+        {
+            await EnsureSalesInvoiceColumnsAsync();
+            invoices = await _db.SalesInvoices
+                .Include(i => i.Client)
+                .Include(i => i.Project)
+                .OrderByDescending(i => i.InvoiceDate)
+                .ThenByDescending(i => i.Id)
+                .AsNoTracking()
+                .ToListAsync();
+        }
 
-        ViewBag.TotalDbCount = await _db.SalesInvoices.CountAsync();
+        ViewBag.TotalDbCount = invoices.Count;
         return View(invoices);
+    }
+
+    private async Task EnsureSalesInvoiceColumnsAsync()
+    {
+        try
+        {
+            await _db.Database.ExecuteSqlRawAsync(@"
+                IF OBJECT_ID('[sales].[sales_invoices]') IS NOT NULL
+                BEGIN
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoices]') AND name = 'WorkOrderNo')
+                        ALTER TABLE [sales].[sales_invoices] ADD [WorkOrderNo] NVARCHAR(100) NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoices]') AND name = 'WorkOrderDate')
+                        ALTER TABLE [sales].[sales_invoices] ADD [WorkOrderDate] DATETIME2 NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoices]') AND name = 'BillingAttention')
+                        ALTER TABLE [sales].[sales_invoices] ADD [BillingAttention] NVARCHAR(250) NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoices]') AND name = 'Remarks')
+                        ALTER TABLE [sales].[sales_invoices] ADD [Remarks] NVARCHAR(MAX) NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoices]') AND name = 'DeductionRemarks')
+                        ALTER TABLE [sales].[sales_invoices] ADD [DeductionRemarks] NVARCHAR(250) NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoices]') AND name = 'DeductionAmount')
+                        ALTER TABLE [sales].[sales_invoices] ADD [DeductionAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                END
+
+                IF OBJECT_ID('[SalesInvoices]') IS NOT NULL OR OBJECT_ID('[dbo].[SalesInvoices]') IS NOT NULL
+                BEGIN
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoices]') OR object_id = OBJECT_ID('[dbo].[SalesInvoices]')) AND name = 'WorkOrderNo')
+                        ALTER TABLE [SalesInvoices] ADD [WorkOrderNo] NVARCHAR(100) NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoices]') OR object_id = OBJECT_ID('[dbo].[SalesInvoices]')) AND name = 'WorkOrderDate')
+                        ALTER TABLE [SalesInvoices] ADD [WorkOrderDate] DATETIME2 NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoices]') OR object_id = OBJECT_ID('[dbo].[SalesInvoices]')) AND name = 'BillingAttention')
+                        ALTER TABLE [SalesInvoices] ADD [BillingAttention] NVARCHAR(250) NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoices]') OR object_id = OBJECT_ID('[dbo].[SalesInvoices]')) AND name = 'Remarks')
+                        ALTER TABLE [SalesInvoices] ADD [Remarks] NVARCHAR(MAX) NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoices]') OR object_id = OBJECT_ID('[dbo].[SalesInvoices]')) AND name = 'DeductionRemarks')
+                        ALTER TABLE [SalesInvoices] ADD [DeductionRemarks] NVARCHAR(250) NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoices]') OR object_id = OBJECT_ID('[dbo].[SalesInvoices]')) AND name = 'DeductionAmount')
+                        ALTER TABLE [SalesInvoices] ADD [DeductionAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                END
+
+                IF OBJECT_ID('[sales].[sales_invoice_items]') IS NOT NULL
+                BEGIN
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoice_items]') AND name = 'GstRate')
+                        ALTER TABLE [sales].[sales_invoice_items] ADD [GstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoice_items]') AND name = 'IgstRate')
+                        ALTER TABLE [sales].[sales_invoice_items] ADD [IgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoice_items]') AND name = 'CgstRate')
+                        ALTER TABLE [sales].[sales_invoice_items] ADD [CgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoice_items]') AND name = 'SgstRate')
+                        ALTER TABLE [sales].[sales_invoice_items] ADD [SgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                END
+
+                IF OBJECT_ID('[SalesInvoiceItems]') IS NOT NULL OR OBJECT_ID('[dbo].[SalesInvoiceItems]') IS NOT NULL
+                BEGIN
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoiceItems]') OR object_id = OBJECT_ID('[dbo].[SalesInvoiceItems]')) AND name = 'GstRate')
+                        ALTER TABLE [SalesInvoiceItems] ADD [GstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoiceItems]') OR object_id = OBJECT_ID('[dbo].[SalesInvoiceItems]')) AND name = 'IgstRate')
+                        ALTER TABLE [SalesInvoiceItems] ADD [IgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoiceItems]') OR object_id = OBJECT_ID('[dbo].[SalesInvoiceItems]')) AND name = 'CgstRate')
+                        ALTER TABLE [SalesInvoiceItems] ADD [CgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoiceItems]') OR object_id = OBJECT_ID('[dbo].[SalesInvoiceItems]')) AND name = 'SgstRate')
+                        ALTER TABLE [SalesInvoiceItems] ADD [SgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                END
+            ");
+        }
+        catch { }
     }
 
     [HttpPost]
