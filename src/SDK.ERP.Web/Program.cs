@@ -300,6 +300,8 @@ using (var scope = app.Services.CreateScope())
                         ALTER TABLE [SalesInvoiceItems] ADD [SgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
                     IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[SalesInvoiceItems]') AND name = 'TaxRateId' AND is_nullable = 0)
                         ALTER TABLE [SalesInvoiceItems] ALTER COLUMN [TaxRateId] INT NULL;
+                END
+
                 -- Ensure CustomerReceipts Direct Payment Columns
                 IF OBJECT_ID('[CustomerReceipts]') IS NOT NULL
                 BEGIN
@@ -332,7 +334,10 @@ using (var scope = app.Services.CreateScope())
                 END
             ");
         }
-        catch { }
+        catch (Exception ex)
+        {
+            app.Logger.LogError(ex, "Schema adjustment SQL error: {Message}", ex.Message);
+        }
 
         await SeedData.InitializeAsync(db);
     }
