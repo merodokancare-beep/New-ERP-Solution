@@ -7,6 +7,7 @@
     var invoices = ViewBag.Invoices as IEnumerable<SDK.ERP.Domain.Entities.Sales.SalesInvoice> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Sales.SalesInvoice>();
     var recentReceipts = ViewBag.RecentProjectReceipts as IEnumerable<SDK.ERP.Domain.Entities.Sales.CustomerReceipt> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Sales.CustomerReceipt>();
     var selectedProjectId = ViewBag.SelectedProjectId != null ? (long)ViewBag.SelectedProjectId : 0;
+    var company = ViewBag.Company as SDK.ERP.Domain.Entities.Admin.Company;
 }
 
 <style>
@@ -306,9 +307,16 @@
                         <i class="fa-solid fa-circle-info text-muted ms-1" style="font-size: 11px;" title="Account where payment is credited"></i>
                     </label>
                     <select name="bankAccountId" class="form-select input-custom">
-                        @foreach (var b in bankAccounts)
+                        @if (bankAccounts.Any())
                         {
-                            <option value="@b.Id">@b.BankName - @b.AccountNumber</option>
+                            @foreach (var b in bankAccounts)
+                            {
+                                <option value="@b.Id">@b.BankName - @b.AccountNumber</option>
+                            }
+                        }
+                        else
+                        {
+                            <option value="">@(company?.BankName ?? "HDFC Bank Ltd") - @(company?.BankAccountNumber ?? "Primary Account")</option>
                         }
                     </select>
                 </div>

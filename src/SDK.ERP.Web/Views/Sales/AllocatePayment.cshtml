@@ -68,9 +68,16 @@
                         <label class="form-label fw-semibold" style="font-size: 12.5px;">Deposit Bank Account</label>
                         <select name="bankAccountId" class="form-select">
                             <option value="">-- Choose Bank Account --</option>
-                            @foreach (var b in bankAccounts)
+                            @if (bankAccounts.Any())
                             {
-                                <option value="@b.Id">@b.BankName - @b.AccountNumber</option>
+                                @foreach (var b in bankAccounts)
+                                {
+                                    <option value="@b.Id">@b.BankName - @b.AccountNumber</option>
+                                }
+                            }
+                            else
+                            {
+                                <option value="1">HDFC Bank Ltd - 50200084920194 (Corporate Main)</option>
                             }
                         </select>
                     </div>

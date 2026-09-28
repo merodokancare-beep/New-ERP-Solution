@@ -1883,7 +1883,8 @@ public class SalesController : Controller
         ViewData["ActiveMenu"] = "Sales";
         var company = await _companyContext.GetCurrentCompanyAsync();
         ViewBag.Company = company;
-        ViewBag.BankAccounts = await _db.BankAccounts.Where(b => b.IsActive).AsNoTracking().ToListAsync();
+        var bankAccounts = await _db.BankAccounts.Where(b => b.IsActive).AsNoTracking().ToListAsync();
+        ViewBag.BankAccounts = bankAccounts;
 
         List<ExpenseType> expenseTypes;
         try
@@ -1936,6 +1937,25 @@ public class SalesController : Controller
         return View();
     }
 
+    [HttpGet]
+    [ResponseCache(Duration = 86400)]
+    public async Task<IActionResult> GetMasterBanks()
+    {
+        try
+        {
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+            var json = await client.GetStringAsync("https://cdn.jsdelivr.net/gh/razorpay/ifsc/src/banknames.json");
+            var dict = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+            if (dict != null)
+            {
+                var banks = dict.Values.Distinct().OrderBy(b => b).ToList();
+                return Json(banks);
+            }
+        }
+        catch { }
+        return Json(Array.Empty<string>());
+    }
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DirectPayment(
@@ -1944,6 +1964,7 @@ public class SalesController : Controller
         decimal paymentReceiveAmount,
         string paymentReceiveMode,
         string paymentReceiveRemarks,
+        string? bankName,
         long? bankAccountId,
         string? transactionRefNo,
         IFormFile? uploadFile)
@@ -1970,6 +1991,10 @@ public class SalesController : Controller
         {
             bank.BookBalance += paymentReceiveAmount;
         }
+
+        var resolvedBank = !string.IsNullOrWhiteSpace(bankName) 
+            ? bankName.Trim() 
+            : (bank != null ? $"{bank.BankName} - {bank.AccountNumber}" : (company.BankName ?? "Direct Deposit"));
 
         long? docId = null;
         if (uploadFile != null && uploadFile.Length > 0)
@@ -2023,7 +2048,9 @@ public class SalesController : Controller
             TransactionRefNo = transactionRefNo,
             Status = "POSTED",
             ExpenseHead = expenseHead,
-            Remarks = paymentReceiveRemarks,
+            Remarks = string.IsNullOrWhiteSpace(paymentReceiveRemarks) 
+                ? $"Deposit Bank: {resolvedBank}" 
+                : $"[Bank: {resolvedBank}] {paymentReceiveRemarks}",
             ReceiptDocId = docId
         };
         _db.CustomerReceipts.Add(receipt);
@@ -2063,7 +2090,7 @@ public class SalesController : Controller
             VoucherType = "RECEIPT",
             SourceEntityType = "DirectPaymentReceive",
             SourceEntityId = receipt.Id,
-            Narration = $"Direct Payment Received: {expenseHead} via {receipt.PaymentMode} (Ref: {transactionRefNo ?? "N/A"}) - {paymentReceiveRemarks}",
+            Narration = $"Direct Payment Received: {expenseHead} via {receipt.PaymentMode} [Bank: {resolvedBank}] (Ref: {transactionRefNo ?? "N/A"}) - {paymentReceiveRemarks}",
             TotalDebit = paymentReceiveAmount,
             TotalCredit = paymentReceiveAmount,
             IsBalanced = true,

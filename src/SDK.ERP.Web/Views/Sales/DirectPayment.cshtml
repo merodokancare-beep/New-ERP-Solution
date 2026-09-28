@@ -2,6 +2,7 @@
     ViewData["Title"] = "Direct Payment Receive";
     ViewData["ActiveMenu"] = "Sales";
     var bankAccounts = ViewBag.BankAccounts as IEnumerable<SDK.ERP.Domain.Entities.Banking.BankAccount> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Banking.BankAccount>();
+    var company = ViewBag.Company as SDK.ERP.Domain.Entities.Admin.Company;
     var expenseTypes = ViewBag.ExpenseTypes as IEnumerable<SDK.ERP.Domain.Entities.MasterData.ExpenseType> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.MasterData.ExpenseType>();
     var expenseHeads = ViewBag.ExpenseHeads as IEnumerable<string> ?? Enumerable.Empty<string>();
     var recentReceipts = ViewBag.RecentDirectReceipts as IEnumerable<SDK.ERP.Domain.Entities.Sales.CustomerReceipt> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Sales.CustomerReceipt>();
@@ -98,6 +99,41 @@
     .tab-nav-link:hover:not(.active) {
         background: #F1F5F9;
         color: #1E293B;
+    }
+    .bank-item-option {
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 13px;
+        color: #1E293B;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        transition: background 0.12s ease, color 0.12s ease;
+    }
+    .bank-item-option:hover {
+        background: #F5F3FF;
+        color: #7C3AED;
+        font-weight: 600;
+    }
+    .bank-section-title {
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: #94A3B8;
+        padding: 8px 10px 4px 10px;
+        letter-spacing: 0.04em;
+    }
+    .bank-dropdown-popup {
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0;
+        right: 0;
+        z-index: 1050;
+        background: #ffffff;
+        border: 1px solid #E2E8F0;
+        border-radius: 10px;
+        box-shadow: 0 12px 28px -4px rgba(0, 0, 0, 0.12), 0 4px 10px -2px rgba(0, 0, 0, 0.06);
     }
 </style>
 
@@ -247,18 +283,60 @@
             <!-- Row 4: Bank, Cheque/Txn No & File Upload -->
             <div class="row g-4 mb-4">
                 <div class="col-md-4">
-                    <label class="form-label-custom">
-                        Bank Name 
-                        <i class="fa-solid fa-circle-info text-muted ms-1" style="font-size: 11px;" title="Select company deposit bank account"></i>
-                        <span class="text-danger">*</span>
-                    </label>
-                    <select name="bankAccountId" class="form-select input-custom" required>
-                        <option value="">-- Select Bank --</option>
-                        @foreach (var b in bankAccounts)
-                        {
-                            <option value="@b.Id">@b.BankName - @b.AccountNumber</option>
-                        }
-                    </select>
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label-custom mb-0">
+                            Bank Name
+                            <i class="fa-solid fa-circle-info text-muted ms-1" style="font-size: 11px;" title="Select company deposit bank account or pick from Indian Banks Master"></i>
+                            <span class="text-danger">*</span>
+                        </label>
+                        <button type="button" class="btn btn-link p-0 text-decoration-none d-flex align-items-center gap-1" style="font-size: 11px; color: #7C3AED; font-weight: 600;" onclick="openIfscModal()" title="Fetch Bank details from official RBI database via IFSC code">
+                            <i class="fa-solid fa-bolt text-warning"></i>Fetch via IFSC
+                        </button>
+                    </div>
+
+                    <!-- Searchable Dropdown Container -->
+                    <div class="position-relative" id="bankDropdownWrapper">
+                        <div class="form-select input-custom d-flex align-items-center justify-content-between" 
+                             id="bankDropdownToggle" 
+                             tabindex="0" 
+                             style="cursor: pointer; user-select: none;">
+                            <span id="bankSelectedLabel" class="text-muted text-truncate" style="max-width: 90%;">
+                                <span class="spinner-border spinner-border-sm text-secondary me-1" role="status" style="width: 12px; height: 12px;"></span>Loading banks...
+                            </span>
+                        </div>
+                        <input type="hidden" name="bankName" id="bankNameHidden" required />
+
+                        <!-- Dropdown Menu with Live Search Filter -->
+                        <div class="bank-dropdown-popup p-2 d-none" id="bankDropdownMenu">
+                            <!-- Search Input inside dropdown -->
+                            <div class="position-relative mb-2">
+                                <i class="fa-solid fa-magnifying-glass position-absolute" style="left: 12px; top: 50%; transform: translateY(-50%); color: #94A3B8; font-size: 12.5px;"></i>
+                                <input type="text" 
+                                       id="bankSearchInput" 
+                                       class="form-control form-control-sm" 
+                                       placeholder="Type to search bank (e.g. State, HDFC)..." 
+                                       autocomplete="off" 
+                                       style="padding-left: 34px; font-size: 13px; border-radius: 6px; border: 1px solid #CBD5E1;" />
+                            </div>
+
+                            <!-- Scrollable Options List -->
+                            <div id="bankOptionsList" style="max-height: 240px; overflow-y: auto;">
+                                <div class="text-center py-3 text-muted" style="font-size: 12px;">
+                                    <div class="spinner-border spinner-border-sm text-primary me-1" role="status"></div> Loading banks from API...
+                                </div>
+                            </div>
+
+                            <!-- Bottom Info Bar -->
+                            <div class="d-flex justify-content-between align-items-center pt-2 mt-1 border-top px-1" style="font-size: 11.5px; color: #64748B;">
+                                <span id="bankCountBadge">0 banks available</span>
+                                <a href="javascript:void(0)" onclick="promptCustomBank()" class="text-decoration-none" style="color: #7C3AED; font-weight: 600;">+ Custom Bank</a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="ifscDetailsBadge" class="mt-1 d-none">
+                        <span class="badge bg-light text-primary border" style="font-size: 11px; font-weight: 500;" id="ifscDetailsText"></span>
+                    </div>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label-custom">
@@ -342,3 +420,314 @@
         </div>
     </div>
 }
+
+<!-- Modal for Live IFSC Fetch (Free Razorpay API) -->
+<div class="modal fade" id="ifscLookupModal" tabindex="-1" aria-labelledby="ifscLookupModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius: 12px; border: 1px solid #E2E8F0; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);">
+            <div class="modal-header border-bottom-0 pb-0">
+                <div>
+                    <h6 class="modal-title fw-bold" id="ifscLookupModalLabel" style="color: #0F172A; font-size: 16px;">
+                        <i class="fa-solid fa-bolt text-warning me-1"></i>Fetch Bank Details via IFSC
+                    </h6>
+                    <small class="text-muted" style="font-size: 12px;">Official RBI Directory Lookup (Live API)</small>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body pt-3">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold" style="font-size: 12.5px; color: #334155;">Enter 11-Character IFSC Code</label>
+                    <div class="input-group">
+                        <input type="text" id="modalIfscInput" class="form-control text-uppercase fw-semibold" placeholder="e.g. HDFC0000123 or SBIN0000001" maxlength="11" style="border-radius: 8px 0 0 8px; font-size: 13.5px;" />
+                        <button type="button" class="btn-save-purple" id="btnFetchIfsc" onclick="performIfscLookup()" style="border-radius: 0 8px 8px 0; padding: 8px 16px;">
+                            <span id="ifscSpinner" class="spinner-border spinner-border-sm d-none me-1" role="status"></span>
+                            <i class="fa-solid fa-magnifying-glass me-1" id="ifscSearchIcon"></i>Verify
+                        </button>
+                    </div>
+                    <div class="form-text" style="font-size: 11px;">Direct RBI clearing lookup. No database entry required.</div>
+                </div>
+
+                <div id="ifscResultContainer" class="d-none p-3 rounded-3" style="background: #F8FAFC; border: 1px solid #E2E8F0;">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <i class="fa-solid fa-building-columns text-primary fs-5"></i>
+                        <div>
+                            <div class="fw-bold text-dark" id="resBankName" style="font-size: 14px;"></div>
+                            <div class="text-muted" id="resBranchName" style="font-size: 12px;"></div>
+                        </div>
+                    </div>
+                    <div class="row g-2 mt-1 pt-2 border-top" style="font-size: 11.5px;">
+                        <div class="col-6"><span class="text-muted">City:</span> <strong id="resCity"></strong></div>
+                        <div class="col-6"><span class="text-muted">State:</span> <strong id="resState"></strong></div>
+                        <div class="col-12"><span class="text-muted">IFSC Code:</span> <code id="resIfsc"></code></div>
+                    </div>
+                </div>
+                <div id="ifscErrorAlert" class="alert alert-danger d-none mt-3 py-2 px-3" style="font-size: 12px; border-radius: 8px;"></div>
+            </div>
+            <div class="modal-footer border-top-0 pt-0">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal" style="border-radius: 6px;">Close</button>
+                <button type="button" class="btn btn-sm btn-save-purple d-none" id="btnApplyIfsc" onclick="applyIfscDetails()">
+                    <i class="fa-solid fa-check me-1"></i>Apply Bank to Form
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let fetchedBankData = null;
+
+    function openIfscModal() {
+        const modalEl = document.getElementById('ifscLookupModal');
+        const modal = new bootstrap.Modal(modalEl);
+        document.getElementById('modalIfscInput').value = '';
+        document.getElementById('ifscResultContainer').classList.add('d-none');
+        document.getElementById('ifscErrorAlert').classList.add('d-none');
+        document.getElementById('btnApplyIfsc').classList.add('d-none');
+        modal.show();
+        setTimeout(() => document.getElementById('modalIfscInput').focus(), 400);
+    }
+
+    async function performIfscLookup() {
+        const codeInput = document.getElementById('modalIfscInput');
+        const ifsc = (codeInput.value || '').trim().toUpperCase();
+        const errorAlert = document.getElementById('ifscErrorAlert');
+        const resultContainer = document.getElementById('ifscResultContainer');
+        const applyBtn = document.getElementById('btnApplyIfsc');
+        const spinner = document.getElementById('ifscSpinner');
+        const icon = document.getElementById('ifscSearchIcon');
+
+        errorAlert.classList.add('d-none');
+        resultContainer.classList.add('d-none');
+        applyBtn.classList.add('d-none');
+
+        if (ifsc.length !== 11) {
+            errorAlert.textContent = 'Please enter a valid 11-digit IFSC code (e.g. SBIN0000001, HDFC0000123).';
+            errorAlert.classList.remove('d-none');
+            return;
+        }
+
+        spinner.classList.remove('d-none');
+        icon.classList.add('d-none');
+
+        try {
+            // Free live public API - Zero DB maintenance required
+            const res = await fetch(`https://ifsc.razorpay.com/${ifsc}`);
+            if (!res.ok) {
+                throw new Error('IFSC code not found or invalid. Please check and try again.');
+            }
+            const data = await res.json();
+            fetchedBankData = data;
+
+            document.getElementById('resBankName').textContent = data.BANK || 'Bank';
+            document.getElementById('resBranchName').textContent = data.BRANCH || '';
+            document.getElementById('resCity').textContent = data.CITY || '-';
+            document.getElementById('resState').textContent = data.STATE || '-';
+            document.getElementById('resIfsc').textContent = data.IFSC || ifsc;
+
+            resultContainer.classList.remove('d-none');
+            applyBtn.classList.remove('d-none');
+        } catch (err) {
+            errorAlert.textContent = err.message || 'Failed to fetch bank details from RBI directory.';
+            errorAlert.classList.remove('d-none');
+        } finally {
+            spinner.classList.add('d-none');
+            icon.classList.remove('d-none');
+        }
+    }
+
+    let allLoadedBanks = [];
+    const registeredCorporateAccounts = [
+        @if (bankAccounts.Any())
+        {
+            foreach (var b in bankAccounts)
+            {
+                <text>"@b.BankName - @b.AccountNumber",</text>
+            }
+        }
+        else if (!string.IsNullOrEmpty(company?.BankName))
+        {
+            <text>"@company.BankName - @(company.BankAccountNumber ?? "Primary")",</text>
+        }
+    ];
+
+    function escapeHtml(str) {
+        return (str || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+    function escapeQuotes(str) {
+        return (str || '').replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, "&quot;");
+    }
+
+    // Load all RBI Scheduled Banks dynamically from Live API (No hardcoding)
+    async function loadLiveBanks() {
+        try {
+            let res = await fetch('https://cdn.jsdelivr.net/gh/razorpay/ifsc/src/banknames.json');
+            if (!res.ok) res = await fetch('/Sales/GetMasterBanks');
+            const data = await res.json();
+            const bankList = Array.isArray(data) ? data : Object.values(data);
+            allLoadedBanks = [...new Set(bankList)].sort((a, b) => a.localeCompare(b));
+            
+            renderBankOptions();
+            const label = document.getElementById('bankSelectedLabel');
+            if (label && !document.getElementById('bankNameHidden').value) {
+                // If company account exists, default to it; otherwise show '-- Select Bank --'
+                if (registeredCorporateAccounts.length > 0) {
+                    selectBankOption(registeredCorporateAccounts[0]);
+                } else {
+                    label.textContent = '-- Select Bank --';
+                }
+            }
+        } catch (err) {
+            console.error('Failed to load banks dynamically from API', err);
+            const label = document.getElementById('bankSelectedLabel');
+            if (label) label.textContent = '-- Select Bank --';
+            renderBankOptions();
+        }
+    }
+
+    function renderBankOptions(query = '') {
+        const container = document.getElementById('bankOptionsList');
+        const countBadge = document.getElementById('bankCountBadge');
+        if (!container) return;
+
+        const q = (query || '').trim().toLowerCase();
+        let html = '';
+        let matchCount = 0;
+
+        // 1. Registered Corporate Accounts (if any)
+        const matchedCorp = registeredCorporateAccounts.filter(b => !q || b.toLowerCase().includes(q));
+        if (matchedCorp.length > 0) {
+            html += '<div class="bank-section-title">Company Corporate Accounts</div>';
+            matchedCorp.forEach(acc => {
+                matchCount++;
+                html += `<div class="bank-item-option" onclick="selectBankOption('${escapeQuotes(acc)}')">
+                    <span><i class="fa-solid fa-building-columns text-primary me-2"></i>${escapeHtml(acc)}</span>
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle" style="font-size: 10px;">Primary</span>
+                </div>`;
+            });
+        }
+
+        // 2. Official RBI Banks from API
+        const matchedBanks = allLoadedBanks.filter(b => !q || b.toLowerCase().includes(q));
+        if (matchedBanks.length > 0) {
+            html += '<div class="bank-section-title">RBI Scheduled Banks (Live Directory)</div>';
+            const displayList = q ? matchedBanks : matchedBanks.slice(0, 120);
+            displayList.forEach(bank => {
+                matchCount++;
+                html += `<div class="bank-item-option" onclick="selectBankOption('${escapeQuotes(bank)}')">
+                    <span><i class="fa-solid fa-landmark me-2 text-muted" style="font-size: 11px;"></i>${escapeHtml(bank)}</span>
+                </div>`;
+            });
+            if (!q && matchedBanks.length > 120) {
+                html += `<div class="text-center py-2 text-muted" style="font-size: 11.5px;">
+                    ... and ${matchedBanks.length - 120} more banks. Type above to filter.
+                </div>`;
+            }
+        }
+
+        if (matchCount === 0) {
+            html = `<div class="text-center py-3 text-muted" style="font-size: 12.5px;">
+                <i class="fa-solid fa-circle-info mb-1 d-block text-secondary"></i>
+                No bank found matching "<strong>${escapeHtml(query)}</strong>"
+                <div class="mt-2">
+                    <button type="button" class="btn btn-sm btn-outline-primary" style="font-size: 11.5px; border-radius: 6px;" onclick="selectBankOption('${escapeQuotes(query)}')">
+                        Use "${escapeHtml(query)}"
+                    </button>
+                </div>
+            </div>`;
+        }
+
+        container.innerHTML = html;
+        if (countBadge) {
+            countBadge.textContent = q ? `${matchCount} matches` : `${allLoadedBanks.length} banks available`;
+        }
+    }
+
+    function selectBankOption(bankName) {
+        if (!bankName) return;
+        const hidden = document.getElementById('bankNameHidden');
+        const label = document.getElementById('bankSelectedLabel');
+        const menu = document.getElementById('bankDropdownMenu');
+        
+        hidden.value = bankName;
+        label.innerHTML = `<span class="fw-semibold text-dark"><i class="fa-solid fa-building-columns text-primary me-2"></i>${escapeHtml(bankName)}</span>`;
+        if (menu) menu.classList.add('d-none');
+    }
+
+    function promptCustomBank() {
+        const custom = prompt("Enter Custom Bank Name:");
+        if (custom && custom.trim()) {
+            selectBankOption(custom.trim());
+        }
+    }
+
+    // DOMContentLoaded setup
+    document.addEventListener('DOMContentLoaded', function () {
+        loadLiveBanks();
+
+        const toggle = document.getElementById('bankDropdownToggle');
+        const menu = document.getElementById('bankDropdownMenu');
+        const searchInput = document.getElementById('bankSearchInput');
+
+        toggle?.addEventListener('click', function (e) {
+            e.stopPropagation();
+            const isOpen = !menu.classList.contains('d-none');
+            if (isOpen) {
+                menu.classList.add('d-none');
+            } else {
+                menu.classList.remove('d-none');
+                searchInput.value = '';
+                renderBankOptions();
+                setTimeout(() => searchInput.focus(), 60);
+            }
+        });
+
+        toggle?.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                toggle.click();
+            } else if (e.key === 'Escape') {
+                menu?.classList.add('d-none');
+            }
+        });
+
+        searchInput?.addEventListener('input', function () {
+            renderBankOptions(this.value);
+        });
+
+        searchInput?.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') {
+                menu?.classList.add('d-none');
+            }
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function (e) {
+            if (!document.getElementById('bankDropdownWrapper')?.contains(e.target)) {
+                menu?.classList.add('d-none');
+            }
+        });
+
+        document.getElementById('modalIfscInput')?.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                performIfscLookup();
+            }
+        });
+    });
+
+    function applyIfscDetails() {
+        if (!fetchedBankData) return;
+        const fullBankTitle = `${fetchedBankData.BANK} - ${fetchedBankData.BRANCH}`;
+        selectBankOption(fullBankTitle);
+
+        const badge = document.getElementById('ifscDetailsBadge');
+        const text = document.getElementById('ifscDetailsText');
+        if (badge && text) {
+            text.innerHTML = `<i class="fa-solid fa-building-columns me-1"></i>${fetchedBankData.IFSC} (${fetchedBankData.CITY})`;
+            badge.classList.remove('d-none');
+        }
+        const modalEl = document.getElementById('ifscLookupModal');
+        const modalInstance = bootstrap.Modal.getInstance(modalEl);
+        if (modalInstance) modalInstance.hide();
+    }
+</script>
