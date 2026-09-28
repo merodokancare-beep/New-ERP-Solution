@@ -437,8 +437,8 @@
                         </tr>
                         <tr>
                             <td>
-                                <span class="field-lbl">Delivery Destination</span>
-                                <span class="field-val">@(branch?.BranchName ?? "Head Office Site")</span>
+                                <span class="field-lbl">PO Type</span>
+                                <span class="field-val">@(string.IsNullOrWhiteSpace(Model.PoType) ? "Standard PO" : Model.PoType)</span>
                             </td>
                             <td>
                                 <span class="field-lbl">Shipment Mode</span>
@@ -447,8 +447,14 @@
                         </tr>
                         <tr>
                             <td colspan="2">
+                                <span class="field-lbl">Ship To / Delivery Destination</span>
+                                <span class="field-val" style="font-weight: normal; white-space: pre-line;">@(string.IsNullOrWhiteSpace(Model.ShipTo) ? (branch?.BranchName ?? "Corporate Headquarters") : Model.ShipTo)</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td colspan="2">
                                 <span class="field-lbl">Special Instructions / Remarks</span>
-                                <span class="field-val" style="font-weight: normal;">3-Way Matching Mandatory (PO + GRN + Vendor Tax Invoice)</span>
+                                <span class="field-val" style="font-weight: normal; white-space: pre-line;">@(string.IsNullOrWhiteSpace(Model.Remarks) ? "3-Way Matching Mandatory (PO + GRN + Vendor Tax Invoice)" : Model.Remarks)</span>
                             </td>
                         </tr>
                     </table>
@@ -657,13 +663,20 @@
             <div class="bottom-section">
                 <!-- Left: Terms & Conditions -->
                 <div class="bottom-left">
-                    <div style="font-weight: bold; text-decoration: underline; margin-bottom: 3px;">Standard Terms &amp; Conditions :</div>
-                    <ol style="padding-left: 14px; margin: 0; font-size: 9px; line-height: 1.35;">
-                        <li>All supplies are subject to technical inspection, count, and verification at destination.</li>
-                        <li>Please quote our PO Number &amp; Date on all dispatch challans and invoices.</li>
-                        <li>Statutory GST e-Invoices with valid IRN/QR must be submitted to ensure input tax credit.</li>
-                        <li>Payment shall be released within @(vendor?.PaymentTermsDays ?? 30) days from receipt of goods with verified GRN.</li>
-                    </ol>
+                    <div style="font-weight: bold; text-decoration: underline; margin-bottom: 3px;">Terms &amp; Conditions :</div>
+                    @if (!string.IsNullOrWhiteSpace(Model.TermsConditions))
+                    {
+                        <div style="font-size: 9px; line-height: 1.4; white-space: pre-line;">@Model.TermsConditions</div>
+                    }
+                    else
+                    {
+                        <ol style="padding-left: 14px; margin: 0; font-size: 9px; line-height: 1.35;">
+                            <li>All supplies are subject to technical inspection, count, and verification at destination.</li>
+                            <li>Please quote our PO Number &amp; Date on all dispatch challans and invoices.</li>
+                            <li>Statutory GST e-Invoices with valid IRN/QR must be submitted to ensure input tax credit.</li>
+                            <li>Payment shall be released within @(vendor?.PaymentTermsDays ?? 30) days from receipt of goods with verified GRN.</li>
+                        </ol>
+                    }
                 </div>
 
                 <!-- Right: Signature Box -->

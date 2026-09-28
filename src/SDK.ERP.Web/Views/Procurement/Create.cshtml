@@ -1,0 +1,690 @@
+@{
+    ViewData["Title"] = "Add Procurement Details";
+    ViewData["ActiveMenu"] = "Procurement";
+    var company = ViewBag.Company as SDK.ERP.Domain.Entities.Admin.Company;
+    var vendors = ViewBag.Vendors as IEnumerable<SDK.ERP.Domain.Entities.MasterData.Vendor> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.MasterData.Vendor>();
+    var projects = ViewBag.Projects as IEnumerable<SDK.ERP.Domain.Entities.Projects.Project> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Projects.Project>();
+    var companyState = company?.StateCode ?? "07";
+    var autoPoNumber = ViewBag.AutoPoNumber as string ?? $"PO/{DateTime.Today:yy-MM}/{DateTime.Now:HHmmss}";
+    var defaultShipTo = ViewBag.DefaultShipTo as string ?? "Sabir Alam (SDK Solutions)\nSecond Floor, Deewan Building,\nOpposite Tajganj, Agra, UP - 282001";
+}
+
+<style>
+    .proc-title {
+        font-size: 20px;
+        font-weight: 700;
+        color: #0F172A;
+        letter-spacing: -0.3px;
+        margin-bottom: 24px;
+    }
+
+    .proc-card {
+        background: #ffffff;
+        border: 1px solid #E2E8F0;
+        border-radius: 12px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+        padding: 32px 36px;
+        margin-bottom: 40px;
+    }
+
+    .proc-label {
+        font-size: 13px;
+        font-weight: 600;
+        color: #1E293B;
+        margin-bottom: 7px;
+        display: block;
+    }
+
+    .proc-input {
+        font-size: 13.5px;
+        border: 1px solid #CBD5E1;
+        border-radius: 7px;
+        padding: 9px 13px;
+        color: #1E293B;
+        background-color: #ffffff;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .proc-input:focus {
+        border-color: #7C3AED;
+        box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12);
+        outline: none;
+    }
+
+    .proc-input::placeholder {
+        color: #94A3B8;
+        font-size: 13px;
+    }
+
+    .btn-add-row {
+        background: #0F172A;
+        color: #ffffff;
+        border: none;
+        border-radius: 6px;
+        padding: 7px 16px;
+        font-size: 13px;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: background 0.15s ease;
+    }
+
+    .btn-add-row:hover {
+        background: #1E293B;
+        color: #ffffff;
+    }
+
+    /* Procurement Table */
+    .proc-table-wrap {
+        border: 1px solid #CBD5E1;
+        border-radius: 8px;
+        overflow: hidden;
+        margin-bottom: 28px;
+    }
+
+    .proc-table {
+        width: 100%;
+        margin-bottom: 0;
+        border-collapse: collapse;
+        font-size: 12.5px;
+    }
+
+    .proc-table thead th {
+        background: #F8FAFC;
+        color: #475569;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 11px 12px;
+        border-bottom: 1px solid #CBD5E1;
+        border-right: 1px solid #E2E8F0;
+        text-align: center;
+        white-space: nowrap;
+        vertical-align: middle;
+    }
+
+    .proc-table thead th:last-child {
+        border-right: none;
+    }
+
+    .proc-table tbody td {
+        padding: 8px 10px;
+        border-bottom: 1px solid #E2E8F0;
+        border-right: 1px solid #E2E8F0;
+        vertical-align: middle;
+        background: #ffffff;
+    }
+
+    .proc-table tbody td:last-child {
+        border-right: none;
+    }
+
+    .proc-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+
+    .proc-table .form-control {
+        font-size: 12.5px;
+        border: 1px solid #CBD5E1;
+        border-radius: 6px;
+        padding: 7px 10px;
+    }
+
+    .proc-table .form-control:focus {
+        border-color: #7C3AED;
+        box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.15);
+        outline: none;
+    }
+
+    .proc-table textarea.form-control {
+        resize: vertical;
+        min-height: 48px;
+    }
+
+    .proc-table .summary-label {
+        font-size: 13px;
+        font-weight: 600;
+        color: #1E293B;
+        text-align: left;
+        padding-left: 16px;
+        background: #FFFFFF;
+    }
+
+    .proc-table .summary-input {
+        background: #FFFFFF;
+        font-weight: 600;
+        color: #0F172A;
+        border: 1px solid #CBD5E1;
+        border-radius: 6px;
+        font-size: 13px;
+    }
+
+    .btn-delete-row {
+        background: #FEF2F2;
+        color: #DC2626;
+        border: 1px solid #FCA5A5;
+        border-radius: 6px;
+        width: 32px;
+        height: 32px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        transition: all 0.15s ease;
+    }
+
+    .btn-delete-row:hover {
+        background: #DC2626;
+        color: #ffffff;
+        border-color: #DC2626;
+    }
+
+    .btn-proc-cancel {
+        background: #7C3AED;
+        color: #ffffff;
+        border: 1px solid #7C3AED;
+        border-radius: 8px;
+        padding: 9px 26px;
+        font-size: 14px;
+        font-weight: 600;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.15s ease;
+    }
+
+    .btn-proc-cancel:hover {
+        background: #6D28D9;
+        border-color: #6D28D9;
+        color: #ffffff;
+    }
+
+    .btn-proc-save {
+        background: #7C3AED;
+        color: #ffffff;
+        border: 1px solid #7C3AED;
+        border-radius: 8px;
+        padding: 9px 28px;
+        font-size: 14px;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.15s ease;
+        box-shadow: 0 2px 4px rgba(124, 58, 237, 0.25);
+    }
+
+    .btn-proc-save:hover {
+        background: #6D28D9;
+        border-color: #6D28D9;
+        color: #ffffff;
+    }
+</style>
+
+<div class="proc-title">Add Procurement Details</div>
+
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show d-flex align-items-center mb-4 shadow-sm" role="alert">
+        <i class="fa-solid fa-triangle-exclamation fs-5 me-2"></i>
+        <div>@TempData["ErrorMessage"]</div>
+        <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+<div class="proc-card">
+    <form id="createPoForm" method="post" asp-controller="Procurement" asp-action="Create">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="poNumber" value="@autoPoNumber" />
+
+        <!-- Row 1: PO Type -->
+        <div class="row g-3 mb-3">
+            <div class="col-12">
+                <label class="proc-label">PO Type <span class="text-danger">*</span></label>
+                <select name="poType" id="poType" class="form-select proc-input" required>
+                    <option value="">--- Select PO Type ---</option>
+                    <option value="Standard Purchase Order" selected>Standard Purchase Order</option>
+                    <option value="Work Order">Work Order</option>
+                    <option value="Service PO">Service PO</option>
+                    <option value="Capital Goods Procurement">Capital Goods Procurement</option>
+                    <option value="Consumables &amp; Supplies">Consumables &amp; Supplies</option>
+                    <option value="Direct Purchase">Direct Purchase</option>
+                    <option value="Rate Contract">Rate Contract</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Row 2: Vendor Name & Project Name -->
+        <div class="row g-3 mb-3">
+            <div class="col-md-6">
+                <label class="proc-label">Vendor Name <span class="text-danger">*</span></label>
+                <select name="vendorId" id="vendorId" class="form-select proc-input" required>
+                    <option value="">--- Select Vendor Name ---</option>
+                    @foreach (var v in vendors)
+                    {
+                        <option value="@v.Id" data-gstin="@v.Gstin">
+                            @v.VendorName (@v.VendorCode)
+                        </option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="proc-label">Project Name (If Applicable)</label>
+                <select name="projectId" id="projectId" class="form-select proc-input">
+                    <option value="">--- Select Project Name ---</option>
+                    @foreach (var p in projects)
+                    {
+                        var clientName = p.Client?.ClientName ?? "";
+                        var clientPo = p.PurchaseOrders?.OrderByDescending(x => x.PoDate).FirstOrDefault();
+                        var poNum = clientPo?.ClientPoNumber ?? "";
+                        <option value="@p.Id" 
+                                data-code="@p.ProjectCode" 
+                                data-name="@p.ProjectName" 
+                                data-client="@clientName"
+                                data-po="@poNum">
+                            @p.ProjectCode - @p.ProjectName @(!string.IsNullOrEmpty(clientName) ? $"({clientName})" : "")
+                        </option>
+                    }
+                </select>
+            </div>
+        </div>
+
+        <!-- Row 3: Purchase Date & Ship To -->
+        <div class="row g-3 mb-3">
+            <div class="col-md-6">
+                <label class="proc-label">Purchase Date <span class="text-danger">*</span></label>
+                <input type="date" name="poDate" id="poDate" class="form-control proc-input" value="@DateTime.Today.ToString("yyyy-MM-dd")" placeholder="Select Purchase Date" required />
+            </div>
+            <div class="col-md-6">
+                <label class="proc-label">Ship To <span class="text-danger">*</span></label>
+                <textarea name="shipTo" id="shipTo" rows="3" class="form-control proc-input" placeholder="Ship To Address" required>@defaultShipTo</textarea>
+            </div>
+        </div>
+
+        <!-- Row 4: Remarks & Terms Conditions -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-6">
+                <label class="proc-label">Remarks <span class="text-danger">*</span></label>
+                <textarea name="remarks" id="remarks" rows="3" class="form-control proc-input" placeholder="Remarks" required></textarea>
+            </div>
+            <div class="col-md-6">
+                <label class="proc-label">Terms Conditions</label>
+                <textarea name="termsConditions" id="termsConditions" rows="3" class="form-control proc-input" placeholder="Terms Conditions"></textarea>
+            </div>
+        </div>
+
+        <!-- Add New Row Button -->
+        <div class="d-flex justify-content-end mb-3">
+            <button type="button" id="btnAddRow" class="btn-add-row">
+                <i class="fa-solid fa-circle-plus"></i> Add New Row
+            </button>
+        </div>
+
+        <!-- Items Table -->
+        <div class="proc-table-wrap">
+            <table class="proc-table" id="itemsTable">
+                <thead>
+                    <tr>
+                        <th style="width: 45px;">SL</th>
+                        <th style="min-width: 240px;">ITEM NAME</th>
+                        <th style="width: 120px;">HSN CODE</th>
+                        <th style="width: 90px;">GST %</th>
+                        <th style="width: 90px;">IGST %</th>
+                        <th style="width: 90px;">CGST %</th>
+                        <th style="width: 90px;">SGST %</th>
+                        <th style="width: 100px;">ORDER QTY</th>
+                        <th style="width: 120px;">RATE</th>
+                        <th style="width: 140px;">AMOUNT</th>
+                        <th style="width: 65px;">ACTION</th>
+                    </tr>
+                </thead>
+                <tbody id="itemsBody">
+                    <tr class="item-row">
+                        <td class="text-center fw-semibold row-sl">1</td>
+                        <td>
+                            <textarea name="itemName[]" class="form-control item-name" rows="2" placeholder="Item Name" required></textarea>
+                        </td>
+                        <td>
+                            <input type="text" name="itemHsn[]" class="form-control item-hsn" placeholder="HSN Code" value="998313" />
+                        </td>
+                        <td>
+                            <input type="number" step="0.01" min="0" name="itemGst[]" class="form-control item-gst text-end" placeholder="Gst %" value="18" />
+                        </td>
+                        <td>
+                            <input type="number" step="0.01" min="0" name="itemIgst[]" class="form-control item-igst text-end" placeholder="IGST %" />
+                        </td>
+                        <td>
+                            <input type="number" step="0.01" min="0" name="itemCgst[]" class="form-control item-cgst text-end" placeholder="CGST %" value="9" />
+                        </td>
+                        <td>
+                            <input type="number" step="0.01" min="0" name="itemSgst[]" class="form-control item-sgst text-end" placeholder="SGST %" value="9" />
+                        </td>
+                        <td>
+                            <input type="number" step="0.01" min="0.01" name="itemQty[]" class="form-control item-qty text-end" placeholder="Qty" value="1" required />
+                        </td>
+                        <td>
+                            <input type="number" step="0.01" min="0" name="itemRate[]" class="form-control item-rate text-end" placeholder="Rate" required />
+                        </td>
+                        <td>
+                            <input type="text" name="itemAmount[]" class="form-control item-amount text-end bg-light" placeholder="Amount" readonly />
+                        </td>
+                        <td class="text-center">
+                            <button type="button" class="btn-delete-row" title="Delete Row">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </td>
+                    </tr>
+                </tbody>
+                <tfoot>
+                    <!-- Net Billing Amount -->
+                    <tr>
+                        <td colspan="9" class="summary-label">Net Billing Amount</td>
+                        <td>
+                            <input type="text" name="netBillingAmount" id="netBillingAmount" class="form-control summary-input text-end" readonly value="0.00" />
+                        </td>
+                        <td class="text-center text-muted">-</td>
+                    </tr>
+                    <!-- IGST Amount -->
+                    <tr>
+                        <td colspan="9" class="summary-label">IGST Amount</td>
+                        <td>
+                            <input type="text" name="igstAmount" id="igstAmount" class="form-control summary-input text-end" readonly value="0.00" />
+                        </td>
+                        <td class="text-center text-muted">-</td>
+                    </tr>
+                    <!-- CGST Amount -->
+                    <tr>
+                        <td colspan="9" class="summary-label">CGST Amount</td>
+                        <td>
+                            <input type="text" name="cgstAmount" id="cgstAmount" class="form-control summary-input text-end" readonly value="0.00" />
+                        </td>
+                        <td class="text-center text-muted">-</td>
+                    </tr>
+                    <!-- SGST Amount -->
+                    <tr>
+                        <td colspan="9" class="summary-label">SGST Amount</td>
+                        <td>
+                            <input type="text" name="sgstAmount" id="sgstAmount" class="form-control summary-input text-end" readonly value="0.00" />
+                        </td>
+                        <td class="text-center text-muted">-</td>
+                    </tr>
+                    <!-- Total Billing Amount -->
+                    <tr>
+                        <td colspan="9" class="summary-label fw-bold">Total Billing Amount</td>
+                        <td>
+                            <input type="text" name="totalBillingAmount" id="totalBillingAmount" class="form-control summary-input text-end fw-bold" readonly value="0.00" />
+                        </td>
+                        <td class="text-center text-muted">-</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <!-- Action Buttons (Bottom Right) -->
+        <div class="d-flex justify-content-end align-items-center gap-2">
+            <a asp-controller="Procurement" asp-action="Index" class="btn-proc-cancel">Cancel</a>
+            <button type="submit" class="btn-proc-save">Save</button>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const companyState = "@companyState";
+        const vendorSelect = document.getElementById("vendorId");
+        const tbody = document.getElementById("itemsBody");
+        const btnAddRow = document.getElementById("btnAddRow");
+
+        const netBillingInput = document.getElementById("netBillingAmount");
+        const igstInput = document.getElementById("igstAmount");
+        const cgstInput = document.getElementById("cgstAmount");
+        const sgstInput = document.getElementById("sgstAmount");
+        const totalBillingInput = document.getElementById("totalBillingAmount");
+
+        function isInterstate() {
+            const selected = vendorSelect.options[vendorSelect.selectedIndex];
+            if (!selected || !selected.value) return false;
+            const vendorGstin = (selected.getAttribute("data-gstin") || "").trim();
+            const vendorState = (selected.getAttribute("data-state") || "").trim();
+
+            if (vendorGstin.length >= 2) {
+                const gstinState = vendorGstin.substring(0, 2);
+                return gstinState !== companyState;
+            }
+            if (vendorState) {
+                return vendorState !== companyState;
+            }
+            return false;
+        }
+
+        function reindexRows() {
+            const rows = tbody.querySelectorAll(".item-row");
+            rows.forEach((tr, index) => {
+                const slCell = tr.querySelector(".row-sl");
+                if (slCell) slCell.textContent = (index + 1);
+            });
+        }
+
+        function applyGstSplit(row) {
+            const gstInput = row.querySelector(".item-gst");
+            const igstInput = row.querySelector(".item-igst");
+            const cgstInput = row.querySelector(".item-cgst");
+            const sgstInput = row.querySelector(".item-sgst");
+
+            const gstVal = parseFloat(gstInput.value) || 0;
+            const interstate = isInterstate();
+
+            if (interstate) {
+                igstInput.value = gstVal > 0 ? gstVal.toFixed(2) : "";
+                cgstInput.value = "";
+                sgstInput.value = "";
+            } else {
+                igstInput.value = "";
+                if (gstVal > 0) {
+                    const half = (gstVal / 2).toFixed(2);
+                    cgstInput.value = half;
+                    sgstInput.value = half;
+                } else {
+                    cgstInput.value = "";
+                    sgstInput.value = "";
+                }
+            }
+        }
+
+        function calculateRow(row) {
+            const qtyInput = row.querySelector(".item-qty");
+            const rateInput = row.querySelector(".item-rate");
+            const amountInput = row.querySelector(".item-amount");
+
+            const qty = parseFloat(qtyInput.value) || 0;
+            const rate = parseFloat(rateInput.value) || 0;
+            const amount = Math.round((qty * rate) * 100) / 100;
+
+            amountInput.value = amount > 0 ? amount.toFixed(2) : "";
+        }
+
+        function calculateTotals() {
+            let net = 0;
+            let totalIgst = 0;
+            let totalCgst = 0;
+            let totalSgst = 0;
+
+            const rows = tbody.querySelectorAll(".item-row");
+            rows.forEach(row => {
+                const qty = parseFloat(row.querySelector(".item-qty").value) || 0;
+                const rate = parseFloat(row.querySelector(".item-rate").value) || 0;
+                const amount = Math.round((qty * rate) * 100) / 100;
+
+                const igstRate = parseFloat(row.querySelector(".item-igst").value) || 0;
+                const cgstRate = parseFloat(row.querySelector(".item-cgst").value) || 0;
+                const sgstRate = parseFloat(row.querySelector(".item-sgst").value) || 0;
+
+                const igst = Math.round((amount * (igstRate / 100)) * 100) / 100;
+                const cgst = Math.round((amount * (cgstRate / 100)) * 100) / 100;
+                const sgst = Math.round((amount * (sgstRate / 100)) * 100) / 100;
+
+                net += amount;
+                totalIgst += igst;
+                totalCgst += cgst;
+                totalSgst += sgst;
+            });
+
+            const grandTotal = net + totalIgst + totalCgst + totalSgst;
+
+            netBillingInput.value = net.toFixed(2);
+            igstInput.value = totalIgst.toFixed(2);
+            cgstInput.value = totalCgst.toFixed(2);
+            sgstInput.value = totalSgst.toFixed(2);
+            totalBillingInput.value = grandTotal.toFixed(2);
+        }
+
+        function bindRowEvents(row) {
+            const qtyInput = row.querySelector(".item-qty");
+            const rateInput = row.querySelector(".item-rate");
+            const gstInput = row.querySelector(".item-gst");
+            const igstInput = row.querySelector(".item-igst");
+            const cgstInput = row.querySelector(".item-cgst");
+            const sgstInput = row.querySelector(".item-sgst");
+            const btnDelete = row.querySelector(".btn-delete-row");
+
+            [qtyInput, rateInput].forEach(inp => {
+                inp.addEventListener("input", function () {
+                    calculateRow(row);
+                    calculateTotals();
+                });
+            });
+
+            gstInput.addEventListener("input", function () {
+                applyGstSplit(row);
+                calculateTotals();
+            });
+
+            [igstInput, cgstInput, sgstInput].forEach(inp => {
+                inp.addEventListener("input", function () {
+                    calculateTotals();
+                });
+            });
+
+            btnDelete.addEventListener("click", function () {
+                const totalRows = tbody.querySelectorAll(".item-row").length;
+                if (totalRows <= 1) {
+                    row.querySelector(".item-name").value = "";
+                    row.querySelector(".item-qty").value = "1";
+                    row.querySelector(".item-rate").value = "";
+                    row.querySelector(".item-amount").value = "";
+                    calculateTotals();
+                    return;
+                }
+                row.remove();
+                reindexRows();
+                calculateTotals();
+            });
+        }
+
+        // Add row functionality
+        btnAddRow.addEventListener("click", function () {
+            const rowCount = tbody.querySelectorAll(".item-row").length + 1;
+            const tr = document.createElement("tr");
+            tr.className = "item-row";
+            tr.innerHTML = `
+                <td class="text-center fw-semibold row-sl">${rowCount}</td>
+                <td>
+                    <textarea name="itemName[]" class="form-control item-name" rows="2" placeholder="Item Name" required></textarea>
+                </td>
+                <td>
+                    <input type="text" name="itemHsn[]" class="form-control item-hsn" placeholder="HSN Code" value="998313" />
+                </td>
+                <td>
+                    <input type="number" step="0.01" min="0" name="itemGst[]" class="form-control item-gst text-end" placeholder="Gst %" value="18" />
+                </td>
+                <td>
+                    <input type="number" step="0.01" min="0" name="itemIgst[]" class="form-control item-igst text-end" placeholder="IGST %" />
+                </td>
+                <td>
+                    <input type="number" step="0.01" min="0" name="itemCgst[]" class="form-control item-cgst text-end" placeholder="CGST %" value="9" />
+                </td>
+                <td>
+                    <input type="number" step="0.01" min="0" name="itemSgst[]" class="form-control item-sgst text-end" placeholder="SGST %" value="9" />
+                </td>
+                <td>
+                    <input type="number" step="0.01" min="0.01" name="itemQty[]" class="form-control item-qty text-end" placeholder="Qty" value="1" required />
+                </td>
+                <td>
+                    <input type="number" step="0.01" min="0" name="itemRate[]" class="form-control item-rate text-end" placeholder="Rate" required />
+                </td>
+                <td>
+                    <input type="text" name="itemAmount[]" class="form-control item-amount text-end bg-light" placeholder="Amount" readonly />
+                </td>
+                <td class="text-center">
+                    <button type="button" class="btn-delete-row" title="Delete Row">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                </td>
+            `;
+
+            tbody.appendChild(tr);
+            applyGstSplit(tr);
+            bindRowEvents(tr);
+        });
+
+        // Vendor selection changes GST split mode
+        vendorSelect.addEventListener("change", function () {
+            tbody.querySelectorAll(".item-row").forEach(row => {
+                applyGstSplit(row);
+            });
+            calculateTotals();
+        });
+
+        // Project selection auto-fills remarks, item name, and terms
+        const projectSelect = document.getElementById("projectId");
+        const remarksInput = document.getElementById("remarks");
+        const termsInput = document.getElementById("termsConditions");
+
+        if (projectSelect) {
+            projectSelect.addEventListener("change", function () {
+                const opt = this.options[this.selectedIndex];
+                if (!opt || !opt.value) return;
+
+                const code = opt.getAttribute("data-code") || "";
+                const name = opt.getAttribute("data-name") || "";
+                const client = opt.getAttribute("data-client") || "";
+                const po = opt.getAttribute("data-po") || "";
+
+                // Auto-fill remarks
+                if (!remarksInput.value.trim() || remarksInput.value.includes("Procurement for Project:")) {
+                    let rText = `Procurement for Project: ${code} - ${name}`;
+                    if (client) rText += ` (${client})`;
+                    if (po) rText += ` [Client PO: ${po}]`;
+                    remarksInput.value = rText;
+                }
+
+                // Auto-fill first item name if empty
+                const firstRow = tbody.querySelector(".item-row");
+                if (firstRow) {
+                    const itemNameInput = firstRow.querySelector(".item-name");
+                    if (itemNameInput && !itemNameInput.value.trim()) {
+                        itemNameInput.value = `Materials & supplies for ${name}`;
+                    }
+                }
+
+                // Auto-fill terms if empty
+                if (!termsInput.value.trim()) {
+                    termsInput.value = "1. Delivery to designated project site.\n2. All items must conform to project specifications and quality benchmarks.\n3. Submission of original tax invoice with e-Way bill mandatory.";
+                }
+            });
+        }
+
+        // Initialize existing rows
+        tbody.querySelectorAll(".item-row").forEach(row => {
+            applyGstSplit(row);
+            bindRowEvents(row);
+            calculateRow(row);
+        });
+        calculateTotals();
+    });
+</script>
+}

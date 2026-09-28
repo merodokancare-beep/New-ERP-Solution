@@ -14,12 +14,19 @@ public class PurchaseOrder : ITenantEntity
     public long? ProjectId { get; set; }
     public long? PrId { get; set; }
     public string PoNumber { get; set; } = string.Empty;
+    public string? PoType { get; set; }
     public DateTime PoDate { get; set; }
     public DateTime? DeliveryDueDate { get; set; }
+    public string? ShipTo { get; set; }
+    public string? Remarks { get; set; }
+    public string? TermsConditions { get; set; }
     public decimal TaxableAmount { get; set; }
     public decimal GstAmount { get; set; }
+    public decimal CgstAmount { get; set; }
+    public decimal SgstAmount { get; set; }
+    public decimal IgstAmount { get; set; }
     public decimal TotalPoValue { get; set; }
-    public string ApprovalStatus { get; set; } = "DRAFT";
+    public string ApprovalStatus { get; set; } = "APPROVED";
     public long? ApprovedBy { get; set; }
 
     public Company Company { get; set; } = null!;

@@ -208,14 +208,14 @@
                     <label class="inv-label">Work Order / PO No.</label>
                     <div class="input-icon-group">
                         <span class="icon-addon"><i class="fa-regular fa-file"></i></span>
-                        <input type="text" name="workOrderNo" class="form-control inv-input" placeholder="Enter Order No." />
+                        <input type="text" name="workOrderNo" id="workOrderNoInput" class="form-control inv-input" placeholder="Enter Order No." />
                     </div>
                 </div>
                 <div class="col-md-3">
                     <label class="inv-label">Work Order Date</label>
                     <div class="input-icon-group">
                         <span class="icon-addon"><i class="fa-regular fa-calendar"></i></span>
-                        <input type="date" name="workOrderDate" class="form-control inv-input" />
+                        <input type="date" name="workOrderDate" id="workOrderDateInput" class="form-control inv-input" />
                     </div>
                 </div>
             </div>
@@ -265,11 +265,23 @@
                             @foreach (var p in projects)
                             {
                                 var cl = p.Client;
+                                var clientPo = p.PurchaseOrders?.OrderByDescending(x => x.PoDate).FirstOrDefault();
+                                var poNum = clientPo?.ClientPoNumber ?? "";
+                                var poDate = clientPo != null && clientPo.PoDate != default ? clientPo.PoDate.ToString("yyyy-MM-dd") : (p.StartDate != default ? p.StartDate.ToString("yyyy-MM-dd") : "");
+                                var scope = !string.IsNullOrWhiteSpace(clientPo?.ScopeOfWork) ? clientPo.ScopeOfWork : (!string.IsNullOrWhiteSpace(p.Description) ? p.Description : p.ProjectName);
+                                var defaultRate = clientPo != null && clientPo.PoValue > 0 ? clientPo.PoValue : (p.ContractValue > 0 ? p.ContractValue : 0);
+
                                 <option value="@p.Id" 
                                         data-client-id="@p.ClientId" 
                                         data-client-name="@(cl?.ClientName ?? "")" 
                                         data-contact="@(cl?.ContactPerson ?? cl?.ClientName ?? "")" 
-                                        data-state="@(cl?.StateCode ?? "07")">
+                                        data-state="@(cl?.StateCode ?? "07")"
+                                        data-po-num="@poNum"
+                                        data-po-date="@poDate"
+                                        data-project-name="@p.ProjectName"
+                                        data-project-code="@p.ProjectCode"
+                                        data-scope="@scope"
+                                        data-rate="@defaultRate">
                                     @p.ProjectCode - @p.ProjectName (@(cl?.ClientName ?? "N/A"))
                                 </option>
                             }
@@ -452,9 +464,49 @@
         const contact = selectedOpt.getAttribute("data-contact");
         const clientName = selectedOpt.getAttribute("data-client-name");
         const state = selectedOpt.getAttribute("data-state") || "07";
+        const poNum = selectedOpt.getAttribute("data-po-num") || "";
+        const poDate = selectedOpt.getAttribute("data-po-date") || "";
+        const projectName = selectedOpt.getAttribute("data-project-name") || "";
+        const projectCode = selectedOpt.getAttribute("data-project-code") || "";
+        const scope = selectedOpt.getAttribute("data-scope") || "";
+        const rate = parseFloat(selectedOpt.getAttribute("data-rate")) || 0;
 
         document.getElementById("clientIdHidden").value = clientId || "";
         document.getElementById("billingAttentionInput").value = contact || clientName || "";
+
+        // Auto-fill Work Order / PO No.
+        const workOrderInput = document.getElementById("workOrderNoInput");
+        if (workOrderInput) {
+            workOrderInput.value = poNum || (projectCode ? `WO-${projectCode}` : "");
+        }
+
+        // Auto-fill Work Order Date
+        const workOrderDateInput = document.getElementById("workOrderDateInput");
+        if (workOrderDateInput && poDate) {
+            workOrderDateInput.value = poDate;
+        }
+
+        // Auto-fill First Item Description & Rate if empty or initial
+        const firstRow = document.querySelector(".item-row");
+        if (firstRow) {
+            const descInput = firstRow.querySelector(".item-desc");
+            if (descInput) {
+                let descText = projectName;
+                if (scope && scope !== projectName) {
+                    descText += `\n${scope}`;
+                }
+                if (poNum) {
+                    descText += ` (Ref: PO No. ${poNum})`;
+                }
+                descInput.value = descText;
+            }
+
+            const rateInput = firstRow.querySelector(".item-rate");
+            if (rateInput && (parseFloat(rateInput.value) || 0) === 0 && rate > 0) {
+                rateInput.value = rate.toFixed(2);
+                recalcRow(rateInput);
+            }
+        }
 
         // Recheck interstate / intrastate split for existing rows
         const rows = document.querySelectorAll(".item-row");

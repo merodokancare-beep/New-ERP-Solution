@@ -332,6 +332,78 @@ using (var scope = app.Services.CreateScope())
                     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[CustomerReceipts]') AND name = 'TotalAmountReceived')
                         ALTER TABLE [CustomerReceipts] ADD [TotalAmountReceived] DECIMAL(18,2) NOT NULL DEFAULT 0;
                 END
+
+                -- Ensure PurchaseOrders Columns
+                IF OBJECT_ID('[PurchaseOrders]') IS NOT NULL
+                BEGIN
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[PurchaseOrders]') AND name = 'PoType')
+                        ALTER TABLE [PurchaseOrders] ADD [PoType] NVARCHAR(100) NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[PurchaseOrders]') AND name = 'ShipTo')
+                        ALTER TABLE [PurchaseOrders] ADD [ShipTo] NVARCHAR(MAX) NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[PurchaseOrders]') AND name = 'Remarks')
+                        ALTER TABLE [PurchaseOrders] ADD [Remarks] NVARCHAR(MAX) NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[PurchaseOrders]') AND name = 'TermsConditions')
+                        ALTER TABLE [PurchaseOrders] ADD [TermsConditions] NVARCHAR(MAX) NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[PurchaseOrders]') AND name = 'CgstAmount')
+                        ALTER TABLE [PurchaseOrders] ADD [CgstAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[PurchaseOrders]') AND name = 'SgstAmount')
+                        ALTER TABLE [PurchaseOrders] ADD [SgstAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[PurchaseOrders]') AND name = 'IgstAmount')
+                        ALTER TABLE [PurchaseOrders] ADD [IgstAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                END
+                IF OBJECT_ID('[procurement].[purchase_orders]') IS NOT NULL
+                BEGIN
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[procurement].[purchase_orders]') AND name = 'PoType')
+                        ALTER TABLE [procurement].[purchase_orders] ADD [PoType] NVARCHAR(100) NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[procurement].[purchase_orders]') AND name = 'ShipTo')
+                        ALTER TABLE [procurement].[purchase_orders] ADD [ShipTo] NVARCHAR(MAX) NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[procurement].[purchase_orders]') AND name = 'Remarks')
+                        ALTER TABLE [procurement].[purchase_orders] ADD [Remarks] NVARCHAR(MAX) NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[procurement].[purchase_orders]') AND name = 'TermsConditions')
+                        ALTER TABLE [procurement].[purchase_orders] ADD [TermsConditions] NVARCHAR(MAX) NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[procurement].[purchase_orders]') AND name = 'CgstAmount')
+                        ALTER TABLE [procurement].[purchase_orders] ADD [CgstAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[procurement].[purchase_orders]') AND name = 'SgstAmount')
+                        ALTER TABLE [procurement].[purchase_orders] ADD [SgstAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[procurement].[purchase_orders]') AND name = 'IgstAmount')
+                        ALTER TABLE [procurement].[purchase_orders] ADD [IgstAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                END
+
+                -- Ensure PurchaseOrderItems Columns
+                IF OBJECT_ID('[PurchaseOrderItems]') IS NOT NULL
+                BEGIN
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[PurchaseOrderItems]') AND name = 'GstRate')
+                        ALTER TABLE [PurchaseOrderItems] ADD [GstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[PurchaseOrderItems]') AND name = 'IgstRate')
+                        ALTER TABLE [PurchaseOrderItems] ADD [IgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[PurchaseOrderItems]') AND name = 'CgstRate')
+                        ALTER TABLE [PurchaseOrderItems] ADD [CgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[PurchaseOrderItems]') AND name = 'SgstRate')
+                        ALTER TABLE [PurchaseOrderItems] ADD [SgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[PurchaseOrderItems]') AND name = 'TaxAmount')
+                        ALTER TABLE [PurchaseOrderItems] ADD [TaxAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[PurchaseOrderItems]') AND name = 'TaxRateId' AND is_nullable = 0)
+                        ALTER TABLE [PurchaseOrderItems] ALTER COLUMN [TaxRateId] INT NULL;
+                    IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[PurchaseOrderItems]') AND name = 'UnitId' AND is_nullable = 0)
+                        ALTER TABLE [PurchaseOrderItems] ALTER COLUMN [UnitId] INT NULL;
+                END
+                IF OBJECT_ID('[procurement].[purchase_order_items]') IS NOT NULL
+                BEGIN
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[procurement].[purchase_order_items]') AND name = 'GstRate')
+                        ALTER TABLE [procurement].[purchase_order_items] ADD [GstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[procurement].[purchase_order_items]') AND name = 'IgstRate')
+                        ALTER TABLE [procurement].[purchase_order_items] ADD [IgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[procurement].[purchase_order_items]') AND name = 'CgstRate')
+                        ALTER TABLE [procurement].[purchase_order_items] ADD [CgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[procurement].[purchase_order_items]') AND name = 'SgstRate')
+                        ALTER TABLE [procurement].[purchase_order_items] ADD [SgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[procurement].[purchase_order_items]') AND name = 'TaxAmount')
+                        ALTER TABLE [procurement].[purchase_order_items] ADD [TaxAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[procurement].[purchase_order_items]') AND name = 'TaxRateId' AND is_nullable = 0)
+                        ALTER TABLE [procurement].[purchase_order_items] ALTER COLUMN [TaxRateId] INT NULL;
+                    IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[procurement].[purchase_order_items]') AND name = 'UnitId' AND is_nullable = 0)
+                        ALTER TABLE [procurement].[purchase_order_items] ALTER COLUMN [UnitId] INT NULL;
+                END
             ");
         }
         catch (Exception ex)

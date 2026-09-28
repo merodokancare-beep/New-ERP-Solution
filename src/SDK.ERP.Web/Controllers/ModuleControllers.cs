@@ -439,7 +439,7 @@ public class MastersController : Controller
         await _db.SaveChangesAsync();
 
         TempData["SuccessMessage"] = $"Client {client.ClientName} ({client.ClientCode}) registered successfully!";
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Index), new { tab = "clients" });
     }
 
     [HttpPost]
@@ -464,7 +464,7 @@ public class MastersController : Controller
         await _db.SaveChangesAsync();
 
         TempData["SuccessMessage"] = $"Vendor {vendor.VendorName} ({vendor.VendorCode}) registered successfully!";
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Index), new { tab = "vendors" });
     }
 
     [HttpPost]
@@ -2353,6 +2353,7 @@ public class SalesController : Controller
 
         ViewBag.Projects = await _db.Projects
             .Include(p => p.Client)
+            .Include(p => p.PurchaseOrders)
             .AsNoTracking()
             .ToListAsync();
 
@@ -2764,9 +2765,54 @@ public class ProcurementController : Controller
         return View(items);
     }
 
+    public async Task<IActionResult> Create()
+    {
+        ViewData["ActiveMenu"] = "Procurement";
+        var company = await _companyContext.GetCurrentCompanyAsync();
+        ViewBag.Company = company;
+        ViewBag.Vendors = await _db.Vendors.AsNoTracking().OrderBy(v => v.VendorName).ToListAsync();
+        ViewBag.Projects = await _db.Projects
+            .Include(p => p.Client)
+            .Include(p => p.PurchaseOrders)
+            .AsNoTracking()
+            .OrderBy(p => p.ProjectName)
+            .ToListAsync();
+
+        var today = DateTime.Today;
+        var startYear = today.Month >= 4 ? today.Year : today.Year - 1;
+        var endYear = (startYear + 1) % 100;
+        var count = await _db.PurchaseOrders.CountAsync() + 1;
+        ViewBag.AutoPoNumber = $"PO/{startYear % 100}-{endYear}/{count:D4}";
+
+        var defaultShipTo = !string.IsNullOrWhiteSpace(company.AuthorizedSignatoryName) || !string.IsNullOrWhiteSpace(company.CompanyName)
+            ? $"{company.AuthorizedSignatoryName ?? "Sabir Alam"} ({(string.IsNullOrWhiteSpace(company.CompanyName) ? "SDK Solutions" : company.CompanyName)})\n" +
+              $"{(string.IsNullOrWhiteSpace(company.AddressLine1) ? "Second Floor, Deewan Building," : company.AddressLine1)}\n" +
+              $"{(string.IsNullOrWhiteSpace(company.City) ? "Opposite Tajganj, Agra, UP - 282001" : $"{company.City}, {company.State} - {company.Pincode}")}"
+            : "Sabir Alam (SDK Solutions)\nSecond Floor, Deewan Building,\nOpposite Tajganj, Agra, UP - 282001";
+
+        ViewBag.DefaultShipTo = defaultShipTo;
+        return View();
+    }
+
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(string poNumber, DateTime poDate, decimal taxableAmount, decimal gstAmount, long? vendorId, long? projectId)
+    public async Task<IActionResult> Create(
+        string? poType,
+        string? poNumber,
+        DateTime? poDate,
+        long? vendorId,
+        long? projectId,
+        string? shipTo,
+        string? remarks,
+        string? termsConditions,
+        decimal? taxableAmount,
+        decimal? gstAmount,
+        decimal? netBillingAmount,
+        decimal? igstAmount,
+        decimal? cgstAmount,
+        decimal? sgstAmount,
+        decimal? totalBillingAmount,
+        IFormCollection form)
     {
         var company = await _companyContext.GetCurrentCompanyAsync();
         var branch = await _db.Branches.FirstOrDefaultAsync(b => b.CompanyId == company.Id) ?? new Branch
@@ -2778,35 +2824,141 @@ public class ProcurementController : Controller
         if (!vendorId.HasValue || vendorId.Value == 0)
         {
             TempData["ErrorMessage"] = "Please select a valid Vendor from the Master Directory to issue a Purchase Order.";
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Create));
         }
 
         var vendor = await _db.Vendors.FindAsync(vendorId.Value);
         if (vendor == null)
         {
             TempData["ErrorMessage"] = "Selected Vendor does not exist in the Master Directory.";
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Create));
         }
 
-        decimal total = taxableAmount + gstAmount;
+        // Parse line items if provided
+        var itemNames = form["itemName[]"].Count > 0 ? form["itemName[]"].ToList() : form["itemName"].ToList();
+        var itemHsns = form["itemHsn[]"].Count > 0 ? form["itemHsn[]"].ToList() : form["itemHsn"].ToList();
+        var itemGsts = form["itemGst[]"].Count > 0 ? form["itemGst[]"].ToList() : form["itemGst"].ToList();
+        var itemIgsts = form["itemIgst[]"].Count > 0 ? form["itemIgst[]"].ToList() : form["itemIgst"].ToList();
+        var itemCgsts = form["itemCgst[]"].Count > 0 ? form["itemCgst[]"].ToList() : form["itemCgst"].ToList();
+        var itemSgsts = form["itemSgst[]"].Count > 0 ? form["itemSgst[]"].ToList() : form["itemSgst"].ToList();
+        var itemQtys = form["itemQty[]"].Count > 0 ? form["itemQty[]"].ToList() : form["itemQty"].ToList();
+        var itemRates = form["itemRate[]"].Count > 0 ? form["itemRate[]"].ToList() : form["itemRate"].ToList();
+
+        var poItems = new List<PurchaseOrderItem>();
+        decimal calculatedTaxable = 0;
+        decimal calculatedIgst = 0;
+        decimal calculatedCgst = 0;
+        decimal calculatedSgst = 0;
+
+        for (int i = 0; i < itemNames.Count; i++)
+        {
+            var name = itemNames[i]?.Trim();
+            if (string.IsNullOrWhiteSpace(name)) continue;
+
+            decimal qty = 1;
+            if (i < itemQtys.Count && decimal.TryParse(itemQtys[i], out var pQty) && pQty > 0)
+                qty = pQty;
+
+            decimal rate = 0;
+            if (i < itemRates.Count && decimal.TryParse(itemRates[i], out var pRate) && pRate >= 0)
+                rate = pRate;
+
+            var hsn = (i < itemHsns.Count && !string.IsNullOrWhiteSpace(itemHsns[i])) ? itemHsns[i].Trim() : "998313";
+
+            decimal gst = 0, igst = 0, cgst = 0, sgst = 0;
+            if (i < itemGsts.Count && decimal.TryParse(itemGsts[i], out var pGst)) gst = pGst;
+            if (i < itemIgsts.Count && decimal.TryParse(itemIgsts[i], out var pIgst)) igst = pIgst;
+            if (i < itemCgsts.Count && decimal.TryParse(itemCgsts[i], out var pCgst)) cgst = pCgst;
+            if (i < itemSgsts.Count && decimal.TryParse(itemSgsts[i], out var pSgst)) sgst = pSgst;
+
+            if (igst == 0 && cgst == 0 && sgst == 0 && gst > 0)
+            {
+                var vendorState = (!string.IsNullOrWhiteSpace(vendor?.Gstin) && vendor.Gstin.Length >= 2) ? vendor.Gstin.Substring(0, 2) : "";
+                var isInterState = !string.IsNullOrEmpty(vendorState) && !string.IsNullOrEmpty(company.StateCode) && vendorState != company.StateCode;
+                if (isInterState)
+                {
+                    igst = gst;
+                }
+                else
+                {
+                    cgst = Math.Round(gst / 2m, 2);
+                    sgst = Math.Round(gst / 2m, 2);
+                }
+            }
+
+            var lineTaxable = Math.Round(qty * rate, 2);
+            var lineIgst = Math.Round(lineTaxable * (igst / 100m), 2);
+            var lineCgst = Math.Round(lineTaxable * (cgst / 100m), 2);
+            var lineSgst = Math.Round(lineTaxable * (sgst / 100m), 2);
+            var lineTotal = lineTaxable + lineIgst + lineCgst + lineSgst;
+
+            calculatedTaxable += lineTaxable;
+            calculatedIgst += lineIgst;
+            calculatedCgst += lineCgst;
+            calculatedSgst += lineSgst;
+
+            poItems.Add(new PurchaseOrderItem
+            {
+                ItemDescription = name,
+                HsnSacCode = hsn,
+                OrderedQty = qty,
+                UnitRate = rate,
+                GstRate = gst,
+                IgstRate = igst,
+                CgstRate = cgst,
+                SgstRate = sgst,
+                TaxAmount = lineIgst + lineCgst + lineSgst,
+                LineTotal = lineTotal
+            });
+        }
+
+        decimal finalTaxable = calculatedTaxable > 0 ? calculatedTaxable : (netBillingAmount ?? taxableAmount ?? 0);
+        decimal finalIgst = calculatedIgst > 0 ? calculatedIgst : (igstAmount ?? 0);
+        decimal finalCgst = calculatedCgst > 0 ? calculatedCgst : (cgstAmount ?? 0);
+        decimal finalSgst = calculatedSgst > 0 ? calculatedSgst : (sgstAmount ?? 0);
+        decimal totalGst = finalIgst + finalCgst + finalSgst > 0 ? (finalIgst + finalCgst + finalSgst) : (gstAmount ?? 0);
+        decimal total = finalTaxable + totalGst;
+
+        if (totalBillingAmount.HasValue && totalBillingAmount.Value > 0 && Math.Abs(totalBillingAmount.Value - total) > 0.5m)
+        {
+            total = totalBillingAmount.Value;
+        }
+
+        if (string.IsNullOrWhiteSpace(poNumber))
+        {
+            var count = await _db.PurchaseOrders.CountAsync() + 1;
+            var today = DateTime.Today;
+            var sYear = today.Month >= 4 ? today.Year : today.Year - 1;
+            var eYear = (sYear + 1) % 100;
+            poNumber = $"PO/{sYear % 100}-{eYear}/{count:D4}";
+        }
+
         var po = new PurchaseOrder
         {
             CompanyId = company.Id,
             BranchId = branch.Id,
             VendorId = vendorId.Value,
-            ProjectId = projectId,
-            PoNumber = string.IsNullOrWhiteSpace(poNumber) ? $"PO/{DateTime.Now:yy-MM}/{DateTime.Now:HHmmss}" : poNumber,
-            PoDate = poDate == default ? DateTime.Today : poDate,
-            TaxableAmount = taxableAmount,
-            GstAmount = gstAmount,
+            ProjectId = projectId.HasValue && projectId.Value > 0 ? projectId : null,
+            PoNumber = poNumber,
+            PoType = string.IsNullOrWhiteSpace(poType) ? "Standard Purchase Order" : poType,
+            PoDate = poDate ?? DateTime.Today,
+            ShipTo = shipTo,
+            Remarks = remarks,
+            TermsConditions = termsConditions,
+            TaxableAmount = finalTaxable,
+            GstAmount = totalGst,
+            IgstAmount = finalIgst,
+            CgstAmount = finalCgst,
+            SgstAmount = finalSgst,
             TotalPoValue = total,
-            ApprovalStatus = "APPROVED"
+            ApprovalStatus = "APPROVED",
+            Items = poItems
         };
 
         _db.PurchaseOrders.Add(po);
         await _db.SaveChangesAsync();
 
-        TempData["SuccessMessage"] = $"Purchase Order {po.PoNumber} issued successfully for &#8377; {total:N2}!";
+        TempData["SuccessMessage"] = $"Purchase Order <strong>{po.PoNumber}</strong> issued successfully for &#8377; {total:N2}!";
         return RedirectToAction(nameof(Index));
     }
 

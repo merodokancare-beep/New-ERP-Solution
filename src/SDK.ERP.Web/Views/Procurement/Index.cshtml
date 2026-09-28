@@ -13,9 +13,9 @@
         <p style="color: var(--erp-text-muted); margin: 0; font-size: 13.5px;">Purchase Orders &bull; Goods Receipt Notes (GRN) &bull; 3-Way Match &bull; Vendor Bills</p>
     </div>
     <div class="d-flex gap-2">
-        <button class="btn btn-primary btn-sm px-3 shadow-sm" style="background: var(--erp-primary);" data-bs-toggle="modal" data-bs-target="#createPoModal">
-            <i class="fa-solid fa-file-signature me-1"></i> Issue Purchase Order
-        </button>
+        <a asp-controller="Procurement" asp-action="Create" class="btn btn-primary btn-sm px-3 shadow-sm d-inline-flex align-items-center gap-2" style="background: var(--erp-primary);">
+            <i class="fa-solid fa-file-signature me-1"></i> Add Procurement Details
+        </a>
     </div>
 </div>
 
@@ -39,6 +39,7 @@
                 <thead class="table-light" style="font-size: 12px;">
                     <tr>
                         <th class="ps-4">PO Number</th>
+                        <th>PO Type</th>
                         <th>Date</th>
                         <th>Vendor</th>
                         <th>Project</th>
@@ -56,13 +57,14 @@
                         {
                             <tr>
                                 <td class="ps-4 fw-bold text-primary">@po.PoNumber</td>
+                                <td><span class="badge bg-light text-dark border">@(string.IsNullOrWhiteSpace(po.PoType) ? "Standard PO" : po.PoType)</span></td>
                                 <td>@po.PoDate.ToString("dd MMM yyyy")</td>
                                 <td><strong>@(po.Vendor?.VendorName ?? "N/A")</strong></td>
                                 <td>@(po.Project?.ProjectCode ?? "N/A")</td>
                                 <td>&#8377; @po.TaxableAmount.ToString("N2")</td>
                                 <td>&#8377; @po.GstAmount.ToString("N2")</td>
                                 <td class="fw-bold text-dark">&#8377; @po.TotalPoValue.ToString("N2")</td>
-                                <td><span class="badge bg-info">@po.ApprovalStatus</span></td>
+                                <td><span class="badge bg-success">@po.ApprovalStatus</span></td>
                                 <td class="text-end pe-4">
                                     <a asp-controller="Procurement" asp-action="PrintPo" asp-route-id="@po.Id" target="_blank" class="btn btn-sm btn-outline-primary shadow-sm">
                                         <i class="fa-solid fa-eye me-1"></i> View
@@ -74,13 +76,13 @@
                     else
                     {
                         <tr>
-                            <td colspan="9" class="text-center py-5">
+                            <td colspan="10" class="text-center py-5">
                                 <i class="fa-solid fa-cart-shopping mb-3" style="font-size: 40px; color: #CBD5E1;"></i>
                                 <h6 class="fw-bold text-secondary mb-1">No Purchase Orders in Database</h6>
                                 <p class="text-muted mb-3" style="font-size: 12.5px;">No purchase orders or vendor bills have been registered yet.</p>
-                                <button class="btn btn-primary btn-sm px-3 shadow-sm" style="background: var(--erp-primary);" data-bs-toggle="modal" data-bs-target="#createPoModal">
-                                    <i class="fa-solid fa-plus me-1"></i> Issue First Purchase Order
-                                </button>
+                                <a asp-controller="Procurement" asp-action="Create" class="btn btn-primary btn-sm px-3 shadow-sm" style="background: var(--erp-primary);">
+                                    <i class="fa-solid fa-plus me-1"></i> Add First Procurement Order
+                                </a>
                             </td>
                         </tr>
                     }
