@@ -1784,6 +1784,51 @@ public class SalesController : Controller
         catch { }
     }
 
+    private async Task EnsurePurchaseOrderColumnsAsync()
+    {
+        try
+        {
+            await _db.Database.ExecuteSqlRawAsync(@"
+                IF OBJECT_ID('[PurchaseOrders]') IS NOT NULL OR OBJECT_ID('[dbo].[PurchaseOrders]') IS NOT NULL
+                BEGIN
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrders]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrders]')) AND name = 'PoType')
+                        ALTER TABLE [PurchaseOrders] ADD [PoType] NVARCHAR(100) NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrders]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrders]')) AND name = 'ShipTo')
+                        ALTER TABLE [PurchaseOrders] ADD [ShipTo] NVARCHAR(MAX) NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrders]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrders]')) AND name = 'Remarks')
+                        ALTER TABLE [PurchaseOrders] ADD [Remarks] NVARCHAR(MAX) NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrders]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrders]')) AND name = 'TermsConditions')
+                        ALTER TABLE [PurchaseOrders] ADD [TermsConditions] NVARCHAR(MAX) NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrders]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrders]')) AND name = 'CgstAmount')
+                        ALTER TABLE [PurchaseOrders] ADD [CgstAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrders]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrders]')) AND name = 'SgstAmount')
+                        ALTER TABLE [PurchaseOrders] ADD [SgstAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrders]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrders]')) AND name = 'IgstAmount')
+                        ALTER TABLE [PurchaseOrders] ADD [IgstAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                END
+
+                IF OBJECT_ID('[PurchaseOrderItems]') IS NOT NULL OR OBJECT_ID('[dbo].[PurchaseOrderItems]') IS NOT NULL
+                BEGIN
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrderItems]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrderItems]')) AND name = 'GstRate')
+                        ALTER TABLE [PurchaseOrderItems] ADD [GstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrderItems]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrderItems]')) AND name = 'IgstRate')
+                        ALTER TABLE [PurchaseOrderItems] ADD [IgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrderItems]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrderItems]')) AND name = 'CgstRate')
+                        ALTER TABLE [PurchaseOrderItems] ADD [CgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrderItems]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrderItems]')) AND name = 'SgstRate')
+                        ALTER TABLE [PurchaseOrderItems] ADD [SgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrderItems]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrderItems]')) AND name = 'TaxAmount')
+                        ALTER TABLE [PurchaseOrderItems] ADD [TaxAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrderItems]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrderItems]')) AND name = 'TaxRateId' AND is_nullable = 0)
+                        ALTER TABLE [PurchaseOrderItems] ALTER COLUMN [TaxRateId] INT NULL;
+                    IF EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrderItems]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrderItems]')) AND name = 'UnitId' AND is_nullable = 0)
+                        ALTER TABLE [PurchaseOrderItems] ALTER COLUMN [UnitId] INT NULL;
+                END
+            ");
+        }
+        catch { }
+    }
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CancelInvoice(long id)
@@ -2351,11 +2396,25 @@ public class SalesController : Controller
         var count = await _db.SalesInvoices.CountAsync() + 1;
         ViewBag.AutoInvoiceNumber = $"INV/{startYear % 100}-{endYear}/{count:D4}";
 
-        ViewBag.Projects = await _db.Projects
-            .Include(p => p.Client)
-            .Include(p => p.PurchaseOrders)
-            .AsNoTracking()
-            .ToListAsync();
+        List<Project> projects;
+        try
+        {
+            projects = await _db.Projects
+                .Include(p => p.Client)
+                .Include(p => p.PurchaseOrders)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+        catch
+        {
+            await EnsurePurchaseOrderColumnsAsync();
+            projects = await _db.Projects
+                .Include(p => p.Client)
+                .Include(p => p.PurchaseOrders)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+        ViewBag.Projects = projects;
 
         ViewBag.Clients = await _db.Clients
             .AsNoTracking()
@@ -2746,11 +2805,24 @@ public class ProcurementController : Controller
         ViewData["ActiveMenu"] = "Procurement";
         ViewBag.Vendors = await _db.Vendors.AsNoTracking().ToListAsync();
         ViewBag.Projects = await _db.Projects.AsNoTracking().ToListAsync();
-        var purchaseOrders = await _db.PurchaseOrders
-            .Include(p => p.Vendor)
-            .Include(p => p.Project)
-            .AsNoTracking()
-            .ToListAsync();
+        List<PurchaseOrder> purchaseOrders;
+        try
+        {
+            purchaseOrders = await _db.PurchaseOrders
+                .Include(p => p.Vendor)
+                .Include(p => p.Project)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+        catch
+        {
+            await EnsurePurchaseOrderColumnsAsync();
+            purchaseOrders = await _db.PurchaseOrders
+                .Include(p => p.Vendor)
+                .Include(p => p.Project)
+                .AsNoTracking()
+                .ToListAsync();
+        }
         return View(purchaseOrders);
     }
 
@@ -2771,12 +2843,27 @@ public class ProcurementController : Controller
         var company = await _companyContext.GetCurrentCompanyAsync();
         ViewBag.Company = company;
         ViewBag.Vendors = await _db.Vendors.AsNoTracking().OrderBy(v => v.VendorName).ToListAsync();
-        ViewBag.Projects = await _db.Projects
-            .Include(p => p.Client)
-            .Include(p => p.PurchaseOrders)
-            .AsNoTracking()
-            .OrderBy(p => p.ProjectName)
-            .ToListAsync();
+        List<Project> projects;
+        try
+        {
+            projects = await _db.Projects
+                .Include(p => p.Client)
+                .Include(p => p.PurchaseOrders)
+                .AsNoTracking()
+                .OrderBy(p => p.ProjectName)
+                .ToListAsync();
+        }
+        catch
+        {
+            await EnsurePurchaseOrderColumnsAsync();
+            projects = await _db.Projects
+                .Include(p => p.Client)
+                .Include(p => p.PurchaseOrders)
+                .AsNoTracking()
+                .OrderBy(p => p.ProjectName)
+                .ToListAsync();
+        }
+        ViewBag.Projects = projects;
 
         var today = DateTime.Today;
         var startYear = today.Month >= 4 ? today.Year : today.Year - 1;
@@ -3015,6 +3102,51 @@ public class ProcurementController : Controller
     public async Task<IActionResult> Details(long id)
     {
         return await PrintPo(id);
+    }
+
+    private async Task EnsurePurchaseOrderColumnsAsync()
+    {
+        try
+        {
+            await _db.Database.ExecuteSqlRawAsync(@"
+                IF OBJECT_ID('[PurchaseOrders]') IS NOT NULL OR OBJECT_ID('[dbo].[PurchaseOrders]') IS NOT NULL
+                BEGIN
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrders]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrders]')) AND name = 'PoType')
+                        ALTER TABLE [PurchaseOrders] ADD [PoType] NVARCHAR(100) NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrders]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrders]')) AND name = 'ShipTo')
+                        ALTER TABLE [PurchaseOrders] ADD [ShipTo] NVARCHAR(MAX) NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrders]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrders]')) AND name = 'Remarks')
+                        ALTER TABLE [PurchaseOrders] ADD [Remarks] NVARCHAR(MAX) NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrders]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrders]')) AND name = 'TermsConditions')
+                        ALTER TABLE [PurchaseOrders] ADD [TermsConditions] NVARCHAR(MAX) NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrders]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrders]')) AND name = 'CgstAmount')
+                        ALTER TABLE [PurchaseOrders] ADD [CgstAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrders]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrders]')) AND name = 'SgstAmount')
+                        ALTER TABLE [PurchaseOrders] ADD [SgstAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrders]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrders]')) AND name = 'IgstAmount')
+                        ALTER TABLE [PurchaseOrders] ADD [IgstAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                END
+
+                IF OBJECT_ID('[PurchaseOrderItems]') IS NOT NULL OR OBJECT_ID('[dbo].[PurchaseOrderItems]') IS NOT NULL
+                BEGIN
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrderItems]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrderItems]')) AND name = 'GstRate')
+                        ALTER TABLE [PurchaseOrderItems] ADD [GstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrderItems]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrderItems]')) AND name = 'IgstRate')
+                        ALTER TABLE [PurchaseOrderItems] ADD [IgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrderItems]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrderItems]')) AND name = 'CgstRate')
+                        ALTER TABLE [PurchaseOrderItems] ADD [CgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrderItems]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrderItems]')) AND name = 'SgstRate')
+                        ALTER TABLE [PurchaseOrderItems] ADD [SgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrderItems]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrderItems]')) AND name = 'TaxAmount')
+                        ALTER TABLE [PurchaseOrderItems] ADD [TaxAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrderItems]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrderItems]')) AND name = 'TaxRateId' AND is_nullable = 0)
+                        ALTER TABLE [PurchaseOrderItems] ALTER COLUMN [TaxRateId] INT NULL;
+                    IF EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrderItems]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrderItems]')) AND name = 'UnitId' AND is_nullable = 0)
+                        ALTER TABLE [PurchaseOrderItems] ALTER COLUMN [UnitId] INT NULL;
+                END
+            ");
+        }
+        catch { }
     }
 }
 
