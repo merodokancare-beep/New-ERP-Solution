@@ -167,7 +167,7 @@
         <h5 class="direct-card-title">Add/Edit Project's Payment Details</h5>
     </div>
     <div class="direct-card-body">
-        <form method="post" asp-action="ProjectPayment" id="projectPaymentForm">
+        <form method="post" asp-action="ProjectPayment" enctype="multipart/form-data" id="projectPaymentForm">
             @Html.AntiForgeryToken()
 
             <!-- Row 1: Project Name (Full Width) -->
@@ -319,6 +319,13 @@
                             <option value="">@(company?.BankName ?? "HDFC Bank Ltd") - @(company?.BankAccountNumber ?? "Primary Account")</option>
                         }
                     </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label-custom">
+                        Bank Receipt / Remittance Voucher
+                        <span class="badge bg-light text-muted border ms-1" style="font-size: 11px;">PDF, PNG, JPG</span>
+                    </label>
+                    <input type="file" name="uploadFile" class="form-control input-custom" accept=".pdf,.png,.jpg,.jpeg,.webp" />
                 </div>
             </div>
 

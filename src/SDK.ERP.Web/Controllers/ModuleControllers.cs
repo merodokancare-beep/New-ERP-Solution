@@ -1845,40 +1845,193 @@ public class SalesController : Controller
 
     public IActionResult Invoices() => RedirectToAction(nameof(Index));
 
-    public async Task<IActionResult> AllocatePayment()
+    public async Task<IActionResult> AllocatePayment(long? clientId = null)
     {
         ViewData["ActiveMenu"] = "Sales";
+        var company = await _companyContext.GetCurrentCompanyAsync() ?? await _db.Companies.FirstOrDefaultAsync();
+        ViewBag.Company = company;
         ViewBag.Clients = await _db.Clients.AsNoTracking().ToListAsync();
-        ViewBag.BankAccounts = await _db.BankAccounts.AsNoTracking().ToListAsync();
-        var pendingInvoices = await _db.SalesInvoices
+        ViewBag.BankAccounts = await _db.BankAccounts.Where(b => b.IsActive).AsNoTracking().ToListAsync();
+        ViewBag.SelectedClientId = clientId;
+
+        var invoiceQuery = _db.SalesInvoices
             .Include(i => i.Client)
-            .Where(i => i.OutstandingBalance > 0)
-            .AsNoTracking()
-            .ToListAsync();
+            .Where(i => i.OutstandingBalance > 0);
+
+        if (clientId.HasValue && clientId.Value > 0)
+        {
+            invoiceQuery = invoiceQuery.Where(i => i.ClientId == clientId.Value);
+        }
+
+        var pendingInvoices = await invoiceQuery.AsNoTracking().ToListAsync();
+
+        List<CustomerReceipt> recentReceipts;
+        try
+        {
+            recentReceipts = await _db.CustomerReceipts
+                .Include(r => r.Client)
+                .OrderByDescending(r => r.ReceiptDate)
+                .ThenByDescending(r => r.Id)
+                .Take(15)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+        catch
+        {
+            await EnsureCustomerReceiptColumnsAsync();
+            try
+            {
+                recentReceipts = await _db.CustomerReceipts
+                    .Include(r => r.Client)
+                    .OrderByDescending(r => r.ReceiptDate)
+                    .ThenByDescending(r => r.Id)
+                    .Take(15)
+                    .AsNoTracking()
+                    .ToListAsync();
+            }
+            catch
+            {
+                recentReceipts = new List<CustomerReceipt>();
+            }
+        }
+
+        var docIds = recentReceipts.Where(r => r.ReceiptDocId.HasValue).Select(r => r.ReceiptDocId!.Value).Distinct().ToList();
+        var receiptDocs = await _db.DocumentAttachments
+            .Where(d => docIds.Contains(d.Id))
+            .ToDictionaryAsync(d => d.Id, d => d);
+
+        ViewBag.RecentReceipts = recentReceipts;
+        ViewBag.ReceiptDocs = receiptDocs;
+
         return View(pendingInvoices);
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> AllocatePayment(long? clientId, decimal amountReceived, long? bankAccountId, string? paymentRef, IFormCollection form)
+    public async Task<IActionResult> AllocatePayment(
+        long? clientId, 
+        decimal amountReceived, 
+        long? bankAccountId, 
+        string? paymentRef, 
+        IFormFile? receiptVoucher, 
+        IFormCollection form)
     {
+        // 1. Mandatory Bank Receipt / Voucher Validation
+        var voucherFile = receiptVoucher ?? form.Files["receiptVoucher"] ?? form.Files["uploadFile"];
+        if (voucherFile == null || voucherFile.Length == 0)
+        {
+            TempData["ErrorMessage"] = "Bank receipt or voucher upload is <strong>mandatory</strong>. Please attach the document before submitting.";
+            return RedirectToAction(nameof(AllocatePayment));
+        }
+
+        var ext = Path.GetExtension(voucherFile.FileName).ToLowerInvariant();
+        var allowedExts = new[] { ".pdf", ".png", ".jpg", ".jpeg", ".webp" };
+        if (!allowedExts.Contains(ext))
+        {
+            TempData["ErrorMessage"] = "Invalid document format. Allowed formats: PDF, PNG, JPG, JPEG, WEBP.";
+            return RedirectToAction(nameof(AllocatePayment));
+        }
+
+        if (voucherFile.Length > 15 * 1024 * 1024)
+        {
+            TempData["ErrorMessage"] = "The uploaded file exceeds the 15 MB size limit.";
+            return RedirectToAction(nameof(AllocatePayment));
+        }
+
         if (amountReceived <= 0)
         {
             TempData["ErrorMessage"] = "Please enter a valid received amount greater than 0.";
             return RedirectToAction(nameof(AllocatePayment));
         }
 
-        var company = await _db.Companies.FirstOrDefaultAsync();
-        var branch = await _db.Branches.FirstOrDefaultAsync();
+        var company = await _companyContext.GetCurrentCompanyAsync() ?? await _db.Companies.FirstOrDefaultAsync();
+        var branch = await _db.Branches.FirstOrDefaultAsync(b => b.CompanyId == (company != null ? company.Id : 1)) ?? await _db.Branches.FirstOrDefaultAsync();
         var user = await _db.Users.FirstOrDefaultAsync();
-        var fy = await _db.FinancialYears.FirstOrDefaultAsync();
+        var fy = await _db.FinancialYears.FirstOrDefaultAsync(f => !f.IsClosed) ?? await _db.FinancialYears.FirstOrDefaultAsync();
 
-        var bank = await _db.BankAccounts.FindAsync(bankAccountId ?? 0) ?? await _db.BankAccounts.FirstOrDefaultAsync();
+        var bank = await _db.BankAccounts.FindAsync(bankAccountId ?? 0) ?? await _db.BankAccounts.FirstOrDefaultAsync(b => b.IsActive);
         if (bank != null)
         {
             bank.BookBalance += amountReceived;
         }
 
+        var resolvedBank = bank != null ? $"{bank.BankName} - {bank.AccountNumber}" : (company?.BankName ?? "Main Bank Account");
+
+        // 2. Save Uploaded Bank Receipt Voucher
+        long? docId = null;
+        try
+        {
+            var companyId = company?.Id ?? 1;
+            var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "tenants", $"org_{companyId}", "receipts");
+            if (!Directory.Exists(uploadsFolder)) Directory.CreateDirectory(uploadsFolder);
+
+            var safeFileName = $"voucher_{DateTime.UtcNow.Ticks}_{Path.GetFileName(voucherFile.FileName)}";
+            var filePath = Path.Combine(uploadsFolder, safeFileName);
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await voucherFile.CopyToAsync(stream);
+            }
+
+            var relativePath = $"/uploads/tenants/org_{companyId}/receipts/{safeFileName}";
+            var attachment = new DocumentAttachment
+            {
+                EntityType = "CustomerReceipt",
+                EntityId = 0,
+                FileName = voucherFile.FileName,
+                FilePath = relativePath,
+                FileSizeBytes = voucherFile.Length,
+                MimeType = voucherFile.ContentType ?? "application/octet-stream",
+                FileHashSha256 = Guid.NewGuid().ToString("N"),
+                UploadedBy = user?.Id ?? 1,
+                UploaderId = user?.Id ?? 1,
+                UploadedAt = DateTime.UtcNow,
+                VersionNumber = 1
+            };
+            _db.DocumentAttachments.Add(attachment);
+            await _db.SaveChangesAsync();
+            docId = attachment.Id;
+        }
+        catch (Exception ex)
+        {
+            TempData["ErrorMessage"] = $"Failed to save bank receipt file: {ex.Message}";
+            return RedirectToAction(nameof(AllocatePayment));
+        }
+
+        await EnsureCustomerReceiptColumnsAsync();
+
+        var count = await _db.CustomerReceipts.CountAsync() + 1;
+        var rcptNo = $"RCPT-ALC-{DateTime.Today:yyMM}-{count:D4}";
+
+        var receipt = new CustomerReceipt
+        {
+            CompanyId = company?.Id ?? 1,
+            ClientId = clientId,
+            BankAccountId = bank?.Id ?? 1,
+            ReceiptNumber = rcptNo,
+            ReceiptDate = DateTime.Today,
+            AmountReceived = amountReceived,
+            UnallocatedAmount = amountReceived,
+            PaymentMode = string.IsNullOrWhiteSpace(paymentRef) ? "Bank Transfer / NEFT" : paymentRef,
+            TransactionRefNo = paymentRef,
+            Status = "POSTED",
+            ExpenseHead = "Customer Invoicing Allocation",
+            Remarks = $"Bank Voucher Attached: {voucherFile.FileName} [Bank: {resolvedBank}]" + (!string.IsNullOrWhiteSpace(paymentRef) ? $" - Ref: {paymentRef}" : ""),
+            ReceiptDocId = docId
+        };
+        _db.CustomerReceipts.Add(receipt);
+        await _db.SaveChangesAsync();
+
+        if (docId.HasValue)
+        {
+            var att = await _db.DocumentAttachments.FindAsync(docId.Value);
+            if (att != null)
+            {
+                att.EntityId = receipt.Id;
+                await _db.SaveChangesAsync();
+            }
+        }
+
+        // 3. Process Invoices Allocation
         decimal totalAllocated = 0;
         foreach (var key in form.Keys)
         {
@@ -1894,21 +2047,48 @@ public class SalesController : Controller
                         inv.OutstandingBalance = Math.Max(0, inv.TotalInvoiceValue - inv.PaidAmount);
                         inv.Status = inv.OutstandingBalance == 0 ? "PAID" : "PARTIAL";
                         totalAllocated += actualAlloc;
+
+                        var alloc = new ReceiptAllocation
+                        {
+                            ReceiptId = receipt.Id,
+                            InvoiceId = inv.Id,
+                            AllocatedAmount = actualAlloc,
+                            TdsDeductedByClient = 0
+                        };
+                        _db.ReceiptAllocations.Add(alloc);
                     }
                 }
             }
+        }
+
+        receipt.UnallocatedAmount = Math.Max(0, amountReceived - totalAllocated);
+        await _db.SaveChangesAsync();
+
+        if (fy == null)
+        {
+            fy = new FinancialYear
+            {
+                CompanyId = company?.Id ?? 1,
+                FyCode = $"FY-{DateTime.Today.Year}-{(DateTime.Today.Year + 1) % 100}",
+                StartDate = new DateTime(DateTime.Today.Year, 4, 1),
+                EndDate = new DateTime(DateTime.Today.Year + 1, 3, 31),
+                IsClosed = false
+            };
+            _db.FinancialYears.Add(fy);
+            await _db.SaveChangesAsync();
         }
 
         var jv = new JournalEntry
         {
             CompanyId = company?.Id ?? 1,
             BranchId = branch?.Id ?? 1,
-            FyId = fy?.Id ?? 1,
+            FyId = fy.Id,
             VoucherNo = $"JV-RCPT-{DateTime.Now:yyyyMMdd-HHmmss}",
             VoucherDate = DateTime.Today,
             VoucherType = "RECEIPT",
             SourceEntityType = "CustomerReceipt",
-            Narration = $"Customer Payment received: {paymentRef ?? "NEFT/Cheque"} (Allocated: &#8377; {totalAllocated:N2})",
+            SourceEntityId = receipt.Id,
+            Narration = $"Customer Payment: {paymentRef ?? "NEFT/Cheque"} (Allocated: &#8377; {totalAllocated:N2}, Advance: &#8377; {receipt.UnallocatedAmount:N2}) [Bank: {resolvedBank}] - Voucher: {voucherFile.FileName}",
             TotalDebit = amountReceived,
             TotalCredit = amountReceived,
             IsBalanced = true,
@@ -1918,8 +2098,11 @@ public class SalesController : Controller
         _db.JournalEntries.Add(jv);
         await _db.SaveChangesAsync();
 
-        TempData["SuccessMessage"] = $"Payment of &#8377; {amountReceived:N2} recorded and auto-posted to General Ledger!";
-        return RedirectToAction(nameof(Index));
+        receipt.JournalEntryId = jv.Id;
+        await _db.SaveChangesAsync();
+
+        TempData["SuccessMessage"] = $"Payment of <strong>&#8377; {amountReceived:N2}</strong> with Bank Voucher <strong>{voucherFile.FileName}</strong> recorded successfully! (Receipt No: <strong>{rcptNo}</strong>)";
+        return RedirectToAction(nameof(AllocatePayment));
     }
 
     [HttpGet]
@@ -2252,7 +2435,8 @@ public class SalesController : Controller
         decimal netAmountReceive,
         decimal totalAmountReceive,
         string paymentReceiveRemarks,
-        long? bankAccountId)
+        long? bankAccountId,
+        IFormFile? uploadFile)
     {
         var project = await _db.Projects.Include(p => p.Client).FirstOrDefaultAsync(p => p.Id == projectId);
         if (project == null)
@@ -2281,6 +2465,43 @@ public class SalesController : Controller
         if (bank != null && netAmountReceive > 0)
         {
             bank.BookBalance += netAmountReceive;
+        }
+
+        long? docId = null;
+        if (uploadFile != null && uploadFile.Length > 0)
+        {
+            try
+            {
+                var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "tenants", $"org_{company.Id}", "receipts");
+                if (!Directory.Exists(uploadsFolder)) Directory.CreateDirectory(uploadsFolder);
+
+                var safeFileName = $"prj_receipt_{DateTime.UtcNow.Ticks}_{Path.GetFileName(uploadFile.FileName)}";
+                var filePath = Path.Combine(uploadsFolder, safeFileName);
+                using (var stream = new FileStream(filePath, FileMode.Create))
+                {
+                    await uploadFile.CopyToAsync(stream);
+                }
+
+                var relativePath = $"/uploads/tenants/org_{company.Id}/receipts/{safeFileName}";
+                var attachment = new DocumentAttachment
+                {
+                    EntityType = "CustomerReceipt",
+                    EntityId = 0,
+                    FileName = uploadFile.FileName,
+                    FilePath = relativePath,
+                    FileSizeBytes = uploadFile.Length,
+                    MimeType = uploadFile.ContentType ?? "application/octet-stream",
+                    FileHashSha256 = Guid.NewGuid().ToString("N"),
+                    UploadedBy = user?.Id ?? 1,
+                    UploaderId = user?.Id ?? 1,
+                    UploadedAt = DateTime.UtcNow,
+                    VersionNumber = 1
+                };
+                _db.DocumentAttachments.Add(attachment);
+                await _db.SaveChangesAsync();
+                docId = attachment.Id;
+            }
+            catch { }
         }
 
         SalesInvoice? invoice = null;
@@ -2320,10 +2541,21 @@ public class SalesController : Controller
             NetAmountReceived = netAmountReceive,
             TotalAmountReceived = totalAmountReceive,
             ExpenseHead = isAdvanceReceived ? "Mobilization Advance" : "Project Milestone Billing",
-            Remarks = paymentReceiveRemarks
+            Remarks = paymentReceiveRemarks,
+            ReceiptDocId = docId
         };
         _db.CustomerReceipts.Add(receipt);
         await _db.SaveChangesAsync();
+
+        if (docId.HasValue)
+        {
+            var att = await _db.DocumentAttachments.FindAsync(docId.Value);
+            if (att != null)
+            {
+                att.EntityId = receipt.Id;
+                await _db.SaveChangesAsync();
+            }
+        }
 
         if (invoice != null)
         {

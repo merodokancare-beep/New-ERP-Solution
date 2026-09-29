@@ -5,8 +5,49 @@
     var invoiceList = Model ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Sales.SalesInvoice>();
     var clients = ViewBag.Clients as IEnumerable<SDK.ERP.Domain.Entities.MasterData.Client> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.MasterData.Client>();
     var bankAccounts = ViewBag.BankAccounts as IEnumerable<SDK.ERP.Domain.Entities.Banking.BankAccount> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Banking.BankAccount>();
+    var recentReceipts = ViewBag.RecentReceipts as IEnumerable<SDK.ERP.Domain.Entities.Sales.CustomerReceipt> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Sales.CustomerReceipt>();
+    var receiptDocs = ViewBag.ReceiptDocs as Dictionary<long, SDK.ERP.Domain.Entities.Admin.DocumentAttachment> ?? new Dictionary<long, SDK.ERP.Domain.Entities.Admin.DocumentAttachment>();
+    var selectedClientId = ViewBag.SelectedClientId != null ? (long?)ViewBag.SelectedClientId : null;
     var totalOutstanding = invoiceList.Sum(i => i.OutstandingBalance);
 }
+
+<style>
+    .voucher-dropzone {
+        border: 2px dashed #CBD5E1;
+        border-radius: 12px;
+        background-color: #F8FAFC;
+        cursor: pointer;
+        transition: all 0.2s ease-in-out;
+        position: relative;
+    }
+    .voucher-dropzone:hover {
+        border-color: #7C3AED;
+        background-color: #F5F3FF;
+    }
+    .voucher-dropzone.dragover {
+        border-color: #7C3AED;
+        background-color: #EDE9FE;
+        box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15);
+    }
+    .voucher-dropzone.has-error {
+        border-color: #EF4444;
+        background-color: #FEF2F2;
+    }
+    .voucher-icon-circle {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: #EDE9FE;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .voucher-preview-box {
+        border: 1px solid #A7F3D0;
+        background-color: #ECFDF5;
+        border-radius: 10px;
+    }
+</style>
 
 <div class="mb-3">
     <nav aria-label="breadcrumb">
@@ -43,27 +84,58 @@
     </div>
 </div>
 
-<form method="post" asp-action="AllocatePayment">
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show d-flex align-items-center mb-3 shadow-sm" role="alert" style="border-radius: 10px;">
+        <i class="fa-solid fa-circle-check fs-5 me-2 text-success"></i>
+        <div>@Html.Raw(TempData["SuccessMessage"])</div>
+        <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show d-flex align-items-center mb-3 shadow-sm" role="alert" style="border-radius: 10px;">
+        <i class="fa-solid fa-circle-exclamation fs-5 me-2 text-danger"></i>
+        <div>@Html.Raw(TempData["ErrorMessage"])</div>
+        <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+<form method="post" asp-action="AllocatePayment" enctype="multipart/form-data" id="paymentAllocationForm">
     @Html.AntiForgeryToken()
     <div class="row g-4">
+        <!-- Receipt Header Column -->
         <div class="col-md-4">
-            <div class="erp-card">
-                <div class="erp-card-header"><h5 class="erp-card-title"><i class="fa-solid fa-receipt me-2"></i>Receipt Header</h5></div>
-                <div class="erp-card-body">
+            <div class="erp-card shadow-sm border">
+                <div class="erp-card-header bg-white border-bottom py-3">
+                    <h5 class="erp-card-title fw-bold text-dark mb-0">
+                        <i class="fa-solid fa-receipt me-2 text-primary"></i>Receipt Header
+                    </h5>
+                </div>
+                <div class="erp-card-body p-4">
+                    <!-- Client Selector -->
                     <div class="mb-3">
                         <label class="form-label fw-semibold" style="font-size: 12.5px;">Select Client</label>
-                        <select name="clientId" class="form-select">
+                        <select name="clientId" id="clientSelect" class="form-select" onchange="filterInvoicesByClient(this.value)">
                             <option value="">-- Choose Client --</option>
                             @foreach (var c in clients)
                             {
-                                <option value="@c.Id">@c.ClientName (@c.ClientCode)</option>
+                                <option value="@c.Id" selected="@(selectedClientId == c.Id ? "selected" : null)">@c.ClientName (@c.ClientCode)</option>
                             }
                         </select>
                     </div>
+
+                    <!-- Amount Received -->
                     <div class="mb-3">
-                        <label class="form-label fw-semibold" style="font-size: 12.5px;">Amount Received (&#8377;) <span class="text-danger">*</span></label>
-                        <input type="number" step="0.01" name="amountReceived" class="form-control fw-bold fs-5 text-success" placeholder="0.00" required />
+                        <label class="form-label fw-semibold" style="font-size: 12.5px;">
+                            Amount Received (&#8377;) <span class="text-danger">*</span>
+                        </label>
+                        <input type="number" step="0.01" min="0.01" name="amountReceived" id="txtAmountReceived" class="form-control fw-bold fs-5 text-success" placeholder="0.00" required oninput="onAmountReceivedChange()" />
+                        <small class="text-muted" style="font-size: 11px;">Enter total remittance credited to the bank.</small>
                     </div>
+
+                    <!-- Bank Account -->
                     <div class="mb-3">
                         <label class="form-label fw-semibold" style="font-size: 12.5px;">Deposit Bank Account</label>
                         <select name="bankAccountId" class="form-select">
@@ -81,30 +153,97 @@
                             }
                         </select>
                     </div>
+
+                    <!-- Payment Mode & Reference -->
                     <div class="mb-3">
                         <label class="form-label fw-semibold" style="font-size: 12.5px;">Payment Mode &amp; Reference (UTR)</label>
                         <input type="text" name="paymentRef" class="form-control" placeholder="e.g. NEFT / UTR-00998822" />
+                    </div>
+
+                    <!-- MANDATORY Bank Receipt / Voucher Upload -->
+                    <div class="mb-2">
+                        <div class="d-flex align-items-center justify-content-between mb-1.5">
+                            <label class="form-label fw-semibold mb-0" style="font-size: 12.5px;">
+                                Bank Receipt / Voucher <span class="text-danger">*</span>
+                            </label>
+                            <span class="badge rounded-pill bg-danger-subtle text-danger border border-danger-subtle px-2 py-0.5" style="font-size: 10px; font-weight: 700; letter-spacing: 0.3px;">
+                                MANDATORY
+                            </span>
+                        </div>
+
+                        <!-- Hidden File Input -->
+                        <input type="file" name="receiptVoucher" id="receiptVoucher" class="d-none" accept=".pdf,.png,.jpg,.jpeg,.webp" required onchange="handleFileChange(this)" />
+
+                        <!-- Interactive Drag & Drop Box -->
+                        <div class="voucher-dropzone p-3 text-center" id="voucherDropZone" onclick="document.getElementById('receiptVoucher').click()">
+                            <div id="dropzonePrompt">
+                                <div class="voucher-icon-circle mx-auto mb-2">
+                                    <i class="fa-solid fa-cloud-arrow-up text-primary fs-5"></i>
+                                </div>
+                                <div class="fw-bold text-dark" style="font-size: 13px;">Upload Bank Receipt or Voucher</div>
+                                <div class="text-muted mt-1" style="font-size: 11.5px;">Drag &amp; drop file here, or click to browse</div>
+                                <div class="badge bg-white text-secondary border mt-2 px-2.5 py-1" style="font-size: 10.5px;">
+                                    PDF, JPG, PNG, WEBP (Max: 15MB)
+                                </div>
+                            </div>
+
+                            <!-- Selected File Details Preview -->
+                            <div id="filePreviewContainer" class="voucher-preview-box p-3 d-none text-start">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div class="d-flex align-items-center gap-2 overflow-hidden me-2">
+                                        <div class="rounded-circle p-2 bg-white text-success shadow-sm">
+                                            <i class="fa-solid fa-file-circle-check fs-5"></i>
+                                        </div>
+                                        <div class="overflow-hidden">
+                                            <div class="fw-bold text-dark text-truncate" id="previewFileName" style="font-size: 12.5px;">voucher.pdf</div>
+                                            <div class="text-muted" id="previewFileSize" style="font-size: 11px;">250 KB</div>
+                                        </div>
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-danger border-0 rounded-circle" onclick="removeVoucherFile(event)" title="Remove and choose another file">
+                                        <i class="fa-solid fa-xmark"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Validation Error Display -->
+                        <div class="text-danger mt-1 fw-semibold d-none" id="voucherErrorMsg" style="font-size: 11.5px;">
+                            <i class="fa-solid fa-triangle-exclamation me-1"></i> Bank receipt or remittance voucher is required.
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
+        <!-- Invoices Allocation Grid Column -->
         <div class="col-md-8">
-            <div class="erp-card">
-                <div class="erp-card-header d-flex justify-content-between align-items-center">
-                    <h5 class="erp-card-title"><i class="fa-solid fa-list-check me-2"></i>Outstanding Invoices Allocation Grid</h5>
-                    <span class="badge bg-primary">Total Outstanding: &#8377; @totalOutstanding.ToString("N2")</span>
+            <div class="erp-card shadow-sm border">
+                <div class="erp-card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="erp-card-title fw-bold text-dark mb-0">
+                            <i class="fa-solid fa-list-check me-2 text-primary"></i>Outstanding Invoices Allocation Grid
+                        </h5>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        @if (invoiceList.Any())
+                        {
+                            <button type="button" class="btn btn-xs btn-outline-primary rounded-pill px-3 py-1" style="font-size: 11.5px;" onclick="autoAllocate()">
+                                <i class="fa-solid fa-wand-magic-sparkles me-1"></i> Auto-Allocate Amount
+                            </button>
+                        }
+                        <span class="badge bg-primary px-3 py-1.5" style="font-size: 12px;">Total Outstanding: &#8377; @totalOutstanding.ToString("N2")</span>
+                    </div>
                 </div>
                 <div class="erp-card-body p-0">
                     <div class="table-responsive">
-                        <table class="table table-bordered align-middle mb-0" style="font-size: 13px;">
+                        <table class="table table-bordered align-middle mb-0" id="invoicesTable" style="font-size: 13px;">
                             <thead class="table-light">
                                 <tr>
                                     <th class="ps-3">Invoice Number</th>
                                     <th>Client</th>
                                     <th>Total Bill</th>
                                     <th>Outstanding</th>
-                                    <th style="width: 180px;">Allocate Amount (&#8377;)</th>
+                                    <th style="width: 190px;">Allocate Amount (&#8377;)</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -112,21 +251,33 @@
                                 {
                                     @foreach (var inv in invoiceList)
                                     {
-                                        <tr>
-                                            <td class="ps-3 fw-bold text-primary">@inv.InvoiceNumber</td>
+                                        <tr class="invoice-row" data-client-id="@inv.ClientId" data-outstanding="@inv.OutstandingBalance">
+                                            <td class="ps-3 fw-bold text-primary">
+                                                <i class="fa-solid fa-file-invoice text-muted me-1"></i> @inv.InvoiceNumber
+                                            </td>
                                             <td>@(inv.Client?.ClientName ?? "N/A")</td>
                                             <td>&#8377; @inv.TotalInvoiceValue.ToString("N2")</td>
                                             <td class="text-danger fw-bold">&#8377; @inv.OutstandingBalance.ToString("N2")</td>
-                                            <td><input type="number" step="0.01" name="alloc_@inv.Id" class="form-control form-control-sm text-end fw-bold" placeholder="0.00" /></td>
+                                            <td>
+                                                <div class="input-group input-group-sm">
+                                                    <span class="input-group-text">&#8377;</span>
+                                                    <input type="number" step="0.01" min="0" max="@inv.OutstandingBalance" name="alloc_@inv.Id" class="form-control text-end fw-bold invoice-alloc-input" placeholder="0.00" oninput="updateAllocationSummary()" />
+                                                </div>
+                                            </td>
                                         </tr>
                                     }
                                 }
                                 else
                                 {
-                                    <tr>
-                                        <td colspan="5" class="text-center py-4 text-muted">
-                                            <i class="fa-solid fa-circle-check mb-2" style="font-size: 24px; color: #10B981;"></i>
-                                            <div>No unpaid or outstanding invoices in the database.</div>
+                                    <tr id="noInvoicesRow">
+                                        <td colspan="5" class="text-center py-5 text-muted">
+                                            <div class="d-inline-flex p-3 rounded-circle bg-success-subtle text-success mb-2">
+                                                <i class="fa-solid fa-circle-check fs-3"></i>
+                                            </div>
+                                            <div class="fw-semibold text-dark fs-6">No unpaid or outstanding invoices in the database.</div>
+                                            <div class="text-muted mt-1" style="font-size: 12.5px;">
+                                                You can still submit this payment with the mandatory bank receipt voucher to record it as an <strong>Unallocated Customer Advance</strong>.
+                                            </div>
                                         </td>
                                     </tr>
                                 }
@@ -134,13 +285,268 @@
                         </table>
                     </div>
                 </div>
-                @if (invoiceList.Any())
-                {
-                    <div class="erp-card-body text-end border-top">
-                        <button type="submit" class="btn btn-success px-4 fw-bold"><i class="fa-solid fa-check me-1"></i> Commit Payment Allocation</button>
+
+                <!-- Footer Summary and Action Buttons -->
+                <div class="erp-card-body border-top bg-light p-3 d-flex flex-wrap align-items-center justify-content-between gap-3">
+                    <div class="d-flex align-items-center gap-3">
+                        <div style="font-size: 12.5px;">
+                            <span class="text-muted">Total Allocated:</span>
+                            <span class="fw-bold text-dark ms-1" id="lblTotalAllocated">&#8377; 0.00</span>
+                        </div>
+                        <div class="vr"></div>
+                        <div style="font-size: 12.5px;">
+                            <span class="text-muted">Unallocated / Advance:</span>
+                            <span class="fw-bold text-success ms-1" id="lblUnallocated">&#8377; 0.00</span>
+                        </div>
                     </div>
-                }
+
+                    <div>
+                        @if (invoiceList.Any())
+                        {
+                            <button type="submit" class="btn btn-success px-4 fw-bold shadow-sm" id="btnSubmitAllocation">
+                                <i class="fa-solid fa-check me-1"></i> Commit Payment Allocation
+                            </button>
+                        }
+                        else
+                        {
+                            <button type="submit" class="btn btn-primary px-4 fw-bold shadow-sm" id="btnSubmitAdvance">
+                                <i class="fa-solid fa-receipt me-1"></i> Record Voucher &amp; Advance
+                            </button>
+                        }
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </form>
+
+<!-- Recent Receipts & Vouchers Audit Grid -->
+@if (recentReceipts.Any())
+{
+    <div class="erp-card shadow-sm border mt-4">
+        <div class="erp-card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+            <h5 class="erp-card-title fw-bold text-dark mb-0">
+                <i class="fa-solid fa-clock-rotate-left me-2 text-primary"></i>Recent Payment Receipts &amp; Bank Vouchers
+            </h5>
+            <span class="badge rounded-pill bg-primary-subtle text-primary border border-primary-subtle px-3 py-1 fw-semibold">
+                General Ledger Auto-Posted
+            </span>
+        </div>
+        <div class="erp-card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0" style="font-size: 13px;">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-3">Receipt No</th>
+                            <th>Date</th>
+                            <th>Client</th>
+                            <th>Payment Mode / Ref</th>
+                            <th class="text-end">Amount Received</th>
+                            <th class="text-end">Unallocated / Advance</th>
+                            <th class="text-center">Attached Bank Receipt</th>
+                            <th class="text-center pe-3">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in recentReceipts)
+                        {
+                            var hasDoc = r.ReceiptDocId.HasValue && receiptDocs.ContainsKey(r.ReceiptDocId.Value);
+                            var doc = hasDoc ? receiptDocs[r.ReceiptDocId!.Value] : null;
+
+                            <tr>
+                                <td class="ps-3 fw-bold text-primary">@r.ReceiptNumber</td>
+                                <td>@r.ReceiptDate.ToString("dd MMM yyyy")</td>
+                                <td>@(r.Client?.ClientName ?? "N/A")</td>
+                                <td>
+                                    <strong>@r.PaymentMode</strong>
+                                    @if (!string.IsNullOrEmpty(r.TransactionRefNo))
+                                    {
+                                        <small class="text-muted d-block text-truncate" style="max-width: 180px;">@r.TransactionRefNo</small>
+                                    }
+                                </td>
+                                <td class="text-end fw-bold text-success">&#8377; @r.AmountReceived.ToString("N2")</td>
+                                <td class="text-end fw-semibold text-secondary">&#8377; @r.UnallocatedAmount.ToString("N2")</td>
+                                <td class="text-center">
+                                    @if (doc != null)
+                                    {
+                                        <a href="@doc.FilePath" target="_blank" class="btn btn-sm btn-outline-primary py-0.5 px-2.5 rounded-pill fw-semibold" style="font-size: 11.5px;" title="View uploaded bank voucher">
+                                            <i class="fa-solid fa-paperclip me-1 text-danger"></i> View Voucher
+                                        </a>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-light text-muted border" style="font-size: 11px;">No voucher</span>
+                                    }
+                                </td>
+                                <td class="text-center pe-3">
+                                    <span class="badge rounded-pill bg-success-subtle text-success border border-success-subtle px-2.5 py-1">
+                                        <i class="fa-solid fa-circle-check me-1"></i> Posted
+                                    </span>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
+<script>
+    // Drag & Drop File Upload Logic
+    const dropZone = document.getElementById('voucherDropZone');
+    const fileInput = document.getElementById('receiptVoucher');
+    const promptContainer = document.getElementById('dropzonePrompt');
+    const previewContainer = document.getElementById('filePreviewContainer');
+    const previewFileName = document.getElementById('previewFileName');
+    const previewFileSize = document.getElementById('previewFileSize');
+    const errorMsg = document.getElementById('voucherErrorMsg');
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZone.classList.add('dragover');
+        }, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZone.classList.remove('dragover');
+        }, false);
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        if (files && files.length > 0) {
+            fileInput.files = files;
+            handleFileSelection(files[0]);
+        }
+    });
+
+    function handleFileChange(input) {
+        if (input.files && input.files[0]) {
+            handleFileSelection(input.files[0]);
+        }
+    }
+
+    function handleFileSelection(file) {
+        const allowedExts = ['.pdf', '.png', '.jpg', '.jpeg', '.webp'];
+        const fileName = file.name;
+        const ext = '.' + fileName.split('.').pop().toLowerCase();
+
+        if (!allowedExts.includes(ext)) {
+            alert('Invalid file format. Please upload a valid document (PDF, PNG, JPG, WEBP).');
+            removeVoucherFile();
+            return;
+        }
+
+        if (file.size > 15 * 1024 * 1024) {
+            alert('File exceeds the 15 MB size limit.');
+            removeVoucherFile();
+            return;
+        }
+
+        dropZone.classList.remove('has-error');
+        errorMsg.classList.add('d-none');
+
+        previewFileName.innerText = fileName;
+        previewFileSize.innerText = formatFileSize(file.size);
+
+        promptContainer.classList.add('d-none');
+        previewContainer.classList.remove('d-none');
+    }
+
+    function removeVoucherFile(e) {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        fileInput.value = '';
+        promptContainer.classList.remove('d-none');
+        previewContainer.classList.add('d-none');
+    }
+
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    // Form Validation on Submit
+    document.getElementById('paymentAllocationForm').addEventListener('submit', function (e) {
+        const amount = parseFloat(document.getElementById('txtAmountReceived').value) || 0;
+        if (amount <= 0) {
+            e.preventDefault();
+            alert('Please enter a valid amount received greater than 0.');
+            document.getElementById('txtAmountReceived').focus();
+            return false;
+        }
+
+        if (!fileInput.files || fileInput.files.length === 0) {
+            e.preventDefault();
+            dropZone.classList.add('has-error');
+            errorMsg.classList.remove('d-none');
+            dropZone.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            return false;
+        }
+    });
+
+    // Real-time Calculation of Allocations
+    function onAmountReceivedChange() {
+        updateAllocationSummary();
+    }
+
+    function updateAllocationSummary() {
+        const amountReceived = parseFloat(document.getElementById('txtAmountReceived').value) || 0;
+        let totalAlloc = 0;
+
+        document.querySelectorAll('.invoice-alloc-input').forEach(input => {
+            const val = parseFloat(input.value) || 0;
+            totalAlloc += val;
+        });
+
+        const unallocated = Math.max(0, amountReceived - totalAlloc);
+        document.getElementById('lblTotalAllocated').innerHTML = '&#8377; ' + totalAlloc.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        document.getElementById('lblUnallocated').innerHTML = '&#8377; ' + unallocated.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    // Auto-allocate helper: sequentially fills unpaid invoices up to amount received
+    function autoAllocate() {
+        let remaining = parseFloat(document.getElementById('txtAmountReceived').value) || 0;
+        if (remaining <= 0) {
+            alert('Please enter the Amount Received before auto-allocating.');
+            document.getElementById('txtAmountReceived').focus();
+            return;
+        }
+
+        document.querySelectorAll('.invoice-row').forEach(row => {
+            if (row.style.display === 'none') return;
+            const outstanding = parseFloat(row.getAttribute('data-outstanding')) || 0;
+            const input = row.querySelector('.invoice-alloc-input');
+            if (remaining > 0) {
+                const alloc = Math.min(remaining, outstanding);
+                input.value = alloc.toFixed(2);
+                remaining -= alloc;
+            } else {
+                input.value = '0.00';
+            }
+        });
+
+        updateAllocationSummary();
+    }
+
+    function filterInvoicesByClient(clientId) {
+        if (!clientId) {
+            window.location.href = '@Url.Action("AllocatePayment", "Sales")';
+        } else {
+            window.location.href = '@Url.Action("AllocatePayment", "Sales")?clientId=' + clientId;
+        }
+    }
+</script>
+
