@@ -850,7 +850,7 @@
                                                 <td class="text-end text-muted">&#8377; @po.GstAmount.ToString("N2")</td>
                                                 <td class="text-end fw-bold text-danger">&#8377; @po.TotalPoValue.ToString("N2")</td>
                                                 <td>
-                                                    <span class="badge @(po.ApprovalStatus == "APPROVED" ? "bg-success" : (po.ApprovalStatus == "REJECTED" ? "bg-danger" : "bg-warning text-dark"))">
+                                                    <span class="badge @(po.ApprovalStatus == "APPROVED" ? "bg-success" : (po.ApprovalStatus == "MARKED_FOR_PAYMENT" ? "bg-primary" : (po.ApprovalStatus == "REJECTED" ? "bg-danger" : (po.ApprovalStatus == "PAID" ? "bg-secondary" : "bg-warning text-dark"))))">
                                                         @(string.IsNullOrWhiteSpace(po.ApprovalStatus) ? "DRAFT" : po.ApprovalStatus)
                                                     </span>
                                                 </td>

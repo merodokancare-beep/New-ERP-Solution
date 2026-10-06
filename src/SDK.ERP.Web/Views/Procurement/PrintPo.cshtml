@@ -432,7 +432,26 @@
                             </td>
                             <td>
                                 <span class="field-lbl">Approval Status</span>
-                                <span class="field-val" style="color: #059669;">@Model.ApprovalStatus</span>
+                                @if (Model.ApprovalStatus == "APPROVED")
+                                {
+                                    <span class="field-val" style="color: #059669; font-weight: 700;">APPROVED</span>
+                                }
+                                else if (Model.ApprovalStatus == "MARKED_FOR_PAYMENT")
+                                {
+                                    <span class="field-val" style="color: #4F46E5; font-weight: 700;">MARKED FOR PAYMENT</span>
+                                }
+                                else if (Model.ApprovalStatus == "REJECTED")
+                                {
+                                    <span class="field-val" style="color: #DC2626; font-weight: 700;">REJECTED</span>
+                                }
+                                else if (Model.ApprovalStatus == "PAID")
+                                {
+                                    <span class="field-val" style="color: #0D9488; font-weight: 700;">PAID</span>
+                                }
+                                else
+                                {
+                                    <span class="field-val" style="color: #D97706; font-weight: 700;">PENDING APPROVAL</span>
+                                }
                             </td>
                         </tr>
                         <tr>

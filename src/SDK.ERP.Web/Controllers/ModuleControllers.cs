@@ -1913,9 +1913,12 @@ public class SalesController : Controller
         decimal amountReceived, 
         long? bankAccountId, 
         string? paymentRef, 
+        bool isAdvance,
         IFormFile? receiptVoucher, 
         IFormCollection form)
     {
+        bool advanceFlag = isAdvance || form["isAdvance"] == "true" || form["isAdvance"] == "on";
+
         // 1. Mandatory Bank Receipt / Voucher Validation
         var voucherFile = receiptVoucher ?? form.Files["receiptVoucher"] ?? form.Files["uploadFile"];
         if (voucherFile == null || voucherFile.Length == 0)
@@ -2014,8 +2017,9 @@ public class SalesController : Controller
             PaymentMode = string.IsNullOrWhiteSpace(paymentRef) ? "Bank Transfer / NEFT" : paymentRef,
             TransactionRefNo = paymentRef,
             Status = "POSTED",
-            ExpenseHead = "Customer Invoicing Allocation",
-            Remarks = $"Bank Voucher Attached: {voucherFile.FileName} [Bank: {resolvedBank}]" + (!string.IsNullOrWhiteSpace(paymentRef) ? $" - Ref: {paymentRef}" : ""),
+            IsAdvance = advanceFlag,
+            ExpenseHead = advanceFlag ? "Customer Advance" : "Customer Invoicing Allocation",
+            Remarks = (advanceFlag ? "[Customer Advance] " : "") + $"Bank Voucher Attached: {voucherFile.FileName} [Bank: {resolvedBank}]" + (!string.IsNullOrWhiteSpace(paymentRef) ? $" - Ref: {paymentRef}" : ""),
             ReceiptDocId = docId
         };
         _db.CustomerReceipts.Add(receipt);
@@ -2031,37 +2035,48 @@ public class SalesController : Controller
             }
         }
 
-        // 3. Process Invoices Allocation
+        // 3. Process Invoices Allocation (Bypassed if user explicitly checked Advance)
         decimal totalAllocated = 0;
-        foreach (var key in form.Keys)
+        if (!advanceFlag)
         {
-            if (key.StartsWith("alloc_") && decimal.TryParse(form[key], out var allocAmt) && allocAmt > 0)
+            foreach (var key in form.Keys)
             {
-                if (long.TryParse(key.Replace("alloc_", ""), out var invId))
+                if (key.StartsWith("alloc_") && decimal.TryParse(form[key], out var allocAmt) && allocAmt > 0)
                 {
-                    var inv = await _db.SalesInvoices.FindAsync(invId);
-                    if (inv != null)
+                    if (long.TryParse(key.Replace("alloc_", ""), out var invId))
                     {
-                        var actualAlloc = Math.Min(allocAmt, inv.OutstandingBalance);
-                        inv.PaidAmount += actualAlloc;
-                        inv.OutstandingBalance = Math.Max(0, inv.TotalInvoiceValue - inv.PaidAmount);
-                        inv.Status = inv.OutstandingBalance == 0 ? "PAID" : "PARTIAL";
-                        totalAllocated += actualAlloc;
-
-                        var alloc = new ReceiptAllocation
+                        var inv = await _db.SalesInvoices.FindAsync(invId);
+                        if (inv != null)
                         {
-                            ReceiptId = receipt.Id,
-                            InvoiceId = inv.Id,
-                            AllocatedAmount = actualAlloc,
-                            TdsDeductedByClient = 0
-                        };
-                        _db.ReceiptAllocations.Add(alloc);
+                            var actualAlloc = Math.Min(allocAmt, inv.OutstandingBalance);
+                            inv.PaidAmount += actualAlloc;
+                            inv.OutstandingBalance = Math.Max(0, inv.TotalInvoiceValue - inv.PaidAmount);
+                            inv.Status = inv.OutstandingBalance == 0 ? "PAID" : "PARTIAL";
+                            totalAllocated += actualAlloc;
+
+                            var alloc = new ReceiptAllocation
+                            {
+                                ReceiptId = receipt.Id,
+                                InvoiceId = inv.Id,
+                                AllocatedAmount = actualAlloc,
+                                TdsDeductedByClient = 0
+                            };
+                            _db.ReceiptAllocations.Add(alloc);
+                        }
                     }
                 }
             }
         }
 
         receipt.UnallocatedAmount = Math.Max(0, amountReceived - totalAllocated);
+        if (advanceFlag || (totalAllocated == 0 && receipt.UnallocatedAmount > 0))
+        {
+            receipt.IsAdvance = true;
+            if (string.IsNullOrEmpty(receipt.ExpenseHead) || receipt.ExpenseHead == "Customer Invoicing Allocation")
+            {
+                receipt.ExpenseHead = "Customer Advance";
+            }
+        }
         await _db.SaveChangesAsync();
 
         if (fy == null)
@@ -2078,6 +2093,10 @@ public class SalesController : Controller
             await _db.SaveChangesAsync();
         }
 
+        var jvNarration = advanceFlag 
+            ? $"Customer Advance Payment: {paymentRef ?? "NEFT/Cheque"} (Advance Amount: &#8377; {amountReceived:N2}) [Bank: {resolvedBank}] - Voucher: {voucherFile.FileName}"
+            : $"Customer Payment: {paymentRef ?? "NEFT/Cheque"} (Allocated: &#8377; {totalAllocated:N2}, Advance: &#8377; {receipt.UnallocatedAmount:N2}) [Bank: {resolvedBank}] - Voucher: {voucherFile.FileName}";
+
         var jv = new JournalEntry
         {
             CompanyId = company?.Id ?? 1,
@@ -2088,7 +2107,7 @@ public class SalesController : Controller
             VoucherType = "RECEIPT",
             SourceEntityType = "CustomerReceipt",
             SourceEntityId = receipt.Id,
-            Narration = $"Customer Payment: {paymentRef ?? "NEFT/Cheque"} (Allocated: &#8377; {totalAllocated:N2}, Advance: &#8377; {receipt.UnallocatedAmount:N2}) [Bank: {resolvedBank}] - Voucher: {voucherFile.FileName}",
+            Narration = jvNarration,
             TotalDebit = amountReceived,
             TotalCredit = amountReceived,
             IsBalanced = true,
@@ -2101,7 +2120,9 @@ public class SalesController : Controller
         receipt.JournalEntryId = jv.Id;
         await _db.SaveChangesAsync();
 
-        TempData["SuccessMessage"] = $"Payment of <strong>&#8377; {amountReceived:N2}</strong> with Bank Voucher <strong>{voucherFile.FileName}</strong> recorded successfully! (Receipt No: <strong>{rcptNo}</strong>)";
+        TempData["SuccessMessage"] = advanceFlag
+            ? $"Customer Advance of <strong>&#8377; {amountReceived:N2}</strong> with Bank Voucher <strong>{voucherFile.FileName}</strong> recorded successfully! (Receipt No: <strong>{rcptNo}</strong>)"
+            : $"Payment of <strong>&#8377; {amountReceived:N2}</strong> with Bank Voucher <strong>{voucherFile.FileName}</strong> recorded successfully! (Receipt No: <strong>{rcptNo}</strong>)";
         return RedirectToAction(nameof(AllocatePayment));
     }
 
@@ -3035,26 +3056,21 @@ public class ProcurementController : Controller
     public async Task<IActionResult> Index()
     {
         ViewData["ActiveMenu"] = "Procurement";
+        await EnsurePurchaseOrderColumnsAsync();
         ViewBag.Vendors = await _db.Vendors.AsNoTracking().ToListAsync();
         ViewBag.Projects = await _db.Projects.AsNoTracking().ToListAsync();
-        List<PurchaseOrder> purchaseOrders;
-        try
-        {
-            purchaseOrders = await _db.PurchaseOrders
-                .Include(p => p.Vendor)
-                .Include(p => p.Project)
-                .AsNoTracking()
-                .ToListAsync();
-        }
-        catch
-        {
-            await EnsurePurchaseOrderColumnsAsync();
-            purchaseOrders = await _db.PurchaseOrders
-                .Include(p => p.Vendor)
-                .Include(p => p.Project)
-                .AsNoTracking()
-                .ToListAsync();
-        }
+        
+        var purchaseOrders = await _db.PurchaseOrders
+            .Include(p => p.Vendor)
+            .Include(p => p.Project)
+            .OrderByDescending(p => p.PoDate)
+            .ThenByDescending(p => p.Id)
+            .AsNoTracking()
+            .ToListAsync();
+
+        var currentUser = await _companyContext.GetCurrentUserAsync();
+        ViewBag.CurrentUser = currentUser;
+
         return View(purchaseOrders);
     }
 
@@ -3252,6 +3268,49 @@ public class ProcurementController : Controller
             poNumber = $"PO/{sYear % 100}-{eYear}/{count:D4}";
         }
 
+        const decimal APPROVAL_THRESHOLD = 100000m; // 1 Lakh threshold
+        var currentUser = await _companyContext.GetCurrentUserAsync();
+
+        string raisedByRole = (form["raisedByRole"].ToString() ?? "").Trim().ToUpperInvariant();
+        if (string.IsNullOrWhiteSpace(raisedByRole))
+        {
+            raisedByRole = (currentUser.Role?.RoleName ?? "ACCOUNTANT").ToUpperInvariant();
+        }
+
+        string approvalStatus;
+        long? approvedBy = null;
+        DateTime? approvedAt = null;
+
+        if (raisedByRole == "SUPER_ADMIN" || raisedByRole == "COMPANY_ADMIN" || raisedByRole == "ADMIN")
+        {
+            // Administrator / Executive authority: Direct approval
+            approvalStatus = "APPROVED";
+            approvedBy = currentUser.Id;
+            approvedAt = DateTime.UtcNow;
+        }
+        else if (raisedByRole == "ACCOUNTANT" || raisedByRole == "ACCOUNTS")
+        {
+            // Accounts department rule:
+            // PO Bills up to 1 Lakh (<= 100,000) can be directly created/approved
+            // Above 1 Lakh (> 100,000) require managerial approval
+            if (total <= APPROVAL_THRESHOLD)
+            {
+                approvalStatus = "APPROVED";
+                approvedBy = currentUser.Id;
+                approvedAt = DateTime.UtcNow;
+            }
+            else
+            {
+                approvalStatus = "PENDING_APPROVAL";
+            }
+        }
+        else
+        {
+            // Raised by subordinates (e.g. Procurement Officer, Store Keeper, junior staff)
+            // Always routed for managerial approval
+            approvalStatus = "PENDING_APPROVAL";
+        }
+
         var po = new PurchaseOrder
         {
             CompanyId = company.Id,
@@ -3270,14 +3329,201 @@ public class ProcurementController : Controller
             CgstAmount = finalCgst,
             SgstAmount = finalSgst,
             TotalPoValue = total,
-            ApprovalStatus = "APPROVED",
+            ApprovalStatus = approvalStatus,
+            ApprovedBy = approvedBy,
+            ApprovedAt = approvedAt,
+            CreatedBy = currentUser.Id,
+            CreatedByName = currentUser.FullName ?? currentUser.Username,
+            CreatedByRole = raisedByRole,
             Items = poItems
         };
 
         _db.PurchaseOrders.Add(po);
         await _db.SaveChangesAsync();
 
-        TempData["SuccessMessage"] = $"Purchase Order <strong>{po.PoNumber}</strong> issued successfully for &#8377; {total:N2}!";
+        if (approvalStatus == "APPROVED")
+        {
+            TempData["SuccessMessage"] = $"Purchase Order <strong>{po.PoNumber}</strong> issued and <strong>APPROVED</strong> successfully for &#8377; {total:N2} (Direct approval under authority limits)!";
+        }
+        else
+        {
+            TempData["SuccessMessage"] = $"Purchase Order <strong>{po.PoNumber}</strong> created for &#8377; {total:N2} and <strong>SUBMITTED FOR APPROVAL</strong> (Exceeds &#8377;1 Lakh limit or raised by subordinate).";
+        }
+
+        return RedirectToAction(nameof(Index));
+    }
+
+    private static bool CanUserApprovePo(User? user, PurchaseOrder po)
+    {
+        if (user == null) return false;
+
+        var roleName = (user.Role?.RoleName ?? "").ToUpperInvariant();
+        var designation = (user.Designation ?? "").ToUpperInvariant();
+        var username = (user.Username ?? "").ToUpperInvariant();
+
+        bool isSystemAdmin = roleName == "SUPER_ADMIN" || 
+                             roleName == "COMPANY_ADMIN" || 
+                             roleName == "ADMIN" || 
+                             roleName == "ORG_ADMIN" ||
+                             username == "ADMIN" || 
+                             username == "SABIR" ||
+                             designation.Contains("DIRECTOR") || 
+                             designation.Contains("OWNER") || 
+                             designation.Contains("CEO");
+
+        if (isSystemAdmin) return true;
+
+        bool isManager = roleName == "PROJECT_MANAGER" || 
+                         roleName == "MANAGER" || 
+                         designation.Contains("MANAGER");
+
+        bool isAccountant = roleName == "ACCOUNTANT" || 
+                            roleName == "ACCOUNTS" || 
+                            designation.Contains("ACCOUNT");
+
+        bool isCreator = (po.CreatedBy.HasValue && po.CreatedBy.Value == user.Id) ||
+                         (!string.IsNullOrWhiteSpace(po.CreatedByName) && po.CreatedByName.Equals(user.Username, StringComparison.OrdinalIgnoreCase)) ||
+                         (!string.IsNullOrWhiteSpace(po.CreatedByName) && !string.IsNullOrWhiteSpace(user.FullName) && po.CreatedByName.Equals(user.FullName, StringComparison.OrdinalIgnoreCase));
+
+        if (isManager)
+        {
+            return !isCreator;
+        }
+
+        if (isAccountant)
+        {
+            // Accounts can only approve subordinate POs <= 1 Lakh
+            return (po.TotalPoValue <= 100000m) && !isCreator;
+        }
+
+        return false;
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ApprovePo(long id)
+    {
+        await EnsurePurchaseOrderColumnsAsync();
+        var po = await _db.PurchaseOrders.FindAsync(id);
+        if (po == null) return NotFound();
+
+        var currentUser = await _companyContext.GetCurrentUserAsync();
+        if (!CanUserApprovePo(currentUser, po))
+        {
+            TempData["ErrorMessage"] = $"Access Denied: You are not authorized to approve Purchase Order <strong>{po.PoNumber}</strong> (&#8377; {po.TotalPoValue:N2}). " +
+                (po.TotalPoValue > 100000m ? "Orders exceeding &#8377;1 Lakh require Managerial / Admin authorization." : "Only Accounts or Management can authorize this order.");
+            return RedirectToAction(nameof(Index));
+        }
+
+        po.ApprovalStatus = "APPROVED";
+        po.ApprovedBy = currentUser.Id;
+        po.ApprovedAt = DateTime.UtcNow;
+        po.RejectionReason = null;
+
+        await _db.SaveChangesAsync();
+
+        TempData["SuccessMessage"] = $"Purchase Order <strong>{po.PoNumber}</strong> (&#8377; {po.TotalPoValue:N2}) has been <strong>APPROVED</strong> successfully!";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RejectPo(long id, string? reason)
+    {
+        await EnsurePurchaseOrderColumnsAsync();
+        var po = await _db.PurchaseOrders.FindAsync(id);
+        if (po == null) return NotFound();
+
+        var currentUser = await _companyContext.GetCurrentUserAsync();
+        if (!CanUserApprovePo(currentUser, po))
+        {
+            TempData["ErrorMessage"] = $"Access Denied: You are not authorized to reject Purchase Order <strong>{po.PoNumber}</strong>. Managerial / Approver authorization required.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        po.ApprovalStatus = "REJECTED";
+        po.RejectionReason = string.IsNullOrWhiteSpace(reason) ? "Rejected by authorized manager." : reason.Trim();
+
+        await _db.SaveChangesAsync();
+
+        TempData["SuccessMessage"] = $"Purchase Order <strong>{po.PoNumber}</strong> has been <strong>REJECTED</strong>. (Reason: <em>{po.RejectionReason}</em>)";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> MarkForPayment(long id)
+    {
+        await EnsurePurchaseOrderColumnsAsync();
+        var po = await _db.PurchaseOrders
+            .Include(p => p.Vendor)
+            .FirstOrDefaultAsync(p => p.Id == id);
+        if (po == null) return NotFound();
+
+        po.ApprovalStatus = "MARKED_FOR_PAYMENT";
+        po.MarkedForPaymentAt = DateTime.UtcNow;
+
+        // Auto-create PurchaseBill (Commercial PO Bill) if not already created
+        var existingBill = await _db.PurchaseBills.FirstOrDefaultAsync(b => b.PoId == po.Id);
+        if (existingBill == null)
+        {
+            var bill = new PurchaseBill
+            {
+                CompanyId = po.CompanyId,
+                VendorId = po.VendorId,
+                PoId = po.Id,
+                ProjectId = po.ProjectId,
+                VendorBillNumber = $"BILL/{po.PoNumber.Replace("PO/", "")}",
+                BillDate = DateTime.Today,
+                DueDate = DateTime.Today.AddDays(30),
+                PlaceOfSupply = (!string.IsNullOrWhiteSpace(po.Vendor?.Gstin) && po.Vendor.Gstin.Length >= 2) ? po.Vendor.Gstin.Substring(0, 2) : "07",
+                TaxableAmount = po.TaxableAmount,
+                CgstAmount = po.CgstAmount,
+                SgstAmount = po.SgstAmount,
+                IgstAmount = po.IgstAmount,
+                TotalBillAmount = po.TotalPoValue,
+                PaidAmount = 0,
+                BalanceDue = po.TotalPoValue,
+                Status = "UNPAID"
+            };
+            _db.PurchaseBills.Add(bill);
+        }
+
+        await _db.SaveChangesAsync();
+
+        TempData["SuccessMessage"] = $"Purchase Order <strong>{po.PoNumber}</strong> is now <strong>MARKED FOR PAYMENT</strong> and Commercial PO Bill generated for &#8377; {po.TotalPoValue:N2}!";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SetPoStatus(long id, string status, string? reason)
+    {
+        await EnsurePurchaseOrderColumnsAsync();
+        var po = await _db.PurchaseOrders.FindAsync(id);
+        if (po == null) return NotFound();
+
+        var currentUser = await _companyContext.GetCurrentUserAsync();
+        status = status.ToUpperInvariant();
+        po.ApprovalStatus = status;
+
+        if (status == "APPROVED")
+        {
+            po.ApprovedBy = currentUser.Id;
+            po.ApprovedAt = DateTime.UtcNow;
+            po.RejectionReason = null;
+        }
+        else if (status == "REJECTED")
+        {
+            po.RejectionReason = string.IsNullOrWhiteSpace(reason) ? "Rejected by manager." : reason.Trim();
+        }
+        else if (status == "MARKED_FOR_PAYMENT")
+        {
+            po.MarkedForPaymentAt = DateTime.UtcNow;
+        }
+
+        await _db.SaveChangesAsync();
+        TempData["SuccessMessage"] = $"Purchase Order <strong>{po.PoNumber}</strong> status transitioned to <strong>{status}</strong>!";
         return RedirectToAction(nameof(Index));
     }
 
@@ -3357,6 +3603,27 @@ public class ProcurementController : Controller
                         ALTER TABLE [PurchaseOrders] ADD [SgstAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;
                     IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrders]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrders]')) AND name = 'IgstAmount')
                         ALTER TABLE [PurchaseOrders] ADD [IgstAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrders]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrders]')) AND name = 'CreatedBy')
+                        ALTER TABLE [PurchaseOrders] ADD [CreatedBy] BIGINT NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrders]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrders]')) AND name = 'CreatedByName')
+                        ALTER TABLE [PurchaseOrders] ADD [CreatedByName] NVARCHAR(150) NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrders]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrders]')) AND name = 'CreatedByRole')
+                        ALTER TABLE [PurchaseOrders] ADD [CreatedByRole] NVARCHAR(50) NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrders]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrders]')) AND name = 'ApprovedAt')
+                        ALTER TABLE [PurchaseOrders] ADD [ApprovedAt] DATETIME2 NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrders]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrders]')) AND name = 'RejectionReason')
+                        ALTER TABLE [PurchaseOrders] ADD [RejectionReason] NVARCHAR(MAX) NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrders]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrders]')) AND name = 'MarkedForPaymentAt')
+                        ALTER TABLE [PurchaseOrders] ADD [MarkedForPaymentAt] DATETIME2 NULL;
+
+                    -- Align historical records exceeding 1 Lakh without approver record to PENDING_APPROVAL
+                    IF EXISTS (SELECT 1 FROM [PurchaseOrders] WHERE [TotalPoValue] > 100000 AND [ApprovalStatus] = 'APPROVED' AND [ApprovedAt] IS NULL)
+                    BEGIN
+                        UPDATE [PurchaseOrders]
+                        SET [ApprovalStatus] = 'PENDING_APPROVAL',
+                            [CreatedByRole] = 'ACCOUNTANT'
+                        WHERE [TotalPoValue] > 100000 AND [ApprovalStatus] = 'APPROVED' AND [ApprovedAt] IS NULL;
+                    END
                 END
 
                 IF OBJECT_ID('[PurchaseOrderItems]') IS NOT NULL OR OBJECT_ID('[dbo].[PurchaseOrderItems]') IS NOT NULL

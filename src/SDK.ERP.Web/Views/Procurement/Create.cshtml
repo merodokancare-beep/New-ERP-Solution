@@ -240,12 +240,11 @@
         @Html.AntiForgeryToken()
         <input type="hidden" name="poNumber" value="@autoPoNumber" />
 
-        <!-- Row 1: PO Type -->
+        <!-- Row 1: PO Type & Initiator / Raised By Role -->
         <div class="row g-3 mb-3">
-            <div class="col-12">
+            <div class="col-md-6">
                 <label class="proc-label">PO Type <span class="text-danger">*</span></label>
                 <select name="poType" id="poType" class="form-select proc-input" required>
-                    <option value="">--- Select PO Type ---</option>
                     <option value="Standard Purchase Order" selected>Standard Purchase Order</option>
                     <option value="Work Order">Work Order</option>
                     <option value="Service PO">Service PO</option>
@@ -253,6 +252,14 @@
                     <option value="Consumables &amp; Supplies">Consumables &amp; Supplies</option>
                     <option value="Direct Purchase">Direct Purchase</option>
                     <option value="Rate Contract">Rate Contract</option>
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="proc-label">Initiator / Raised By Role <span class="text-danger">*</span></label>
+                <select name="raisedByRole" id="raisedByRole" class="form-select proc-input" required>
+                    <option value="ACCOUNTANT" selected>Accounts Department (Accountant)</option>
+                    <option value="SUBORDINATE">Subordinate Staff (Procurement Officer / Team)</option>
+                    <option value="ADMIN">Administrator / Top Management</option>
                 </select>
             </div>
         </div>
@@ -423,10 +430,23 @@
             </table>
         </div>
 
+        <!-- Dynamic Workflow Status Preview Box -->
+        <div id="createWorkflowPreview" class="p-3 mb-3 rounded-3 border d-flex align-items-center justify-content-between gap-3 shadow-sm" style="background: #F8FAFC; border-color: #E2E8F0; font-size: 13px;">
+            <div class="d-flex align-items-center gap-2" id="createWorkflowContent">
+                <i class="fa-solid fa-circle-info text-primary fs-5"></i>
+                <div>
+                    <div class="fw-bold text-dark">Workflow Routing Preview</div>
+                    <div class="text-muted" style="font-size: 12px;">Subordinates: Always routes for approval. Accounts: Direct PO Bill creation for &le; &#8377;1 Lakh; approval required above &#8377;1 Lakh.</div>
+                </div>
+            </div>
+        </div>
+
         <!-- Action Buttons (Bottom Right) -->
         <div class="d-flex justify-content-end align-items-center gap-2">
             <a asp-controller="Procurement" asp-action="Index" class="btn-proc-cancel">Cancel</a>
-            <button type="submit" class="btn-proc-save">Save</button>
+            <button type="submit" id="btnSavePo" class="btn-proc-save">
+                <i class="fa-solid fa-paper-plane me-1"></i> Save &amp; Issue PO
+            </button>
         </div>
     </form>
 </div>
@@ -540,6 +560,85 @@
             cgstInput.value = totalCgst.toFixed(2);
             sgstInput.value = totalSgst.toFixed(2);
             totalBillingInput.value = grandTotal.toFixed(2);
+            updateWorkflowPreview();
+        }
+
+        const raisedBySelect = document.getElementById("raisedByRole");
+        const previewBox = document.getElementById("createWorkflowPreview");
+        const previewContent = document.getElementById("createWorkflowContent");
+        const btnSavePo = document.getElementById("btnSavePo");
+
+        function updateWorkflowPreview() {
+            if (!totalBillingInput || !previewBox || !previewContent) return;
+            const total = parseFloat(totalBillingInput.value) || 0;
+            const role = raisedBySelect ? raisedBySelect.value : "ACCOUNTANT";
+
+            if (total <= 0) {
+                previewBox.style.background = "#F8FAFC";
+                previewBox.style.borderColor = "#E2E8F0";
+                previewContent.innerHTML = `
+                    <i class="fa-solid fa-circle-info text-primary fs-5"></i>
+                    <div>
+                        <div class="fw-bold text-dark">Workflow Routing Preview</div>
+                        <div class="text-muted" style="font-size: 12px;">Subordinates: Always routes for approval. Accounts: Direct PO Bill creation for &le; &#8377;1 Lakh; approval required above &#8377;1 Lakh.</div>
+                    </div>
+                `;
+                if (btnSavePo) btnSavePo.innerHTML = '<i class="fa-solid fa-paper-plane me-1"></i> Save PO';
+                return;
+            }
+
+            if (role === "SUBORDINATE") {
+                previewBox.style.background = "#FEF3C7";
+                previewBox.style.borderColor = "#FDE68A";
+                previewContent.innerHTML = `
+                    <i class="fa-solid fa-clock-rotate-left text-warning fs-5"></i>
+                    <div>
+                        <div class="fw-bold text-warning-emphasis">Status: PENDING APPROVAL (Total: &#8377; ${total.toLocaleString('en-IN', {minimumFractionDigits: 2})})</div>
+                        <div class="text-secondary" style="font-size: 12px;">Orders raised by subordinate personnel must be submitted for managerial review and approval.</div>
+                    </div>
+                `;
+                if (btnSavePo) btnSavePo.innerHTML = '<i class="fa-solid fa-paper-plane me-1"></i> Submit for Managerial Approval';
+            } else if (role === "ACCOUNTANT") {
+                if (total <= 100000) {
+                    previewBox.style.background = "#D1FAE5";
+                    previewBox.style.borderColor = "#A7F3D0";
+                    previewContent.innerHTML = `
+                        <i class="fa-solid fa-circle-check text-success fs-5"></i>
+                        <div>
+                            <div class="fw-bold text-success-emphasis">Status: DIRECT APPROVAL / PO BILL CREATION (Total: &#8377; ${total.toLocaleString('en-IN', {minimumFractionDigits: 2})})</div>
+                            <div class="text-success-emphasis" style="font-size: 12px;">Within &#8377;1,00,000 (1 Lakh) limit: The accounts department is authorized to issue and directly create this PO Bill.</div>
+                        </div>
+                    `;
+                    if (btnSavePo) btnSavePo.innerHTML = '<i class="fa-solid fa-file-circle-check me-1"></i> Direct Issue &amp; Approve';
+                } else {
+                    previewBox.style.background = "#FEE2E2";
+                    previewBox.style.borderColor = "#FECACA";
+                    previewContent.innerHTML = `
+                        <i class="fa-solid fa-triangle-exclamation text-danger fs-5"></i>
+                        <div>
+                            <div class="fw-bold text-danger-emphasis">Status: PENDING APPROVAL (Total: &#8377; ${total.toLocaleString('en-IN', {minimumFractionDigits: 2})})</div>
+                            <div class="text-danger-emphasis" style="font-size: 12px;">Exceeds &#8377;1,00,000 (1 Lakh) threshold: Accounts requires managerial authorization before PO Bill creation.</div>
+                        </div>
+                    `;
+                    if (btnSavePo) btnSavePo.innerHTML = '<i class="fa-solid fa-paper-plane me-1"></i> Submit for Managerial Approval';
+                }
+            } else {
+                // ADMIN
+                previewBox.style.background = "#D1FAE5";
+                previewBox.style.borderColor = "#A7F3D0";
+                previewContent.innerHTML = `
+                    <i class="fa-solid fa-crown text-success fs-5"></i>
+                    <div>
+                        <div class="fw-bold text-success-emphasis">Status: DIRECT APPROVAL (Total: &#8377; ${total.toLocaleString('en-IN', {minimumFractionDigits: 2})})</div>
+                        <div class="text-success-emphasis" style="font-size: 12px;">Executive / Administrator authority applies. Direct approval granted.</div>
+                    </div>
+                `;
+                if (btnSavePo) btnSavePo.innerHTML = '<i class="fa-solid fa-paper-plane me-1"></i> Issue &amp; Approve Purchase Order';
+            }
+        }
+
+        if (raisedBySelect) {
+            raisedBySelect.addEventListener("change", updateWorkflowPreview);
         }
 
         function bindRowEvents(row) {

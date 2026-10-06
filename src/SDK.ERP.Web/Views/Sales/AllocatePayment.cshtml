@@ -135,6 +135,26 @@
                         <small class="text-muted" style="font-size: 11px;">Enter total remittance credited to the bank.</small>
                     </div>
 
+                    <!-- Is Advance Payment Checkbox -->
+                    <div class="mb-3">
+                        <div class="advance-checkbox-card p-3 rounded-3 border" id="advanceCardBox" style="background: #F8FAFC; border-color: #E2E8F0; transition: all 0.25s ease;">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div class="form-check d-flex align-items-center gap-2 mb-0">
+                                    <input type="checkbox" name="isAdvance" value="true" id="chkIsAdvance" class="form-check-input mt-0" style="width: 20px; height: 20px; cursor: pointer;" onchange="onAdvanceCheckboxToggle(this.checked)" />
+                                    <label for="chkIsAdvance" class="form-check-label fw-bold mb-0 text-dark" style="font-size: 13.5px; cursor: pointer; user-select: none;">
+                                        Is this amount an Advance?
+                                    </label>
+                                </div>
+                                <span class="badge rounded-pill bg-secondary-subtle text-secondary border px-2.5 py-1" id="advanceBadge" style="font-size: 10.5px; font-weight: 600;">
+                                    Regular Payment
+                                </span>
+                            </div>
+                            <div class="text-muted mt-2 pt-1 border-top" id="advanceHelpText" style="font-size: 11.5px; line-height: 1.4;">
+                                <i class="fa-solid fa-circle-info text-primary me-1"></i> Check this box if this payment is an advance from the client; uncheck to allocate against open invoices.
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Bank Account -->
                     <div class="mb-3">
                         <label class="form-label fw-semibold" style="font-size: 12.5px;">Deposit Bank Account</label>
@@ -227,13 +247,30 @@
                     <div class="d-flex align-items-center gap-2">
                         @if (invoiceList.Any())
                         {
-                            <button type="button" class="btn btn-xs btn-outline-primary rounded-pill px-3 py-1" style="font-size: 11.5px;" onclick="autoAllocate()">
+                            <button type="button" id="btnAutoAllocate" class="btn btn-xs btn-outline-primary rounded-pill px-3 py-1" style="font-size: 11.5px;" onclick="autoAllocate()">
                                 <i class="fa-solid fa-wand-magic-sparkles me-1"></i> Auto-Allocate Amount
                             </button>
                         }
                         <span class="badge bg-primary px-3 py-1.5" style="font-size: 12px;">Total Outstanding: &#8377; @totalOutstanding.ToString("N2")</span>
                     </div>
                 </div>
+
+                <!-- Advance Mode Active Callout Banner -->
+                <div id="advanceModeBanner" class="p-3 bg-info-subtle border-bottom d-none">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div class="d-flex align-items-center gap-2 text-info-emphasis">
+                            <i class="fa-solid fa-hand-holding-dollar fs-4 text-info"></i>
+                            <div>
+                                <div class="fw-bold" style="font-size: 13.5px;">Advance Payment Mode Active</div>
+                                <div style="font-size: 11.5px;">This entire payment will be recorded directly into the customer's advance ledger without adjusting against open invoices.</div>
+                            </div>
+                        </div>
+                        <span class="badge bg-info text-white px-3 py-1.5 fw-semibold" style="font-size: 12px;">
+                            Advance: <span id="advanceBannerAmount">&#8377; 0.00</span>
+                        </span>
+                    </div>
+                </div>
+
                 <div class="erp-card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-bordered align-middle mb-0" id="invoicesTable" style="font-size: 13px;">
@@ -275,8 +312,8 @@
                                                 <i class="fa-solid fa-circle-check fs-3"></i>
                                             </div>
                                             <div class="fw-semibold text-dark fs-6">No unpaid or outstanding invoices in the database.</div>
-                                            <div class="text-muted mt-1" style="font-size: 12.5px;">
-                                                You can still submit this payment with the mandatory bank receipt voucher to record it as an <strong>Unallocated Customer Advance</strong>.
+                                            <div class="text-muted mt-1" style="font-size: 12.5px;" id="noInvoicesPrompt">
+                                                Please check the <strong>"Is this amount an Advance?"</strong> box above to record this payment as a <strong>Customer Advance</strong>.
                                             </div>
                                         </td>
                                     </tr>
@@ -301,18 +338,16 @@
                     </div>
 
                     <div>
-                        @if (invoiceList.Any())
-                        {
-                            <button type="submit" class="btn btn-success px-4 fw-bold shadow-sm" id="btnSubmitAllocation">
-                                <i class="fa-solid fa-check me-1"></i> Commit Payment Allocation
-                            </button>
-                        }
-                        else
-                        {
-                            <button type="submit" class="btn btn-primary px-4 fw-bold shadow-sm" id="btnSubmitAdvance">
-                                <i class="fa-solid fa-receipt me-1"></i> Record Voucher &amp; Advance
-                            </button>
-                        }
+                        <button type="submit" class="btn @(invoiceList.Any() ? "btn-success" : "btn-primary") px-4 fw-bold shadow-sm" id="btnSubmitPayment">
+                            @if (invoiceList.Any())
+                            {
+                                <i class="fa-solid fa-check me-1"></i> <span>Commit Payment Allocation</span>
+                            }
+                            else
+                            {
+                                <i class="fa-solid fa-hand-holding-dollar me-1"></i> <span>Record Customer Advance &amp; Voucher</span>
+                            }
+                        </button>
                     </div>
                 </div>
             </div>
@@ -354,7 +389,15 @@
                             var doc = hasDoc ? receiptDocs[r.ReceiptDocId!.Value] : null;
 
                             <tr>
-                                <td class="ps-3 fw-bold text-primary">@r.ReceiptNumber</td>
+                                <td class="ps-3 fw-bold text-primary">
+                                    <div>@r.ReceiptNumber</div>
+                                    @if (r.IsAdvance || (r.UnallocatedAmount > 0 && r.UnallocatedAmount == r.AmountReceived))
+                                    {
+                                        <span class="badge rounded-pill bg-info-subtle text-info border border-info-subtle mt-1" style="font-size: 10px; font-weight: 600;">
+                                            <i class="fa-solid fa-coins me-1"></i>Advance Receipt
+                                        </span>
+                                    }
+                                </td>
                                 <td>@r.ReceiptDate.ToString("dd MMM yyyy")</td>
                                 <td>@(r.Client?.ClientName ?? "N/A")</td>
                                 <td>
@@ -495,7 +538,119 @@
             dropZone.scrollIntoView({ behavior: 'smooth', block: 'center' });
             return false;
         }
+
+        const isAdvance = document.getElementById('chkIsAdvance').checked;
+        const invoiceRows = document.querySelectorAll('.invoice-row');
+        const hasInvoices = invoiceRows.length > 0;
+
+        // If client has NO open invoices and isAdvance is NOT checked:
+        if (!hasInvoices && !isAdvance) {
+            e.preventDefault();
+            const shouldCheck = confirm('There are no outstanding invoices for this client.\n\nIs this amount an Advance? Click OK to mark it as an Advance and proceed, or Cancel to review.');
+            if (shouldCheck) {
+                document.getElementById('chkIsAdvance').checked = true;
+                onAdvanceCheckboxToggle(true);
+                // Resubmit after setting advance
+                setTimeout(() => document.getElementById('paymentAllocationForm').submit(), 100);
+            } else {
+                document.getElementById('chkIsAdvance').focus();
+            }
+            return false;
+        }
+
+        // If there ARE open invoices, but user allocated 0.00 and did NOT check advance:
+        if (hasInvoices && !isAdvance) {
+            let totalAlloc = 0;
+            document.querySelectorAll('.invoice-alloc-input').forEach(i => totalAlloc += (parseFloat(i.value) || 0));
+            if (totalAlloc <= 0) {
+                e.preventDefault();
+                const confirmAdvance = confirm('You have not allocated any amount to the outstanding invoices.\n\nDid you intend to record this entire amount as an Advance? Click OK to mark as Advance and continue, or Cancel to allocate against invoices.');
+                if (confirmAdvance) {
+                    document.getElementById('chkIsAdvance').checked = true;
+                    onAdvanceCheckboxToggle(true);
+                    setTimeout(() => document.getElementById('paymentAllocationForm').submit(), 100);
+                }
+                return false;
+            }
+        }
     });
+
+    // Advance Mode Checkbox Toggle Handler
+    function onAdvanceCheckboxToggle(isChecked) {
+        const advanceCard = document.getElementById('advanceCardBox');
+        const advanceBadge = document.getElementById('advanceBadge');
+        const advanceHelp = document.getElementById('advanceHelpText');
+        const advanceBanner = document.getElementById('advanceModeBanner');
+        const btnSubmit = document.getElementById('btnSubmitPayment');
+        const autoAllocBtn = document.getElementById('btnAutoAllocate');
+        const hasInvoices = document.querySelectorAll('.invoice-row').length > 0;
+
+        if (isChecked) {
+            if (advanceCard) {
+                advanceCard.style.backgroundColor = '#EFF6FF';
+                advanceCard.style.borderColor = '#93C5FD';
+            }
+            if (advanceBadge) {
+                advanceBadge.className = 'badge rounded-pill bg-primary text-white px-2.5 py-1';
+                advanceBadge.innerHTML = '<i class="fa-solid fa-check me-1"></i>Advance Mode Active';
+            }
+            if (advanceHelp) {
+                advanceHelp.innerHTML = '<i class="fa-solid fa-circle-check text-success me-1"></i> <strong>Marked as Customer Advance:</strong> Amount will be credited to advance ledger without invoice deductions.';
+            }
+            if (advanceBanner) {
+                advanceBanner.classList.remove('d-none');
+            }
+            if (autoAllocBtn) {
+                autoAllocBtn.classList.add('disabled');
+            }
+
+            // Disable all invoice inputs and clear values
+            document.querySelectorAll('.invoice-alloc-input').forEach(input => {
+                input.value = '0.00';
+                input.disabled = true;
+            });
+
+            if (btnSubmit) {
+                btnSubmit.className = 'btn btn-primary px-4 fw-bold shadow-sm';
+                btnSubmit.innerHTML = '<i class="fa-solid fa-hand-holding-dollar me-1"></i> Record Customer Advance &amp; Voucher';
+            }
+        } else {
+            if (advanceCard) {
+                advanceCard.style.backgroundColor = '#F8FAFC';
+                advanceCard.style.borderColor = '#E2E8F0';
+            }
+            if (advanceBadge) {
+                advanceBadge.className = 'badge rounded-pill bg-secondary-subtle text-secondary border px-2.5 py-1';
+                advanceBadge.innerHTML = 'Regular Payment';
+            }
+            if (advanceHelp) {
+                advanceHelp.innerHTML = '<i class="fa-solid fa-circle-info text-primary me-1"></i> Check this box if this payment is an advance from the client; uncheck to allocate against open invoices.';
+            }
+            if (advanceBanner) {
+                advanceBanner.classList.add('d-none');
+            }
+            if (autoAllocBtn) {
+                autoAllocBtn.classList.remove('disabled');
+            }
+
+            // Re-enable invoice inputs
+            document.querySelectorAll('.invoice-alloc-input').forEach(input => {
+                input.disabled = false;
+            });
+
+            if (btnSubmit) {
+                if (hasInvoices) {
+                    btnSubmit.className = 'btn btn-success px-4 fw-bold shadow-sm';
+                    btnSubmit.innerHTML = '<i class="fa-solid fa-check me-1"></i> Commit Payment Allocation';
+                } else {
+                    btnSubmit.className = 'btn btn-outline-secondary px-4 fw-bold shadow-sm';
+                    btnSubmit.innerHTML = '<i class="fa-solid fa-circle-exclamation me-1"></i> Advance Check Required';
+                }
+            }
+        }
+
+        updateAllocationSummary();
+    }
 
     // Real-time Calculation of Allocations
     function onAmountReceivedChange() {
@@ -504,20 +659,36 @@
 
     function updateAllocationSummary() {
         const amountReceived = parseFloat(document.getElementById('txtAmountReceived').value) || 0;
+        const isAdvance = document.getElementById('chkIsAdvance') ? document.getElementById('chkIsAdvance').checked : false;
         let totalAlloc = 0;
 
-        document.querySelectorAll('.invoice-alloc-input').forEach(input => {
-            const val = parseFloat(input.value) || 0;
-            totalAlloc += val;
-        });
+        if (isAdvance) {
+            totalAlloc = 0;
+        } else {
+            document.querySelectorAll('.invoice-alloc-input').forEach(input => {
+                const val = parseFloat(input.value) || 0;
+                totalAlloc += val;
+            });
+        }
 
         const unallocated = Math.max(0, amountReceived - totalAlloc);
         document.getElementById('lblTotalAllocated').innerHTML = '&#8377; ' + totalAlloc.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        document.getElementById('lblUnallocated').innerHTML = '&#8377; ' + unallocated.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        document.getElementById('lblUnallocated').innerHTML = '&#8377; ' + (isAdvance ? amountReceived : unallocated).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        const bannerAmt = document.getElementById('advanceBannerAmount');
+        if (bannerAmt) {
+            bannerAmt.innerHTML = '&#8377; ' + (isAdvance ? amountReceived : unallocated).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
     }
 
     // Auto-allocate helper: sequentially fills unpaid invoices up to amount received
     function autoAllocate() {
+        const isAdvance = document.getElementById('chkIsAdvance') && document.getElementById('chkIsAdvance').checked;
+        if (isAdvance) {
+            alert('Cannot auto-allocate while "Is this amount an Advance?" is checked. Uncheck the box first if you wish to allocate to invoices.');
+            return;
+        }
+
         let remaining = parseFloat(document.getElementById('txtAmountReceived').value) || 0;
         if (remaining <= 0) {
             alert('Please enter the Amount Received before auto-allocating.');
@@ -548,5 +719,19 @@
             window.location.href = '@Url.Action("AllocatePayment", "Sales")?clientId=' + clientId;
         }
     }
+
+    // On page load: If client has 0 invoices, guide user regarding Advance mode
+    document.addEventListener('DOMContentLoaded', function () {
+        const hasInvoices = document.querySelectorAll('.invoice-row').length > 0;
+        const clientSelect = document.getElementById('clientSelect');
+        if (!hasInvoices && clientSelect && clientSelect.value) {
+            // Suggest or pre-check advance when client has no invoices
+            const chk = document.getElementById('chkIsAdvance');
+            if (chk) {
+                chk.checked = true;
+                onAdvanceCheckboxToggle(true);
+            }
+        }
+    });
 </script>
 

@@ -28,6 +28,12 @@ public class PurchaseOrder : ITenantEntity
     public decimal TotalPoValue { get; set; }
     public string ApprovalStatus { get; set; } = "APPROVED";
     public long? ApprovedBy { get; set; }
+    public DateTime? ApprovedAt { get; set; }
+    public long? CreatedBy { get; set; }
+    public string? CreatedByName { get; set; }
+    public string? CreatedByRole { get; set; }
+    public string? RejectionReason { get; set; }
+    public DateTime? MarkedForPaymentAt { get; set; }
 
     public Company Company { get; set; } = null!;
     public Branch Branch { get; set; } = null!;
