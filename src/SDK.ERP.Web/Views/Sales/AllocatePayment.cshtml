@@ -174,10 +174,33 @@
                         </select>
                     </div>
 
-                    <!-- Payment Mode & Reference -->
+                    <!-- Payment Mode Dropdown -->
                     <div class="mb-3">
-                        <label class="form-label fw-semibold" style="font-size: 12.5px;">Payment Mode &amp; Reference (UTR)</label>
-                        <input type="text" name="paymentRef" class="form-control" placeholder="e.g. NEFT / UTR-00998822" />
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <label class="form-label fw-semibold mb-0" style="font-size: 12.5px;">
+                                Payment Mode <span class="text-danger">*</span>
+                            </label>
+                            <span class="badge rounded-pill bg-primary-subtle text-primary border border-primary-subtle px-2 py-0.5" id="badgePaymentMode" style="font-size: 10px; font-weight: 600;">
+                                <i class="fa-solid fa-building-columns me-1"></i>NEFT / RTGS
+                            </span>
+                        </div>
+                        <select name="paymentMode" id="ddlPaymentMode" class="form-select fw-semibold" style="font-size: 13px;" required onchange="onPaymentModeChanged(this.value)">
+                            <option value="NEFT/RTGS" selected>NEFT/RTGS</option>
+                            <option value="Cash">Cash</option>
+                            <option value="Cheq">Cheque (Cheq)</option>
+                            <option value="UPI">UPI</option>
+                        </select>
+                    </div>
+
+                    <!-- Payment Reference / Instrument No. -->
+                    <div class="mb-3" id="paymentRefGroup">
+                        <label class="form-label fw-semibold" id="lblPaymentRef" style="font-size: 12.5px;">
+                            UTR / Transaction Reference No. <span class="text-danger" id="refRequiredStar">*</span>
+                        </label>
+                        <input type="text" name="paymentRef" id="txtPaymentRef" class="form-control" placeholder="e.g. UTR-00998822 / CMS Ref" required />
+                        <small class="text-muted d-block mt-1" id="hintPaymentRef" style="font-size: 11px;">
+                            Enter bank UTR or remittance transaction number from payment advice.
+                        </small>
                     </div>
 
                     <!-- MANDATORY Bank Receipt / Voucher Upload -->
@@ -720,8 +743,65 @@
         }
     }
 
+    function onPaymentModeChanged(mode) {
+        const lbl = document.getElementById('lblPaymentRef');
+        const input = document.getElementById('txtPaymentRef');
+        const hint = document.getElementById('hintPaymentRef');
+        const badge = document.getElementById('badgePaymentMode');
+        const reqStar = document.getElementById('refRequiredStar');
+
+        if (!input || !lbl) return;
+
+        if (mode === 'Cash') {
+            lbl.innerText = 'Receipt / Counter Slip No.';
+            input.placeholder = 'e.g. Cash Receipt # (Optional)';
+            input.required = false;
+            if (reqStar) reqStar.style.display = 'none';
+            if (hint) hint.innerText = 'Enter cash memo, voucher, or counter receipt number (optional).';
+            if (badge) {
+                badge.className = 'badge rounded-pill bg-success-subtle text-success border border-success-subtle px-2 py-0.5';
+                badge.innerHTML = '<i class="fa-solid fa-money-bill-wave me-1"></i>Cash In Hand';
+            }
+        } else if (mode === 'Cheq' || mode === 'Cheque') {
+            lbl.innerText = 'Cheque / DD Number';
+            input.placeholder = 'e.g. Cheque No. 402918';
+            input.required = true;
+            if (reqStar) reqStar.style.display = 'inline';
+            if (hint) hint.innerText = 'Enter 6-digit cheque number or instrument reference.';
+            if (badge) {
+                badge.className = 'badge rounded-pill bg-info-subtle text-info border border-info-subtle px-2 py-0.5';
+                badge.innerHTML = '<i class="fa-solid fa-money-check me-1"></i>Cheque / DD';
+            }
+        } else if (mode === 'UPI') {
+            lbl.innerText = 'UPI Ref / Transaction ID';
+            input.placeholder = 'e.g. UPI Ref / GPay / PhonePe (12 digits)';
+            input.required = true;
+            if (reqStar) reqStar.style.display = 'inline';
+            if (hint) hint.innerText = 'Enter 12-digit UPI reference ID or transaction hash.';
+            if (badge) {
+                badge.className = 'badge rounded-pill bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2 py-0.5';
+                badge.innerHTML = '<i class="fa-solid fa-mobile-screen-button me-1"></i>UPI Transfer';
+            }
+        } else { // NEFT/RTGS
+            lbl.innerText = 'UTR / Transaction Reference No.';
+            input.placeholder = 'e.g. UTR-00998822 / CMS Ref';
+            input.required = true;
+            if (reqStar) reqStar.style.display = 'inline';
+            if (hint) hint.innerText = 'Enter bank UTR or remittance transaction number from payment advice.';
+            if (badge) {
+                badge.className = 'badge rounded-pill bg-primary-subtle text-primary border border-primary-subtle px-2 py-0.5';
+                badge.innerHTML = '<i class="fa-solid fa-building-columns me-1"></i>NEFT / RTGS';
+            }
+        }
+    }
+
     // On page load: If client has 0 invoices, guide user regarding Advance mode
     document.addEventListener('DOMContentLoaded', function () {
+        const ddlMode = document.getElementById('ddlPaymentMode');
+        if (ddlMode) {
+            onPaymentModeChanged(ddlMode.value);
+        }
+
         const hasInvoices = document.querySelectorAll('.invoice-row').length > 0;
         const clientSelect = document.getElementById('clientSelect');
         if (!hasInvoices && clientSelect && clientSelect.value) {

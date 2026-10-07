@@ -1912,6 +1912,7 @@ public class SalesController : Controller
         long? clientId, 
         decimal amountReceived, 
         long? bankAccountId, 
+        string? paymentMode,
         string? paymentRef, 
         bool isAdvance,
         IFormFile? receiptVoucher, 
@@ -2005,6 +2006,10 @@ public class SalesController : Controller
         var count = await _db.CustomerReceipts.CountAsync() + 1;
         var rcptNo = $"RCPT-ALC-{DateTime.Today:yyMM}-{count:D4}";
 
+        var selectedMode = !string.IsNullOrWhiteSpace(paymentMode) 
+            ? paymentMode.Trim() 
+            : (!string.IsNullOrWhiteSpace(form["paymentMode"]) ? form["paymentMode"].ToString().Trim() : "NEFT/RTGS");
+
         var receipt = new CustomerReceipt
         {
             CompanyId = company?.Id ?? 1,
@@ -2014,12 +2019,12 @@ public class SalesController : Controller
             ReceiptDate = DateTime.Today,
             AmountReceived = amountReceived,
             UnallocatedAmount = amountReceived,
-            PaymentMode = string.IsNullOrWhiteSpace(paymentRef) ? "Bank Transfer / NEFT" : paymentRef,
+            PaymentMode = selectedMode,
             TransactionRefNo = paymentRef,
             Status = "POSTED",
             IsAdvance = advanceFlag,
             ExpenseHead = advanceFlag ? "Customer Advance" : "Customer Invoicing Allocation",
-            Remarks = (advanceFlag ? "[Customer Advance] " : "") + $"Bank Voucher Attached: {voucherFile.FileName} [Bank: {resolvedBank}]" + (!string.IsNullOrWhiteSpace(paymentRef) ? $" - Ref: {paymentRef}" : ""),
+            Remarks = (advanceFlag ? "[Customer Advance] " : "") + $"Mode: {selectedMode}" + (!string.IsNullOrWhiteSpace(paymentRef) ? $" - Ref: {paymentRef}" : "") + $" [Bank: {resolvedBank}] Voucher: {voucherFile.FileName}",
             ReceiptDocId = docId
         };
         _db.CustomerReceipts.Add(receipt);
@@ -2093,9 +2098,13 @@ public class SalesController : Controller
             await _db.SaveChangesAsync();
         }
 
+        var modeAndRef = !string.IsNullOrWhiteSpace(paymentRef) 
+            ? $"{selectedMode} (Ref: {paymentRef})" 
+            : selectedMode;
+
         var jvNarration = advanceFlag 
-            ? $"Customer Advance Payment: {paymentRef ?? "NEFT/Cheque"} (Advance Amount: &#8377; {amountReceived:N2}) [Bank: {resolvedBank}] - Voucher: {voucherFile.FileName}"
-            : $"Customer Payment: {paymentRef ?? "NEFT/Cheque"} (Allocated: &#8377; {totalAllocated:N2}, Advance: &#8377; {receipt.UnallocatedAmount:N2}) [Bank: {resolvedBank}] - Voucher: {voucherFile.FileName}";
+            ? $"Customer Advance Payment via {modeAndRef} (Advance Amount: &#8377; {amountReceived:N2}) [Bank: {resolvedBank}] - Voucher: {voucherFile.FileName}"
+            : $"Customer Payment via {modeAndRef} (Allocated: &#8377; {totalAllocated:N2}, Advance: &#8377; {receipt.UnallocatedAmount:N2}) [Bank: {resolvedBank}] - Voucher: {voucherFile.FileName}";
 
         var jv = new JournalEntry
         {
