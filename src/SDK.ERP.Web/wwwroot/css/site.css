@@ -444,6 +444,149 @@ body {
     justify-content: center;
 }
 
+/* ==========================================================================
+   ENTERPRISE NOTIFICATION CENTER & APPROVAL FLYOUT
+   ========================================================================== */
+.notification-dropdown-menu {
+    width: 390px;
+    max-width: 94vw;
+    border-radius: 14px;
+    box-shadow: 0 20px 45px -10px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(15, 23, 42, 0.08);
+    overflow: hidden;
+    margin-top: 10px;
+    z-index: 1060;
+    animation: notifSlideDown 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes notifSlideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-8px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.notif-badge-active {
+    box-shadow: 0 0 0 2px #FFFFFF, 0 2px 4px rgba(239, 68, 68, 0.4);
+    animation: notifPulse 2.5s infinite;
+}
+
+@keyframes notifPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.15); }
+}
+
+.notification-header-icon {
+    width: 32px;
+    height: 32px;
+    background: #EFF6FF;
+    color: #0284C7;
+    font-size: 13px;
+}
+
+.notification-tabs {
+    background: #F8FAFC;
+}
+
+.notif-tab {
+    background: transparent;
+    border: none;
+    border-radius: 20px;
+    padding: 4px 10px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: #64748B;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+}
+
+.notif-tab:hover {
+    color: #0F172A;
+    background: #E2E8F0;
+}
+
+.notif-tab.active {
+    background: #0284C7;
+    color: #FFFFFF;
+}
+
+.notif-pill-count {
+    background: rgba(0, 0, 0, 0.08);
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 10px;
+}
+
+.notif-tab.active .notif-pill-count {
+    background: rgba(255, 255, 255, 0.25);
+    color: #FFFFFF;
+}
+
+.notification-list-body {
+    max-height: 390px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.notification-list-body::-webkit-scrollbar {
+    width: 5px;
+}
+.notification-list-body::-webkit-scrollbar-thumb {
+    background: #CBD5E1;
+    border-radius: 4px;
+}
+
+.notif-card-item {
+    transition: background 0.15s ease, transform 0.2s ease;
+}
+
+.notif-card-item:hover {
+    background: #F8FAFC !important;
+}
+
+.notif-icon-circle {
+    width: 34px;
+    height: 34px;
+    font-size: 13px;
+}
+
+.bg-purple-subtle {
+    background-color: #F3E8FF !important;
+}
+
+.text-purple {
+    color: #7C3AED !important;
+}
+
+.border-purple-subtle {
+    border-color: #DDD6FE !important;
+}
+
+.notif-dismiss-btn {
+    transition: opacity 0.2s ease;
+}
+
+.notif-card-item:hover .notif-dismiss-btn {
+    opacity: 1 !important;
+}
+
+.notif-empty-state {
+    background: #FFFFFF;
+}
+
+.notif-empty-icon {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
 .user-profile-header {
     display: flex;
     align-items: center;

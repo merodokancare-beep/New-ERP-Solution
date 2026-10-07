@@ -83,7 +83,9 @@ public class HomeController : Controller
                 vm.TotalContractValue = await projectQuery.SumAsync(x => (decimal?)x.ContractValue, ct) ?? 0m;
 
                 vm.LowStockItemsCount = await _db.Items.CountAsync(x => x.CurrentStockQty <= x.ReorderLevelQty && x.ReorderLevelQty > 0, ct);
-                vm.PendingApprovalsCount = await _db.ApprovalRequests.CountAsync(x => x.Status == "Pending", ct);
+                var pendingPoApprovals = await _db.PurchaseOrders.CountAsync(x => x.ApprovalStatus == "PENDING" || x.ApprovalStatus == "PENDING_APPROVAL", ct);
+                var pendingGeneralApprovals = await _db.ApprovalRequests.CountAsync(x => x.Status == "Pending" || x.Status == "PENDING", ct);
+                vm.PendingApprovalsCount = pendingPoApprovals + pendingGeneralApprovals;
             }
         }
         catch (Exception ex)

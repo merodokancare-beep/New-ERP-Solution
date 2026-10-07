@@ -259,10 +259,67 @@
                 </div>
 
                 <div class="topbar-right">
-                    <button class="icon-btn" id="notificationsBtn" title="Notifications">
-                        <i class="fa-regular fa-bell"></i>
-                        <span class="badge-count">5</span>
-                    </button>
+                    <!-- Interactive Notification Center Dropdown -->
+                    <div class="dropdown" id="notificationDropdownContainer">
+                        <button class="icon-btn position-relative" id="notificationsBtn" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" title="Notifications &amp; Pending Approvals" style="outline: none;">
+                            <i class="fa-regular fa-bell" id="bellIcon"></i>
+                            <span class="badge-count d-none" id="notificationBadge">0</span>
+                        </button>
+
+                        <div class="dropdown-menu dropdown-menu-end shadow-xl border-0 p-0 notification-dropdown-menu" id="notificationMenu" aria-labelledby="notificationsBtn">
+                            <!-- Header -->
+                            <div class="notification-header d-flex align-items-center justify-content-between p-3 border-bottom bg-white">
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="notification-header-icon rounded-circle d-flex align-items-center justify-content-center">
+                                        <i class="fa-solid fa-bell text-primary"></i>
+                                    </div>
+                                    <div>
+                                        <h6 class="mb-0 fw-bold text-dark" style="font-size: 13.5px;">Notifications &amp; Approvals</h6>
+                                        <small class="text-muted" id="notificationHeaderSub" style="font-size: 11px;">Checking pending tasks...</small>
+                                    </div>
+                                </div>
+                                <div class="d-flex align-items-center gap-1.5">
+                                    <button type="button" class="btn btn-sm btn-light border p-1 px-2 text-secondary rounded-pill" id="btnRefreshNotifications" title="Refresh Notifications" onclick="loadNotifications(true)">
+                                        <i class="fa-solid fa-rotate" id="refreshIcon" style="font-size: 11px;"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-link text-decoration-none p-0 fw-semibold" id="btnMarkAllRead" style="font-size: 11px; color: #7C3AED;" onclick="markAllNotificationsAsRead()">
+                                        Mark all read
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Filter Tabs -->
+                            <div class="notification-tabs px-3 py-2 bg-light d-flex gap-1 border-bottom">
+                                <button type="button" class="notif-tab active" data-tab="ALL" onclick="filterNotificationTab('ALL')">
+                                    All <span class="notif-pill-count ms-1" id="tabCountAll">0</span>
+                                </button>
+                                <button type="button" class="notif-tab" data-tab="APPROVAL" onclick="filterNotificationTab('APPROVAL')">
+                                    Approvals <span class="notif-pill-count ms-1" id="tabCountApprovals">0</span>
+                                </button>
+                                <button type="button" class="notif-tab" data-tab="ALERT" onclick="filterNotificationTab('ALERT')">
+                                    Alerts <span class="notif-pill-count ms-1" id="tabCountAlerts">0</span>
+                                </button>
+                            </div>
+
+                            <!-- Notification Items Container -->
+                            <div class="notification-list-body" id="notificationListContainer">
+                                <div class="p-4 text-center text-muted" id="notifLoading">
+                                    <div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
+                                    <div style="font-size: 12px;">Checking for approvals and alerts...</div>
+                                </div>
+                            </div>
+
+                            <!-- Footer -->
+                            <div class="notification-footer p-2.5 px-3 bg-light border-top d-flex align-items-center justify-content-between">
+                                <a asp-controller="Procurement" asp-action="Index" class="text-decoration-none fw-semibold d-flex align-items-center gap-1" style="font-size: 11.5px; color: #7C3AED;">
+                                    <i class="fa-solid fa-stamp"></i> Procurement Approvals &rarr;
+                                </a>
+                                <a asp-controller="Sales" asp-action="AllocatePayment" class="text-decoration-none fw-semibold text-secondary" style="font-size: 11.5px;">
+                                    Receipt Allocation &rarr;
+                                </a>
+                            </div>
+                        </div>
+                    </div>
                     <button class="icon-btn" id="themeToggleBtn" title="Toggle Dark/Light Mode">
                         <i class="fa-solid fa-moon"></i>
                     </button>
@@ -372,9 +429,11 @@
         </div>
     </div>
 
+    <form id="notifCsrfForm" class="d-none">@Html.AntiForgeryToken()</form>
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
+    <script src="~/js/notifications.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>
