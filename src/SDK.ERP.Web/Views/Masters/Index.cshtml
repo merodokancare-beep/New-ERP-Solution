@@ -65,9 +65,9 @@
         </button>
     </li>
     <li class="nav-item" role="presentation">
-        <a class="nav-link fw-semibold" asp-controller="Masters" asp-action="ExpenseTypes">
+        <button class="nav-link fw-semibold" id="expensetypes-tab" data-bs-toggle="pill" data-bs-target="#expensetypes" type="button" role="tab">
             <i class="fa-solid fa-receipt me-2"></i>Expense Types (@expenseTypes.Count)
-        </a>
+        </button>
     </li>
 </ul>
 
@@ -579,6 +579,143 @@
             </div>
         </div>
     </div>
+
+    <!-- 7. Expense Types Tab -->
+    <div class="tab-pane fade" id="expensetypes" role="tabpanel">
+        <div class="erp-card">
+            <div class="erp-card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div>
+                    <h5 class="erp-card-title mb-0"><i class="fa-solid fa-receipt me-2"></i>Expense Types Master Directory</h5>
+                    <small class="text-muted" style="font-size: 11.5px;">Manage accounting expense heads, direct payment categories, and project associations</small>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <div class="input-group input-group-sm" style="width: 240px;">
+                        <span class="input-group-text bg-light border-end-0"><i class="fa-solid fa-magnifying-glass text-muted" style="font-size: 11px;"></i></span>
+                        <input type="text" id="expenseTypeSearchInput" class="form-control border-start-0" placeholder="Filter expense types..." style="font-size: 12.5px;" />
+                    </div>
+                    <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#createExpenseTypeModal">
+                        <i class="fa-solid fa-plus me-1"></i> Add Expense Type
+                    </button>
+                </div>
+            </div>
+            <div class="erp-card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0" id="expenseTypesTable">
+                        <thead class="table-light">
+                            <tr style="font-size: 12px; text-transform: uppercase;">
+                                <th class="ps-4" style="width: 26%;">Expense Type Name</th>
+                                <th style="width: 24%;">Classification / Scope</th>
+                                <th style="width: 25%;">Description</th>
+                                <th class="text-center" style="width: 13%;">Opening Amount</th>
+                                <th class="text-center" style="width: 12%;">Status</th>
+                                <th class="text-end pe-4" style="width: 140px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody style="font-size: 13.5px;">
+                            @if (expenseTypes.Any())
+                            {
+                                @foreach (var exp in expenseTypes)
+                                {
+                                    <tr class="expense-type-row" data-name="@exp.Name.ToLower()" data-desc="@(exp.Description?.ToLower() ?? "")">
+                                        <td class="ps-4">
+                                            <div class="fw-bold text-dark">@exp.Name</div>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex flex-column gap-1" style="font-size: 12px;">
+                                                <div>
+                                                    <span class="text-muted me-1">Project Related:</span>
+                                                    @if (exp.IsProjectRelated)
+                                                    {
+                                                        <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-0">Yes</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="badge bg-light text-muted border px-2 py-0">No</span>
+                                                    }
+                                                </div>
+                                                <div>
+                                                    <span class="text-muted me-1">Direct Receipts:</span>
+                                                    @if (exp.ReceiveDirectPayments)
+                                                    {
+                                                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-0">Yes</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="badge bg-light text-muted border px-2 py-0">No</span>
+                                                    }
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="text-muted" style="font-size: 12.5px;">
+                                            @(string.IsNullOrWhiteSpace(exp.Description) ? "—" : exp.Description)
+                                        </td>
+                                        <td class="text-center">
+                                            @if (exp.OpeningAmount.HasValue && exp.OpeningAmount.Value > 0)
+                                            {
+                                                <span class="fw-bold text-dark">&#8377; @exp.OpeningAmount.Value.ToString("N2")</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-light text-muted border">N/A</span>
+                                            }
+                                        </td>
+                                        <td class="text-center">
+                                            @if (exp.IsActive)
+                                            {
+                                                <span class="badge bg-success-subtle text-success">ACTIVE</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-danger-subtle text-danger">INACTIVE</span>
+                                            }
+                                        </td>
+                                        <td class="text-end pe-4">
+                                            <div class="d-inline-flex gap-1">
+                                                <button type="button" class="btn btn-sm btn-outline-primary px-2 py-1 edit-exp-btn" title="Edit Expense Type"
+                                                        data-id="@exp.Id"
+                                                        data-name="@exp.Name"
+                                                        data-desc="@(exp.Description ?? "")"
+                                                        data-isproject="@exp.IsProjectRelated.ToString().ToLower()"
+                                                        data-isdirect="@exp.ReceiveDirectPayments.ToString().ToLower()"
+                                                        data-opening="@(exp.OpeningAmount?.ToString() ?? "")">
+                                                    <i class="fa-solid fa-pen-to-square"></i>
+                                                </button>
+                                                <form method="post" asp-controller="Masters" asp-action="ToggleExpenseType" style="display:inline;">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="id" value="@exp.Id" />
+                                                    <button type="submit" class="btn btn-sm @(exp.IsActive ? "btn-outline-warning" : "btn-outline-success") px-2 py-1" title="@(exp.IsActive ? "Deactivate" : "Activate")">
+                                                        <i class="fa-solid @(exp.IsActive ? "fa-ban" : "fa-check")"></i>
+                                                    </button>
+                                                </form>
+                                                <button type="button" class="btn btn-sm btn-outline-danger px-2 py-1 delete-exp-btn" title="Delete Expense Type"
+                                                        data-id="@exp.Id"
+                                                        data-name="@exp.Name">
+                                                    <i class="fa-solid fa-trash-can"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="6" class="text-center py-5">
+                                        <i class="fa-solid fa-receipt mb-3" style="font-size: 40px; color: #CBD5E1;"></i>
+                                        <h6 class="fw-bold text-secondary mb-1">No Expense Types Configured</h6>
+                                        <p class="text-muted mb-3" style="font-size: 12.5px;">Configure expense and direct payment heads for your company.</p>
+                                        <button class="btn btn-primary btn-sm px-3" data-bs-toggle="modal" data-bs-target="#createExpenseTypeModal">
+                                            <i class="fa-solid fa-plus me-1"></i> Add First Expense Type
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- ========================================================================= -->
@@ -619,6 +756,146 @@
                     </button>
                 </div>
             </form>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- CREATE EXPENSE TYPE MODAL -->
+<!-- ========================================================================= -->
+<div class="modal fade" id="createExpenseTypeModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <form method="post" asp-controller="Masters" asp-action="CreateExpenseType">
+                @Html.AntiForgeryToken()
+                <div class="modal-header bg-light">
+                    <h5 class="modal-title fw-bold text-primary" style="font-size: 16px;">
+                        <i class="fa-solid fa-receipt me-2"></i>Add Expense Type Master
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Expense Type Name <span class="text-danger">*</span></label>
+                            <input type="text" name="name" class="form-control" placeholder="e.g. OFFICE EXPENSES, SITE MOBILIZATION" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Project Related?</label>
+                            <div class="form-check form-switch mt-1">
+                                <input class="form-check-input" type="checkbox" name="isProjectRelated" value="true" id="createIsProjectRelated" style="cursor: pointer; width: 40px; height: 20px;">
+                                <label class="form-check-label ms-2" for="createIsProjectRelated" style="font-size: 13px;">Yes</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Receive Direct Payments?</label>
+                            <div class="form-check form-switch mt-1">
+                                <input class="form-check-input" type="checkbox" name="receiveDirectPayments" value="true" id="createReceiveDirectPayments" style="cursor: pointer; width: 40px; height: 20px;">
+                                <label class="form-check-label ms-2" for="createReceiveDirectPayments" style="font-size: 13px;">Yes</label>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Opening Amount (Optional)</label>
+                            <div class="input-group">
+                                <span class="input-group-text">&#8377;</span>
+                                <input type="number" step="0.01" name="openingAmount" class="form-control" placeholder="0.00" />
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Description / Purpose</label>
+                            <textarea name="description" class="form-control" rows="2" placeholder="Brief scope or accounting purpose of this expense type..."></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm px-4 fw-bold">
+                        <i class="fa-solid fa-check me-1"></i> Save Expense Type
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- EDIT EXPENSE TYPE MODAL -->
+<!-- ========================================================================= -->
+<div class="modal fade" id="editExpenseTypeModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <form method="post" asp-controller="Masters" asp-action="UpdateExpenseType">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" id="editExpenseTypeId" />
+                <div class="modal-header bg-light">
+                    <h5 class="modal-title fw-bold text-primary" style="font-size: 16px;">
+                        <i class="fa-solid fa-pen-to-square me-2"></i>Edit Expense Type
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Expense Type Name <span class="text-danger">*</span></label>
+                            <input type="text" name="name" id="editExpenseTypeName" class="form-control" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Project Related?</label>
+                            <div class="form-check form-switch mt-1">
+                                <input class="form-check-input" type="checkbox" name="isProjectRelated" value="true" id="editIsProjectRelated" style="cursor: pointer; width: 40px; height: 20px;">
+                                <label class="form-check-label ms-2" for="editIsProjectRelated" style="font-size: 13px;">Yes</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Receive Direct Payments?</label>
+                            <div class="form-check form-switch mt-1">
+                                <input class="form-check-input" type="checkbox" name="receiveDirectPayments" value="true" id="editReceiveDirectPayments" style="cursor: pointer; width: 40px; height: 20px;">
+                                <label class="form-check-label ms-2" for="editReceiveDirectPayments" style="font-size: 13px;">Yes</label>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Opening Amount (Optional)</label>
+                            <div class="input-group">
+                                <span class="input-group-text">&#8377;</span>
+                                <input type="number" step="0.01" name="openingAmount" id="editOpeningAmount" class="form-control" placeholder="0.00" />
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Description / Purpose</label>
+                            <textarea name="description" id="editDescription" class="form-control" rows="2"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm px-4 fw-bold">
+                        <i class="fa-solid fa-check me-1"></i> Update Expense Type
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- DELETE EXPENSE TYPE MODAL -->
+<!-- ========================================================================= -->
+<div class="modal fade" id="deleteExpenseTypeModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-body text-center p-4">
+                <i class="fa-solid fa-triangle-exclamation text-danger mb-3" style="font-size: 40px;"></i>
+                <h6 class="fw-bold mb-2">Delete Expense Type?</h6>
+                <p class="text-muted small mb-4" id="deleteExpenseTypeMessage"></p>
+                <form method="post" asp-controller="Masters" asp-action="DeleteExpenseType">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" id="deleteExpenseTypeId" />
+                    <div class="d-flex justify-content-center gap-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-danger btn-sm px-3 fw-bold">Confirm Delete</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 </div>
@@ -1010,9 +1287,55 @@
             '#vendors': { modal: '#createVendorModal', label: 'Add Vendor' },
             '#items': { modal: '#createItemModal', label: 'Add Item' },
             '#projecttypes': { modal: '#createProjectTypeModal', label: 'Add Project Type' },
+            '#expensetypes': { modal: '#createExpenseTypeModal', label: 'Add Expense Type' },
             '#tax': { modal: '', label: 'Add Record', hide: true },
             '#coa': { modal: '', label: 'Add Record', hide: true }
         };
+
+        // Expense Types client-side search filter
+        const expSearchInput = document.getElementById('expenseTypeSearchInput');
+        if (expSearchInput) {
+            expSearchInput.addEventListener('input', function () {
+                const term = this.value.toLowerCase().trim();
+                const rows = document.querySelectorAll('#expenseTypesTable tbody tr.expense-type-row');
+                rows.forEach(row => {
+                    const name = row.getAttribute('data-name') || '';
+                    const desc = row.getAttribute('data-desc') || '';
+                    if (!term || name.includes(term) || desc.includes(term)) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+            });
+        }
+
+        // Expense Types edit & delete modal bindings
+        document.querySelectorAll('.edit-exp-btn').forEach(btn => {
+            btn.addEventListener('click', function () {
+                document.getElementById('editExpenseTypeId').value = this.getAttribute('data-id');
+                document.getElementById('editExpenseTypeName').value = this.getAttribute('data-name');
+                document.getElementById('editDescription').value = this.getAttribute('data-desc');
+                document.getElementById('editIsProjectRelated').checked = this.getAttribute('data-isproject') === 'true';
+                document.getElementById('editReceiveDirectPayments').checked = this.getAttribute('data-isdirect') === 'true';
+                document.getElementById('editOpeningAmount').value = this.getAttribute('data-opening') || '';
+
+                const modal = new bootstrap.Modal(document.getElementById('editExpenseTypeModal'));
+                modal.show();
+            });
+        });
+
+        document.querySelectorAll('.delete-exp-btn').forEach(btn => {
+            btn.addEventListener('click', function () {
+                const id = this.getAttribute('data-id');
+                const name = this.getAttribute('data-name');
+                document.getElementById('deleteExpenseTypeId').value = id;
+                document.getElementById('deleteExpenseTypeMessage').innerText = 'Are you sure you want to delete or deactivate "' + name + '"?';
+
+                const modal = new bootstrap.Modal(document.getElementById('deleteExpenseTypeModal'));
+                modal.show();
+            });
+        });
 
         function updateGlobalAddButton(targetId) {
             if (!globalAddBtn) return;

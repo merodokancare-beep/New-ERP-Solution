@@ -201,7 +201,7 @@
                         <label class="form-label-custom mb-0">
                             Expense Head <span class="text-danger">*</span>
                         </label>
-                        <a href="/Masters/ExpenseTypes" target="_blank" class="text-decoration-none" style="font-size: 11px; color: #7c3aed; font-weight: 600;">
+                        <a href="/Masters?tab=expensetypes" target="_blank" class="text-decoration-none" style="font-size: 11px; color: #7c3aed; font-weight: 600;">
                             <i class="fa-solid fa-gear me-1"></i>Expense Types Master
                         </a>
                     </div>
@@ -260,7 +260,7 @@
                     <label class="form-label-custom">
                         Payment Receive Mode <span class="text-danger">*</span>
                     </label>
-                    <select name="paymentReceiveMode" class="form-select input-custom" required>
+                    <select name="paymentReceiveMode" id="ddlDirectPaymentMode" class="form-select input-custom" required onchange="onDirectPaymentModeChanged(this.value)">
                         <option value="">-- Select Mode --</option>
                         <option value="NEFT/RTGS">NEFT/RTGS</option>
                         <option value="Cash">Cash</option>
@@ -283,8 +283,8 @@
             </div>
 
             <!-- Row 4: Bank, Cheque/Txn No & File Upload -->
-            <div class="row g-4 mb-4">
-                <div class="col-md-4">
+            <div class="row g-4 mb-4" id="directBankDetailsRow">
+                <div class="col-md-4" id="colDirectBankName">
                     <div class="d-flex justify-content-between align-items-center mb-1">
                         <label class="form-label-custom mb-0">
                             Bank Name
@@ -340,14 +340,14 @@
                         <span class="badge bg-light text-primary border" style="font-size: 11px; font-weight: 500;" id="ifscDetailsText"></span>
                     </div>
                 </div>
-                <div class="col-md-4">
-                    <label class="form-label-custom">
+                <div class="col-md-4" id="colDirectTransactionRefNo">
+                    <label class="form-label-custom" id="lblDirectTransactionRefNo">
                         Cheque/Transaction No. <span class="text-danger">*</span>
                     </label>
-                    <input type="text" name="transactionRefNo" class="form-control input-custom" placeholder="" required />
+                    <input type="text" name="transactionRefNo" id="txtDirectTransactionRefNo" class="form-control input-custom" placeholder="" required />
                 </div>
-                <div class="col-md-4">
-                    <label class="form-label-custom">
+                <div class="col-md-4" id="colDirectUploadFile">
+                    <label class="form-label-custom" id="lblDirectUploadFile">
                         Upload File (allowed formats: image/pdf)
                     </label>
                     <input type="file" name="uploadFile" class="form-control input-custom" accept=".pdf,.jpg,.jpeg,.png" />
@@ -715,7 +715,86 @@
                 performIfscLookup();
             }
         });
+
+        // Initialize Cash mode toggling on page load
+        const modeSelect = document.getElementById('ddlDirectPaymentMode');
+        if (modeSelect) {
+            onDirectPaymentModeChanged(modeSelect.value);
+            modeSelect.addEventListener('change', function () {
+                onDirectPaymentModeChanged(this.value);
+            });
+        }
     });
+
+    function onDirectPaymentModeChanged(mode) {
+        const colBank = document.getElementById('colDirectBankName');
+        const colRef = document.getElementById('colDirectTransactionRefNo');
+        const colUpload = document.getElementById('colDirectUploadFile');
+        const bankHidden = document.getElementById('bankNameHidden');
+        const refInput = document.getElementById('txtDirectTransactionRefNo');
+        const uploadLbl = document.getElementById('lblDirectUploadFile');
+        const refLabel = document.getElementById('lblDirectTransactionRefNo');
+
+        if (!colBank || !colRef) return;
+
+        if (mode === 'Cash') {
+            colBank.classList.add('d-none');
+            colRef.classList.add('d-none');
+            if (bankHidden) {
+                bankHidden.removeAttribute('required');
+                bankHidden.value = 'Cash in Hand';
+            }
+            if (refInput) {
+                refInput.removeAttribute('required');
+                refInput.value = '';
+            }
+            if (colUpload) {
+                colUpload.className = 'col-md-6';
+            }
+            if (uploadLbl) {
+                uploadLbl.innerHTML = 'Upload Receipt / Cash Voucher <span class="badge bg-light text-muted border ms-1" style="font-size: 11px;">Image/PDF (Optional)</span>';
+            }
+        } else {
+            colBank.classList.remove('d-none');
+            colRef.classList.remove('d-none');
+            if (bankHidden) {
+                bankHidden.setAttribute('required', 'required');
+                if (bankHidden.value === 'Cash in Hand') {
+                    bankHidden.value = '';
+                    const label = document.getElementById('bankSelectedLabel');
+                    if (label) {
+                        if (registeredCorporateAccounts.length > 0) {
+                            selectBankOption(registeredCorporateAccounts[0]);
+                        } else {
+                            label.textContent = '-- Select Bank --';
+                        }
+                    }
+                }
+            }
+            if (refInput) {
+                refInput.setAttribute('required', 'required');
+            }
+            if (colUpload) {
+                colUpload.className = 'col-md-4';
+            }
+            if (uploadLbl) {
+                uploadLbl.innerHTML = 'Upload File (allowed formats: image/pdf)';
+            }
+
+            // Adjust Ref label dynamically according to chosen mode
+            if (refLabel) {
+                if (mode === 'Cheque') {
+                    refLabel.innerHTML = 'Cheque / Instrument No. <span class="text-danger">*</span>';
+                } else if (mode === 'UPI') {
+                    refLabel.innerHTML = 'UPI Ref / Transaction ID <span class="text-danger">*</span>';
+                } else if (mode === 'NEFT/RTGS') {
+                    refLabel.innerHTML = 'UTR / Transaction Ref No. <span class="text-danger">*</span>';
+                } else {
+                    refLabel.innerHTML = 'Cheque/Transaction No. <span class="text-danger">*</span>';
+                }
+            }
+        }
+    }
 
     function applyIfscDetails() {
         if (!fetchedBankData) return;

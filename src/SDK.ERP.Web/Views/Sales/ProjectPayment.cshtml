@@ -206,7 +206,7 @@
                     <label class="form-label-custom">
                         Payment Receive Mode <span class="text-danger">*</span>
                     </label>
-                    <select name="paymentReceiveMode" class="form-select input-custom" required>
+                    <select name="paymentReceiveMode" id="ddlProjectPaymentMode" class="form-select input-custom" required onchange="onProjectPaymentModeChanged(this.value)">
                         <option value="">-- Select Mode --</option>
                         <option value="NEFT/RTGS">NEFT/RTGS</option>
                         <option value="Cash">Cash</option>
@@ -302,13 +302,13 @@
             </div>
 
             <!-- Row 7: Deposit Bank Selection (Optional / Default to Active Bank) -->
-            <div class="row g-4 mb-4">
-                <div class="col-md-6">
+            <div class="row g-4 mb-4" id="projectBankDetailsRow">
+                <div class="col-md-6" id="colDepositBank">
                     <label class="form-label-custom">
                         Deposit Bank Account
                         <i class="fa-solid fa-circle-info text-muted ms-1" style="font-size: 11px;" title="Account where payment is credited"></i>
                     </label>
-                    <select name="bankAccountId" class="form-select input-custom">
+                    <select name="bankAccountId" id="ddlBankAccountId" class="form-select input-custom">
                         @if (bankAccounts.Any())
                         {
                             @foreach (var b in bankAccounts)
@@ -322,8 +322,8 @@
                         }
                     </select>
                 </div>
-                <div class="col-md-6">
-                    <label class="form-label-custom">
+                <div class="col-md-6" id="colProjectUpload">
+                    <label class="form-label-custom" id="lblProjectUpload">
                         Bank Receipt / Remittance Voucher
                         <span class="badge bg-light text-muted border ms-1" style="font-size: 11px;">PDF, PNG, JPG</span>
                     </label>
@@ -494,10 +494,43 @@
         document.getElementById("txtNet").value = net.toFixed(2);
     }
 
+    function onProjectPaymentModeChanged(mode) {
+        const colDepositBank = document.getElementById("colDepositBank");
+        const colUpload = document.getElementById("colProjectUpload");
+        const lblUpload = document.getElementById("lblProjectUpload");
+        const bankSelect = document.getElementById("ddlBankAccountId");
+
+        if (!colDepositBank) return;
+
+        if (mode === "Cash") {
+            colDepositBank.classList.add("d-none");
+            if (bankSelect) bankSelect.disabled = true;
+            if (colUpload) colUpload.className = "col-md-6";
+            if (lblUpload) {
+                lblUpload.innerHTML = 'Payment Receipt / Cash Voucher <span class="badge bg-light text-muted border ms-1" style="font-size: 11px;">PDF, PNG, JPG (Optional)</span>';
+            }
+        } else {
+            colDepositBank.classList.remove("d-none");
+            if (bankSelect) bankSelect.disabled = false;
+            if (colUpload) colUpload.className = "col-md-6";
+            if (lblUpload) {
+                lblUpload.innerHTML = 'Bank Receipt / Remittance Voucher <span class="badge bg-light text-muted border ms-1" style="font-size: 11px;">PDF, PNG, JPG</span>';
+            }
+        }
+    }
+
     document.addEventListener("DOMContentLoaded", function() {
         const projectSelect = document.getElementById("projectSelect");
-        if (projectSelect.value) {
+        if (projectSelect && projectSelect.value) {
             onProjectSelected();
+        }
+
+        const modeSelect = document.getElementById("ddlProjectPaymentMode");
+        if (modeSelect) {
+            onProjectPaymentModeChanged(modeSelect.value);
+            modeSelect.addEventListener("change", function () {
+                onProjectPaymentModeChanged(this.value);
+            });
         }
     });
 </script>

@@ -658,25 +658,13 @@ public class MastersController : Controller
             await _db.SaveChangesAsync();
             TempData["SuccessMessage"] = $"Project Type '{pt.Name}' status updated to {(pt.IsActive ? "ACTIVE" : "INACTIVE")}.";
         }
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Index), new { tab = "projecttypes" });
     }
 
     [HttpGet]
-    public async Task<IActionResult> ExpenseTypes(string? search)
+    public IActionResult ExpenseTypes(string? search)
     {
-        ViewData["ActiveMenu"] = "ExpenseTypes";
-        await EnsureExpenseTypesTableAsync();
-
-        var query = _db.ExpenseTypes.AsNoTracking().AsQueryable();
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            search = search.Trim();
-            query = query.Where(e => e.Name.Contains(search) || (e.Description != null && e.Description.Contains(search)));
-            ViewBag.Search = search;
-        }
-
-        var list = await query.OrderBy(e => e.Name).ToListAsync();
-        return View(list);
+        return RedirectToAction(nameof(Index), new { tab = "expensetypes" });
     }
 
     [HttpPost]
@@ -687,14 +675,14 @@ public class MastersController : Controller
         if (string.IsNullOrWhiteSpace(name))
         {
             TempData["ErrorMessage"] = "Expense Type Name is required.";
-            return RedirectToAction(nameof(ExpenseTypes));
+            return RedirectToAction(nameof(Index), new { tab = "expensetypes" });
         }
 
         name = name.Trim();
         if (await _db.ExpenseTypes.AnyAsync(e => e.Name.ToLower() == name.ToLower()))
         {
             TempData["ErrorMessage"] = $"Expense Type '{name}' already exists.";
-            return RedirectToAction(nameof(ExpenseTypes));
+            return RedirectToAction(nameof(Index), new { tab = "expensetypes" });
         }
 
         var exp = new ExpenseType
@@ -711,7 +699,7 @@ public class MastersController : Controller
         await _db.SaveChangesAsync();
 
         TempData["SuccessMessage"] = $"Expense Type '{exp.Name}' created successfully!";
-        return RedirectToAction(nameof(ExpenseTypes));
+        return RedirectToAction(nameof(Index), new { tab = "expensetypes" });
     }
 
     [HttpPost]
@@ -723,13 +711,13 @@ public class MastersController : Controller
         if (exp == null)
         {
             TempData["ErrorMessage"] = "Expense Type not found.";
-            return RedirectToAction(nameof(ExpenseTypes));
+            return RedirectToAction(nameof(Index), new { tab = "expensetypes" });
         }
 
         if (string.IsNullOrWhiteSpace(name))
         {
             TempData["ErrorMessage"] = "Expense Type Name is required.";
-            return RedirectToAction(nameof(ExpenseTypes));
+            return RedirectToAction(nameof(Index), new { tab = "expensetypes" });
         }
 
         exp.Name = name.Trim();
@@ -740,7 +728,22 @@ public class MastersController : Controller
         await _db.SaveChangesAsync();
 
         TempData["SuccessMessage"] = $"Expense Type '{exp.Name}' updated successfully!";
-        return RedirectToAction(nameof(ExpenseTypes));
+        return RedirectToAction(nameof(Index), new { tab = "expensetypes" });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ToggleExpenseType(long id)
+    {
+        await EnsureExpenseTypesTableAsync();
+        var exp = await _db.ExpenseTypes.FindAsync(id);
+        if (exp != null)
+        {
+            exp.IsActive = !exp.IsActive;
+            await _db.SaveChangesAsync();
+            TempData["SuccessMessage"] = $"Expense Type '{exp.Name}' status updated to {(exp.IsActive ? "ACTIVE" : "INACTIVE")}.";
+        }
+        return RedirectToAction(nameof(Index), new { tab = "expensetypes" });
     }
 
     [HttpPost]
@@ -765,7 +768,7 @@ public class MastersController : Controller
                 TempData["SuccessMessage"] = $"Expense Type '{exp.Name}' deleted successfully!";
             }
         }
-        return RedirectToAction(nameof(ExpenseTypes));
+        return RedirectToAction(nameof(Index), new { tab = "expensetypes" });
     }
 }
 
@@ -2244,15 +2247,18 @@ public class SalesController : Controller
         var user = await _db.Users.FirstOrDefaultAsync();
         var fy = await _db.FinancialYears.FirstOrDefaultAsync(f => !f.IsClosed);
 
+        var isCash = string.Equals(paymentReceiveMode, "Cash", StringComparison.OrdinalIgnoreCase);
         var bank = await _db.BankAccounts.FindAsync(bankAccountId ?? 0) ?? await _db.BankAccounts.FirstOrDefaultAsync(b => b.IsActive);
-        if (bank != null)
+        if (bank != null && !isCash)
         {
             bank.BookBalance += paymentReceiveAmount;
         }
 
-        var resolvedBank = !string.IsNullOrWhiteSpace(bankName) 
-            ? bankName.Trim() 
-            : (bank != null ? $"{bank.BankName} - {bank.AccountNumber}" : (company.BankName ?? "Direct Deposit"));
+        var resolvedBank = isCash
+            ? "Cash in Hand"
+            : (!string.IsNullOrWhiteSpace(bankName) 
+                ? bankName.Trim() 
+                : (bank != null ? $"{bank.BankName} - {bank.AccountNumber}" : (company.BankName ?? "Direct Deposit")));
 
         long? docId = null;
         if (uploadFile != null && uploadFile.Length > 0)
@@ -2303,12 +2309,12 @@ public class SalesController : Controller
             AmountReceived = paymentReceiveAmount,
             UnallocatedAmount = paymentReceiveAmount,
             PaymentMode = string.IsNullOrWhiteSpace(paymentReceiveMode) ? "Cheque" : paymentReceiveMode,
-            TransactionRefNo = transactionRefNo,
+            TransactionRefNo = isCash ? "CASH" : transactionRefNo,
             Status = "POSTED",
             ExpenseHead = expenseHead,
             Remarks = string.IsNullOrWhiteSpace(paymentReceiveRemarks) 
-                ? $"Deposit Bank: {resolvedBank}" 
-                : $"[Bank: {resolvedBank}] {paymentReceiveRemarks}",
+                ? (isCash ? "Payment Mode: Cash in Hand" : $"Deposit Bank: {resolvedBank}") 
+                : (isCash ? $"[Mode: Cash in Hand] {paymentReceiveRemarks}" : $"[Bank: {resolvedBank}] {paymentReceiveRemarks}"),
             ReceiptDocId = docId
         };
         _db.CustomerReceipts.Add(receipt);
@@ -2348,7 +2354,9 @@ public class SalesController : Controller
             VoucherType = "RECEIPT",
             SourceEntityType = "DirectPaymentReceive",
             SourceEntityId = receipt.Id,
-            Narration = $"Direct Payment Received: {expenseHead} via {receipt.PaymentMode} [Bank: {resolvedBank}] (Ref: {transactionRefNo ?? "N/A"}) - {paymentReceiveRemarks}",
+            Narration = isCash 
+                ? $"Direct Payment Received: {expenseHead} via Cash - {paymentReceiveRemarks}"
+                : $"Direct Payment Received: {expenseHead} via {receipt.PaymentMode} [Bank: {resolvedBank}] (Ref: {transactionRefNo ?? "N/A"}) - {paymentReceiveRemarks}",
             TotalDebit = paymentReceiveAmount,
             TotalCredit = paymentReceiveAmount,
             IsBalanced = true,
@@ -2491,7 +2499,8 @@ public class SalesController : Controller
         var user = await _db.Users.FirstOrDefaultAsync();
         var fy = await _db.FinancialYears.FirstOrDefaultAsync(f => !f.IsClosed);
 
-        var bank = await _db.BankAccounts.FindAsync(bankAccountId ?? 0) ?? await _db.BankAccounts.FirstOrDefaultAsync(b => b.IsActive);
+        var isCash = string.Equals(paymentReceiveMode, "Cash", StringComparison.OrdinalIgnoreCase);
+        var bank = isCash ? null : (await _db.BankAccounts.FindAsync(bankAccountId ?? 0) ?? await _db.BankAccounts.FirstOrDefaultAsync(b => b.IsActive));
         if (bank != null && netAmountReceive > 0)
         {
             bank.BookBalance += netAmountReceive;
@@ -2554,12 +2563,13 @@ public class SalesController : Controller
         {
             CompanyId = company.Id,
             ClientId = project.ClientId,
-            BankAccountId = bank?.Id ?? 1,
+            BankAccountId = bank?.Id ?? (await _db.BankAccounts.Select(b => b.Id).FirstOrDefaultAsync()),
             ReceiptNumber = rcptNo,
             ReceiptDate = paymentReceiveDate ?? DateTime.Today,
             AmountReceived = netAmountReceive > 0 ? netAmountReceive : totalAmountReceive,
             UnallocatedAmount = 0,
             PaymentMode = string.IsNullOrWhiteSpace(paymentReceiveMode) ? "Netbanking" : paymentReceiveMode,
+            TransactionRefNo = isCash ? "CASH" : "N/A",
             Status = "POSTED",
             ProjectId = project.Id,
             InvoiceId = invoice?.Id,
@@ -2571,7 +2581,7 @@ public class SalesController : Controller
             NetAmountReceived = netAmountReceive,
             TotalAmountReceived = totalAmountReceive,
             ExpenseHead = isAdvanceReceived ? "Mobilization Advance" : "Project Milestone Billing",
-            Remarks = paymentReceiveRemarks,
+            Remarks = isCash ? $"[Mode: Cash] {paymentReceiveRemarks}" : paymentReceiveRemarks,
             ReceiptDocId = docId
         };
         _db.CustomerReceipts.Add(receipt);
@@ -2625,7 +2635,7 @@ public class SalesController : Controller
             SourceEntityType = "ProjectPaymentReceived",
             SourceEntityId = receipt.Id,
             ProjectId = project.Id,
-            Narration = $"Project Payment: {project.ProjectName} (Invoice: {invoice?.InvoiceNumber ?? "Advance"}) - Net ₹{netAmountReceive:N2} (Total ₹{totalAmountReceive:N2}) - {paymentReceiveRemarks}",
+            Narration = $"Project Payment: {project.ProjectName} (Invoice: {invoice?.InvoiceNumber ?? "Advance"}) via {(isCash ? "Cash" : "Bank")} - Net ₹{netAmountReceive:N2} (Total ₹{totalAmountReceive:N2}) - {paymentReceiveRemarks}",
             TotalDebit = totalAmountReceive,
             TotalCredit = totalAmountReceive,
             IsBalanced = true,
