@@ -245,6 +245,8 @@ using (var scope = app.Services.CreateScope())
                 -- Ensure SalesInvoice Reference, Work Order, Terms & Deductions Columns
                 IF OBJECT_ID('[sales].[sales_invoices]') IS NOT NULL
                 BEGIN
+                    IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoices]') AND name = 'ProjectId' AND is_nullable = 0)
+                        ALTER TABLE [sales].[sales_invoices] ALTER COLUMN [ProjectId] BIGINT NULL;
                     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoices]') AND name = 'WorkOrderNo')
                         ALTER TABLE [sales].[sales_invoices] ADD [WorkOrderNo] NVARCHAR(100) NULL;
                     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoices]') AND name = 'WorkOrderDate')
@@ -260,6 +262,8 @@ using (var scope = app.Services.CreateScope())
                 END
                 IF OBJECT_ID('[SalesInvoices]') IS NOT NULL
                 BEGIN
+                    IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[SalesInvoices]') AND name = 'ProjectId' AND is_nullable = 0)
+                        ALTER TABLE [SalesInvoices] ALTER COLUMN [ProjectId] BIGINT NULL;
                     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[SalesInvoices]') AND name = 'WorkOrderNo')
                         ALTER TABLE [SalesInvoices] ADD [WorkOrderNo] NVARCHAR(100) NULL;
                     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[SalesInvoices]') AND name = 'WorkOrderDate')

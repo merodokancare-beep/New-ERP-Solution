@@ -11,7 +11,7 @@ public class SalesInvoice : ITenantEntity
     public long CompanyId { get; set; }
     public long BranchId { get; set; }
     public long ClientId { get; set; }
-    public long ProjectId { get; set; }
+    public long? ProjectId { get; set; }
     public long? SalesOrderId { get; set; }
     public string InvoiceNumber { get; set; } = string.Empty;
     public DateTime InvoiceDate { get; set; }
@@ -39,7 +39,7 @@ public class SalesInvoice : ITenantEntity
     public Company Company { get; set; } = null!;
     public Branch Branch { get; set; } = null!;
     public Client Client { get; set; } = null!;
-    public Project Project { get; set; } = null!;
+    public Project? Project { get; set; }
     public SalesOrder? SalesOrder { get; set; }
 
     public ICollection<SalesInvoiceItem> Items { get; set; } = new List<SalesInvoiceItem>();

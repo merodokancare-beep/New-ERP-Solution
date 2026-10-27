@@ -371,7 +371,7 @@
                     @foreach (var inv in invoiceList)
                     {
                         var clientName = inv.Client?.ClientName ?? "N/A";
-                        var projectName = inv.Project?.ProjectName ?? "Execution & Milestone Services";
+                        var projectName = inv.Project != null ? inv.Project.ProjectName : "Direct Client Billing";
                         var firstChar = !string.IsNullOrEmpty(clientName) ? clientName.Substring(0, 1).ToUpper() : "C";
                         var colorClass = $"avatar-color-{idx % 5}";
                         idx++;
@@ -401,7 +401,16 @@
                                             @clientName
                                         </div>
                                         <div class="text-muted text-truncate" style="font-size: 12px;" title="@projectName">
-                                            <i class="fa-solid fa-box text-secondary me-1" style="font-size: 11px;"></i>@projectName
+                                            @if (inv.Project != null)
+                                            {
+                                                <i class="fa-solid fa-diagram-project text-secondary me-1" style="font-size: 11px;"></i>@projectName
+                                            }
+                                            else
+                                            {
+                                                <span class="badge px-1.5 py-0.5 rounded text-secondary" style="background: #F1F5F9; font-size: 10.5px; font-weight: 500;">
+                                                    <i class="fa-solid fa-user-tag me-1 text-primary"></i> Direct Client
+                                                </span>
+                                            }
                                         </div>
                                     </div>
                                 </div>

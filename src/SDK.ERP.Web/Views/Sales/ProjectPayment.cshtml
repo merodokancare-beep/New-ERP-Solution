@@ -2,11 +2,13 @@
     ViewData["Title"] = "Project's Payment Received";
     ViewData["ActiveMenu"] = "Sales";
 
+    var clients = ViewBag.Clients as IEnumerable<SDK.ERP.Domain.Entities.MasterData.Client> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.MasterData.Client>();
     var projects = ViewBag.Projects as IEnumerable<SDK.ERP.Domain.Entities.Projects.Project> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Projects.Project>();
     var bankAccounts = ViewBag.BankAccounts as IEnumerable<SDK.ERP.Domain.Entities.Banking.BankAccount> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Banking.BankAccount>();
     var invoices = ViewBag.Invoices as IEnumerable<SDK.ERP.Domain.Entities.Sales.SalesInvoice> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Sales.SalesInvoice>();
     var recentReceipts = ViewBag.RecentProjectReceipts as IEnumerable<SDK.ERP.Domain.Entities.Sales.CustomerReceipt> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Sales.CustomerReceipt>();
     var selectedProjectId = ViewBag.SelectedProjectId != null ? (long)ViewBag.SelectedProjectId : 0;
+    var selectedClientId = ViewBag.SelectedClientId != null ? (long)ViewBag.SelectedClientId : 0;
     var company = ViewBag.Company as SDK.ERP.Domain.Entities.Admin.Company;
 }
 
@@ -161,6 +163,9 @@
     </div>
 }
 
+<!-- Dynamic Alert Placeholder for newly added Master records -->
+<div id="clientCreatedAlertPlaceholder"></div>
+
 <!-- Project's Payment Form Card (Matches Sample Screenshot Pixel-for-Pixel) -->
 <div class="direct-card">
     <div class="direct-card-header">
@@ -170,27 +175,60 @@
         <form method="post" asp-action="ProjectPayment" enctype="multipart/form-data" id="projectPaymentForm">
             @Html.AntiForgeryToken()
 
-            <!-- Row 1: Project Name (Full Width) -->
+            <!-- Row 1: Client Name (Mandatory) with Quick Add to Master -->
             <div class="row g-4 mb-4">
                 <div class="col-md-12">
-                    <label class="form-label-custom">
-                        Project Name <span class="text-danger">*</span>
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label-custom mb-0" for="clientSelect">
+                            Client Name <span class="text-danger">*</span>
+                        </label>
+                        <button type="button" class="btn btn-sm d-inline-flex align-items-center gap-1.5 py-1 px-3 rounded-pill shadow-xs" 
+                                style="font-size: 12px; font-weight: 600; background: #F5F3FF; color: #7C3AED; border: 1px solid #DDD6FE; transition: all 0.2s ease;" 
+                                onmouseover="this.style.background='#7C3AED'; this.style.color='#ffffff';" 
+                                onmouseout="this.style.background='#F5F3FF'; this.style.color='#7C3AED';"
+                                data-bs-toggle="modal" data-bs-target="#quickAddClientModal">
+                            <i class="fa-solid fa-user-plus"></i> Add New Client
+                        </button>
+                    </div>
+                    <select name="clientId" id="clientSelect" class="form-select input-custom" required onchange="onClientSelected()">
+                        <option value="">-- Select Client Name --</option>
+                        @foreach (var c in clients)
+                        {
+                            var isSelected = (selectedClientId > 0 && selectedClientId == c.Id);
+                            <option value="@c.Id" 
+                                    data-client-name="@c.ClientName" 
+                                    data-gstin="@(c.Gstin ?? "")" 
+                                    data-state="@(c.StateCode ?? "07")"
+                                    selected="@(isSelected ? "selected" : null)">
+                                @c.ClientCode - @c.ClientName @(!string.IsNullOrEmpty(c.Gstin) ? $"({c.Gstin})" : "")
+                            </option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            <!-- Row 1b: Project Name (Optional - Cascaded by Client) -->
+            <div class="row g-4 mb-4">
+                <div class="col-md-12">
+                    <label class="form-label-custom d-flex align-items-center justify-content-between" for="projectSelect">
+                        <span>Project Name <span class="text-muted fw-normal" style="font-size: 11.5px;">(Optional - Cascaded by Client)</span></span>
+                        <span id="projectCountBadge" class="badge bg-light text-secondary border d-none" style="font-size: 11px;">0 Projects Available</span>
                     </label>
-                    <select name="projectId" id="projectSelect" class="form-select input-custom" required onchange="onProjectSelected()">
-                        <option value="">-- Select Project Name --</option>
+                    <select name="projectId" id="projectSelect" class="form-select input-custom" onchange="onProjectSelected()">
+                        <option value="">-- Select Client First --</option>
                         @foreach (var p in projects)
                         {
                             var isSelected = (selectedProjectId > 0 && selectedProjectId == p.Id);
-                            if (isSelected)
-                            {
-                                <option value="@p.Id" selected="selected">@p.ProjectCode - @p.ProjectName (@(p.Client?.ClientName ?? "N/A"))</option>
-                            }
-                            else
-                            {
-                                <option value="@p.Id">@p.ProjectCode - @p.ProjectName (@(p.Client?.ClientName ?? "N/A"))</option>
-                            }
+                            <option value="@p.Id" 
+                                    data-client-id="@p.ClientId" 
+                                    selected="@(isSelected ? "selected" : null)">
+                                @p.ProjectCode - @p.ProjectName
+                            </option>
                         }
                     </select>
+                    <small class="text-muted mt-1 d-block" style="font-size: 11.5px;">
+                        <i class="fa-solid fa-circle-info me-1 text-primary"></i> Optional: Select a project if payment is against a project, or leave blank for direct client billing.
+                    </small>
                 </div>
             </div>
 
@@ -380,8 +418,23 @@
                                 <td class="ps-4 fw-bold text-primary">@r.ReceiptNumber</td>
                                 <td>@r.ReceiptDate.ToString("dd MMM yyyy")</td>
                                 <td>
-                                    <strong>@(r.Project?.ProjectCode ?? "PRJ")</strong>
-                                    <small class="text-muted d-block text-truncate" style="max-width: 180px;">@(r.Project?.ProjectName ?? "N/A")</small>
+                                    @if (r.Project != null)
+                                    {
+                                        <strong>@r.Project.ProjectCode</strong>
+                                        <small class="text-muted d-block text-truncate" style="max-width: 180px;">@r.Project.ProjectName</small>
+                                        <span class="badge px-1.5 py-0.5 rounded text-secondary" style="background: #F1F5F9; font-size: 10px;">
+                                            @(r.Client?.ClientName ?? r.Project.Client?.ClientName ?? "N/A")
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge px-2 py-0.5 rounded-pill text-success" style="background: #ECFDF5; font-size: 10.5px; font-weight: 600;">
+                                            <i class="fa-solid fa-user-tag me-1"></i> Direct Client
+                                        </span>
+                                        <div class="fw-semibold text-dark text-truncate" style="max-width: 180px;">
+                                            @(r.Client?.ClientName ?? "Direct Client")
+                                        </div>
+                                    }
                                 </td>
                                 <td>
                                     @if (r.Invoice != null)
@@ -415,7 +468,152 @@
     </div>
 }
 
+<!-- Quick Add Client Modal (Saves to Master Catalogs) -->
+<div class="modal fade" id="quickAddClientModal" tabindex="-1" aria-labelledby="quickAddClientModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 14px; overflow: hidden;">
+            <div class="modal-header text-white" style="background: linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%); padding: 18px 24px;">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="rounded-circle bg-white text-primary p-2 d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; color: #7C3AED !important;">
+                        <i class="fa-solid fa-user-tie fs-6"></i>
+                    </div>
+                    <div>
+                        <h5 class="modal-title fw-bold mb-0 text-white" id="quickAddClientModalLabel" style="font-size: 16px;">
+                            Register New Enterprise Client
+                        </h5>
+                        <small class="text-white-50" style="font-size: 11.5px;">Saves permanently to Master Catalogs and automatically selects for this payment</small>
+                    </div>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <form id="quickClientForm" onsubmit="event.preventDefault(); saveQuickClient();">
+                @Html.AntiForgeryToken()
+                <div class="modal-body p-4" style="background: #F8FAFC;">
+                    <div id="quickClientError" class="alert alert-danger d-none mb-3 py-2 px-3" style="font-size: 12.5px; border-radius: 8px;"></div>
+
+                    <div class="card border-0 shadow-sm p-3 mb-0 bg-white" style="border-radius: 10px;">
+                        <div class="row g-3">
+                            <div class="col-md-5">
+                                <label class="form-label-custom" style="font-size: 12px;">Client Code <span class="text-danger">*</span></label>
+                                <input type="text" id="quickClientCode" name="clientCode" class="form-control form-control-sm input-custom bg-light" value="CL-@DateTime.Now.ToString("MMddHHmm")" required />
+                            </div>
+                            <div class="col-md-7">
+                                <label class="form-label-custom" style="font-size: 12px;">Client / Company Name <span class="text-danger">*</span></label>
+                                <input type="text" id="quickClientName" name="clientName" class="form-control form-control-sm input-custom" placeholder="e.g. Tata Consultancy Services Ltd" required />
+                            </div>
+
+                            <div class="col-md-7">
+                                <label class="form-label-custom d-flex justify-content-between align-items-center" style="font-size: 12px;">
+                                    <span>GSTIN <span class="text-muted fw-normal">(Optional)</span></span>
+                                    <span class="text-muted" style="font-size: 11px;"><i class="fa-solid fa-bolt text-warning me-1"></i>Auto-fills PAN &amp; State</span>
+                                </label>
+                                <div class="input-group input-group-sm">
+                                    <input type="text" id="quickClientGstin" name="gstin" class="form-control text-uppercase font-monospace" placeholder="e.g. 07AAAAA0000A1Z5" maxlength="15" autocomplete="off" />
+                                    <button class="btn btn-outline-primary" type="button" id="btnQuickFetchGstin" onclick="quickFetchGstin()" title="Auto-Fetch Client details from GSTIN">
+                                        <i class="fa-solid fa-wand-magic-sparkles me-1"></i> Auto-Fetch
+                                    </button>
+                                </div>
+                                <div id="quickGstinFeedback" class="mt-1" style="font-size: 11.5px; display: none;"></div>
+                            </div>
+                            <div class="col-md-5">
+                                <label class="form-label-custom" style="font-size: 12px;">PAN <span class="text-muted fw-normal">(Auto / 10-Char)</span></label>
+                                <input type="text" id="quickClientPan" name="pan" class="form-control form-control-sm text-uppercase font-monospace input-custom" placeholder="e.g. AAAAA0000A" maxlength="10" />
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label-custom" style="font-size: 12px;">State / Jurisdiction <span class="text-danger">*</span></label>
+                                <select id="quickClientState" name="stateCode" class="form-select form-select-sm input-custom">
+                                    @{
+                                        var compState = company?.StateCode ?? "07";
+                                        var states = new (string Code, string Name)[]
+                                        {
+                                            ("07", "07 - Delhi"),
+                                            ("01", "01 - Jammu and Kashmir"),
+                                            ("02", "02 - Himachal Pradesh"),
+                                            ("03", "03 - Punjab"),
+                                            ("04", "04 - Chandigarh"),
+                                            ("05", "05 - Uttarakhand"),
+                                            ("06", "06 - Haryana"),
+                                            ("08", "08 - Rajasthan"),
+                                            ("09", "09 - Uttar Pradesh"),
+                                            ("10", "10 - Bihar"),
+                                            ("11", "11 - Sikkim"),
+                                            ("12", "12 - Arunachal Pradesh"),
+                                            ("13", "13 - Nagaland"),
+                                            ("14", "14 - Manipur"),
+                                            ("15", "15 - Mizoram"),
+                                            ("16", "16 - Tripura"),
+                                            ("17", "17 - Meghalaya"),
+                                            ("18", "18 - Assam"),
+                                            ("19", "19 - West Bengal"),
+                                            ("20", "20 - Jharkhand"),
+                                            ("21", "21 - Odisha"),
+                                            ("22", "22 - Chhattisgarh"),
+                                            ("23", "23 - Madhya Pradesh"),
+                                            ("24", "24 - Gujarat"),
+                                            ("26", "26 - Dadra & Nagar Haveli and Daman & Diu"),
+                                            ("27", "27 - Maharashtra"),
+                                            ("29", "29 - Karnataka"),
+                                            ("30", "30 - Goa"),
+                                            ("31", "31 - Lakshadweep"),
+                                            ("32", "32 - Kerala"),
+                                            ("33", "33 - Tamil Nadu"),
+                                            ("34", "34 - Puducherry"),
+                                            ("35", "35 - Andaman & Nicobar Islands"),
+                                            ("36", "36 - Telangana"),
+                                            ("37", "37 - Andhra Pradesh"),
+                                            ("38", "38 - Ladakh")
+                                        };
+                                        foreach (var s in states)
+                                        {
+                                            <option value="@s.Code" selected="@(s.Code == compState ? "selected" : null)">@s.Name</option>
+                                        }
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label-custom" style="font-size: 12px;">Contact Person</label>
+                                <input type="text" id="quickClientContact" name="contactPerson" class="form-control form-control-sm input-custom" placeholder="e.g. Accounts / Finance Head" />
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label-custom" style="font-size: 12px;">Phone / Mobile</label>
+                                <input type="text" id="quickClientPhone" name="phone" class="form-control form-control-sm input-custom" placeholder="e.g. +91 98765 43210" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label-custom" style="font-size: 12px;">Email Address</label>
+                                <input type="email" id="quickClientEmail" name="email" class="form-control form-control-sm input-custom" placeholder="e.g. accounts@client.com" />
+                            </div>
+
+                            <div class="col-12">
+                                <label class="form-label-custom" style="font-size: 12px;">Billing Address <span class="text-danger">*</span></label>
+                                <textarea id="quickClientAddress" name="billingAddress" class="form-control form-control-sm input-custom" rows="2" placeholder="Complete statutory billing address..." required>Commercial Address</textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer bg-white px-4 py-3 border-top">
+                    <button type="button" class="btn btn-light btn-sm px-3 fw-semibold border" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" id="btnSaveQuickClient" class="btn btn-save-purple btn-sm px-4 fw-semibold shadow-sm" onclick="saveQuickClient()">
+                        <i class="fa-solid fa-floppy-disk me-1"></i> Save to Master &amp; Select
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script>
+    // In-memory list of all projects for instant cascading
+    const ALL_PROJECTS = [
+        @foreach (var p in projects)
+        {
+            @:{ id: @p.Id, clientId: @p.ClientId, code: "@p.ProjectCode", name: "@Html.Raw(p.ProjectName.Replace("\"", "\\\""))" },
+        }
+    ];
+
     function toggleAdvanceMode() {
         const isAdvance = document.getElementById("chkIsAdvance").checked;
         const invoiceSelect = document.getElementById("invoiceSelect");
@@ -431,29 +629,127 @@
         }
     }
 
-    async function onProjectSelected() {
+    async function onClientSelected() {
+        const clientSelect = document.getElementById("clientSelect");
+        const clientId = clientSelect.value;
         const projectSelect = document.getElementById("projectSelect");
-        const projectId = projectSelect.value;
+        const badge = document.getElementById("projectCountBadge");
         const invoiceSelect = document.getElementById("invoiceSelect");
 
-        if (!projectId) {
-            // Show all or clear
+        if (!clientId) {
+            projectSelect.innerHTML = '<option value="">-- Select Client First --</option>';
+            projectSelect.disabled = true;
+            if (badge) badge.classList.add("d-none");
+            invoiceSelect.innerHTML = '<option value="">--- Select Invoice ---</option>';
             return;
         }
 
+        projectSelect.disabled = false;
+
+        // 1. Cascade Projects linked to this client
+        const filteredProjects = ALL_PROJECTS.filter(p => p.clientId == clientId);
+
+        if (filteredProjects.length === 0) {
+            projectSelect.innerHTML = '<option value="">-- No Linked Projects (Direct Client Billing) --</option>';
+            if (badge) {
+                badge.className = "badge bg-light text-muted border";
+                badge.innerText = "No Linked Projects";
+                badge.classList.remove("d-none");
+            }
+        } else {
+            let html = '<option value="">-- Select Project Name (Optional) --</option>';
+            filteredProjects.forEach(p => {
+                html += `<option value="${p.id}" data-client-id="${p.clientId}">${p.code} - ${p.name}</option>`;
+            });
+            projectSelect.innerHTML = html;
+            if (badge) {
+                badge.className = "badge bg-primary-subtle text-primary border border-primary-subtle";
+                badge.innerText = `${filteredProjects.length} Project${filteredProjects.length > 1 ? 's' : ''} Available`;
+                badge.classList.remove("d-none");
+            }
+        }
+
+        // 2. Load open invoices for this client (both direct and project invoices)
+        try {
+            const resp = await fetch(`/Sales/GetInvoicesByClient?clientId=${clientId}`);
+            if (resp.ok) {
+                const invoices = await resp.json();
+                invoiceSelect.innerHTML = '<option value="">--- Select Invoice ---</option>';
+                if (invoices.length === 0) {
+                    const opt = document.createElement("option");
+                    opt.value = "";
+                    opt.innerText = "-- No outstanding invoices found for this client --";
+                    opt.disabled = true;
+                    invoiceSelect.appendChild(opt);
+                } else {
+                    invoices.forEach(inv => {
+                        const opt = document.createElement("option");
+                        opt.value = inv.id;
+                        opt.setAttribute("data-outstanding", inv.outstandingBalance);
+                        opt.setAttribute("data-total", inv.totalValue);
+                        opt.innerText = `${inv.invoiceNumber} (${inv.invoiceDate}) - Bal: ₹ ${Number(inv.outstandingBalance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+                        invoiceSelect.appendChild(opt);
+                    });
+                }
+            }
+        } catch (e) {
+            console.error("Failed to load client invoices", e);
+        }
+    }
+
+    async function onProjectSelected() {
+        const projectSelect = document.getElementById("projectSelect");
+        const projectId = projectSelect.value;
+        const clientSelect = document.getElementById("clientSelect");
+        const clientId = clientSelect.value;
+        const invoiceSelect = document.getElementById("invoiceSelect");
+
+        if (!projectId) {
+            // Project unselected: fallback to all invoices for this client
+            if (clientId) {
+                try {
+                    const resp = await fetch(`/Sales/GetInvoicesByClient?clientId=${clientId}`);
+                    if (resp.ok) {
+                        const invoices = await resp.json();
+                        invoiceSelect.innerHTML = '<option value="">--- Select Invoice ---</option>';
+                        invoices.forEach(inv => {
+                            const opt = document.createElement("option");
+                            opt.value = inv.id;
+                            opt.setAttribute("data-outstanding", inv.outstandingBalance);
+                            opt.setAttribute("data-total", inv.totalValue);
+                            opt.innerText = `${inv.invoiceNumber} (${inv.invoiceDate}) - Bal: ₹ ${Number(inv.outstandingBalance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+                            invoiceSelect.appendChild(opt);
+                        });
+                    }
+                } catch (e) {
+                    console.error("Failed to reload client invoices", e);
+                }
+            }
+            return;
+        }
+
+        // Project selected: filter invoices specifically for this project
         try {
             const resp = await fetch(`/Sales/GetInvoicesByProject?projectId=${projectId}`);
             if (resp.ok) {
                 const invoices = await resp.json();
                 invoiceSelect.innerHTML = '<option value="">--- Select Invoice ---</option>';
-                invoices.forEach(inv => {
+                if (invoices.length === 0) {
                     const opt = document.createElement("option");
-                    opt.value = inv.id;
-                    opt.setAttribute("data-outstanding", inv.outstandingBalance);
-                    opt.setAttribute("data-total", inv.totalValue);
-                    opt.innerText = `${inv.invoiceNumber} (${inv.invoiceDate}) - Bal: ₹ ${inv.outstandingBalance.toFixed(2)}`;
+                    opt.value = "";
+                    opt.innerText = "-- No outstanding invoices for this project --";
+                    opt.disabled = true;
                     invoiceSelect.appendChild(opt);
-                });
+                } else {
+                    invoices.forEach(inv => {
+                        const opt = document.createElement("option");
+                        opt.value = inv.id;
+                        opt.setAttribute("data-outstanding", inv.outstandingBalance);
+                        opt.setAttribute("data-total", inv.totalValue);
+                        opt.innerText = `${inv.invoiceNumber} (${inv.invoiceDate}) - Bal: ₹ ${Number(inv.outstandingBalance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+                        invoiceSelect.appendChild(opt);
+                    });
+                }
             }
         } catch (e) {
             console.error("Failed to load project invoices", e);
@@ -519,10 +815,262 @@
         }
     }
 
+    // =========================================================================
+    // Quick Add Client from Modal -> Persist in Master & Auto-select
+    // =========================================================================
+    async function quickFetchGstin() {
+        const input = document.getElementById('quickClientGstin');
+        const feedback = document.getElementById('quickGstinFeedback');
+        const nameEl = document.getElementById('quickClientName');
+        const panEl = document.getElementById('quickClientPan');
+        const stateEl = document.getElementById('quickClientState');
+        const addrEl = document.getElementById('quickClientAddress');
+
+        if (!input) return;
+        const cleanGstin = input.value.trim().toUpperCase();
+
+        if (cleanGstin.length !== 15) {
+            if (feedback) {
+                feedback.style.display = 'block';
+                feedback.innerHTML = '<span class="text-danger"><i class="fa-solid fa-circle-exclamation me-1"></i> GSTIN must be exactly 15 alphanumeric characters.</span>';
+            }
+            return;
+        }
+
+        // Auto-extract PAN & State Code
+        if (panEl) panEl.value = cleanGstin.substring(2, 12);
+        if (stateEl) stateEl.value = cleanGstin.substring(0, 2);
+
+        if (feedback) {
+            feedback.style.display = 'block';
+            feedback.innerHTML = '<span class="text-primary"><i class="fa-solid fa-spinner fa-spin me-1"></i> Verifying GSTIN &amp; fetching taxpayer details...</span>';
+        }
+
+        try {
+            const resp = await fetch(`/Masters/LookupGstin?gstin=${encodeURIComponent(cleanGstin)}`);
+            if (resp.ok) {
+                const data = await resp.json();
+                if (data && data.success) {
+                    if (nameEl && data.tradeName) nameEl.value = data.tradeName;
+                    if (panEl && data.pan) panEl.value = data.pan;
+                    if (stateEl && data.stateCode) stateEl.value = data.stateCode;
+                    if (addrEl && data.address) addrEl.value = data.address;
+
+                    if (feedback) {
+                        feedback.innerHTML = `<span class="text-success fw-semibold"><i class="fa-solid fa-circle-check me-1"></i> GSTIN Verified: ${data.stateName || ''} (${data.stateCode || ''})</span>`;
+                    }
+                } else if (feedback) {
+                    feedback.innerHTML = `<span class="text-warning"><i class="fa-solid fa-triangle-exclamation me-1"></i> ${data.message || 'Auto-fetch returned no records. Check manually.'}</span>`;
+                }
+            }
+        } catch (e) {
+            if (feedback) {
+                feedback.innerHTML = '<span class="text-muted"><i class="fa-solid fa-info-circle me-1"></i> Offline verification: State and PAN extracted.</span>';
+            }
+        }
+    }
+
+    async function saveQuickClient() {
+        const errEl = document.getElementById('quickClientError');
+        const btnSave = document.getElementById('btnSaveQuickClient');
+        const nameEl = document.getElementById('quickClientName');
+        const codeEl = document.getElementById('quickClientCode');
+        const addrEl = document.getElementById('quickClientAddress');
+        const gstinEl = document.getElementById('quickClientGstin');
+        const panEl = document.getElementById('quickClientPan');
+        const stateEl = document.getElementById('quickClientState');
+        const contactEl = document.getElementById('quickClientContact');
+        const phoneEl = document.getElementById('quickClientPhone');
+        const emailEl = document.getElementById('quickClientEmail');
+
+        if (errEl) errEl.classList.add('d-none');
+
+        const clientName = (nameEl?.value || '').trim();
+        if (!clientName) {
+            if (errEl) {
+                errEl.innerText = 'Please enter the Client / Company Name.';
+                errEl.classList.remove('d-none');
+            }
+            nameEl?.focus();
+            return;
+        }
+
+        const billingAddr = (addrEl?.value || '').trim();
+        if (!billingAddr) {
+            if (errEl) {
+                errEl.innerText = 'Please enter a Billing Address.';
+                errEl.classList.remove('d-none');
+            }
+            addrEl?.focus();
+            return;
+        }
+
+        // Disable save button & show spinner
+        const originalBtnHtml = btnSave ? btnSave.innerHTML : '';
+        if (btnSave) {
+            btnSave.disabled = true;
+            btnSave.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Saving to Master...';
+        }
+
+        try {
+            const formData = new FormData();
+            formData.append('clientCode', codeEl?.value || '');
+            formData.append('clientName', clientName);
+            formData.append('billingAddress', billingAddr);
+            formData.append('gstin', gstinEl?.value || '');
+            formData.append('pan', panEl?.value || '');
+            formData.append('stateCode', stateEl?.value || '07');
+            formData.append('contactPerson', contactEl?.value || '');
+            formData.append('phone', phoneEl?.value || '');
+            formData.append('email', emailEl?.value || '');
+
+            const token = document.querySelector('#quickClientForm input[name="__RequestVerificationToken"]')?.value ||
+                          document.querySelector('#projectPaymentForm input[name="__RequestVerificationToken"]')?.value;
+            if (token) {
+                formData.append('__RequestVerificationToken', token);
+            }
+
+            const response = await fetch('/Sales/QuickCreateClient', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+
+            if (result && result.success && result.client) {
+                const c = result.client;
+                const clientSelect = document.getElementById('clientSelect');
+
+                if (clientSelect) {
+                    // Create new option
+                    const newOpt = document.createElement('option');
+                    newOpt.value = c.id;
+                    newOpt.text = c.displayText;
+                    newOpt.setAttribute('data-client-name', c.clientName);
+                    newOpt.setAttribute('data-gstin', c.gstin || '');
+                    newOpt.setAttribute('data-state', c.stateCode || '07');
+                    clientSelect.appendChild(newOpt);
+
+                    // Select it
+                    clientSelect.value = c.id;
+
+                    // Trigger cascade
+                    await onClientSelected();
+                }
+
+                // Close modal
+                const modalEl = document.getElementById('quickAddClientModal');
+                const modalInstance = bootstrap.Modal.getInstance(modalEl);
+                if (modalInstance) {
+                    modalInstance.hide();
+                }
+
+                // Show top success alert banner
+                const alertPlaceholder = document.getElementById('clientCreatedAlertPlaceholder');
+                if (alertPlaceholder) {
+                    alertPlaceholder.innerHTML = `
+                        <div class="alert alert-success alert-dismissible fade show d-flex align-items-center mb-3 shadow-sm" role="alert" style="border-radius: 10px;">
+                            <i class="fa-solid fa-circle-check fs-5 me-2 text-success"></i>
+                            <div>
+                                <strong>Client Saved in Master!</strong> Client <strong>${c.clientName}</strong> (${c.clientCode}) has been registered to Master Catalogs and automatically selected.
+                            </div>
+                            <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    `;
+                }
+
+                // Reset modal form
+                document.getElementById('quickClientForm')?.reset();
+                if (codeEl) {
+                    const now = new Date();
+                    const mm = String(now.getMonth() + 1).padStart(2, '0');
+                    const dd = String(now.getDate()).padStart(2, '0');
+                    const hh = String(now.getHours()).padStart(2, '0');
+                    const min = String(now.getMinutes()).padStart(2, '0');
+                    codeEl.value = `CL-${mm}${dd}${hh}${min}`;
+                }
+                const feedbackEl = document.getElementById('quickGstinFeedback');
+                if (feedbackEl) feedbackEl.style.display = 'none';
+
+            } else {
+                if (errEl) {
+                    errEl.innerText = result?.message || 'Failed to register client. Please check details.';
+                    errEl.classList.remove('d-none');
+                }
+            }
+        } catch (err) {
+            console.error('Error saving client:', err);
+            if (errEl) {
+                errEl.innerText = 'Network or server error while registering client.';
+                errEl.classList.remove('d-none');
+            }
+        } finally {
+            if (btnSave) {
+                btnSave.disabled = false;
+                btnSave.innerHTML = originalBtnHtml;
+            }
+        }
+    }
+
     document.addEventListener("DOMContentLoaded", function() {
-        const projectSelect = document.getElementById("projectSelect");
-        if (projectSelect && projectSelect.value) {
-            onProjectSelected();
+        // Quick Client Modal GSTIN listeners
+        const quickGstin = document.getElementById('quickClientGstin');
+        const quickPan = document.getElementById('quickClientPan');
+        const quickState = document.getElementById('quickClientState');
+
+        if (quickGstin) {
+            quickGstin.addEventListener('input', function() {
+                this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                if (this.value.length >= 2 && quickState) {
+                    const st = this.value.substring(0, 2);
+                    if (quickState.querySelector(`option[value="${st}"]`)) {
+                        quickState.value = st;
+                    }
+                }
+                if (this.value.length >= 12 && quickPan) {
+                    quickPan.value = this.value.substring(2, 12);
+                }
+                if (this.value.length === 15) {
+                    quickFetchGstin();
+                }
+            });
+
+            quickGstin.addEventListener('paste', function() {
+                setTimeout(() => {
+                    this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                    if (this.value.length >= 12 && quickPan) {
+                        quickPan.value = this.value.substring(2, 12);
+                    }
+                    if (this.value.length === 15) {
+                        quickFetchGstin();
+                    }
+                }, 50);
+            });
+        }
+        const clientSelect = document.getElementById("clientSelect");
+        const initialClientId = "@selectedClientId";
+        const initialProjectId = "@selectedProjectId";
+
+        if (initialClientId && initialClientId !== "0") {
+            clientSelect.value = initialClientId;
+            onClientSelected().then(() => {
+                if (initialProjectId && initialProjectId !== "0") {
+                    const projectSelect = document.getElementById("projectSelect");
+                    if (projectSelect) {
+                        projectSelect.value = initialProjectId;
+                        onProjectSelected();
+                    }
+                }
+            });
+        } else if (clientSelect && clientSelect.value) {
+            onClientSelected();
+        } else {
+            // Disable project select until a client is chosen
+            const projectSelect = document.getElementById("projectSelect");
+            if (projectSelect) {
+                projectSelect.innerHTML = '<option value="">-- Select Client First --</option>';
+                projectSelect.disabled = true;
+            }
         }
 
         const modeSelect = document.getElementById("ddlProjectPaymentMode");

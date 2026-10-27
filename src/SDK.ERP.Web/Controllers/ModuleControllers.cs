@@ -1689,6 +1689,8 @@ public class SalesController : Controller
             await _db.Database.ExecuteSqlRawAsync(@"
                 IF OBJECT_ID('[sales].[sales_invoices]') IS NOT NULL
                 BEGIN
+                    IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoices]') AND name = 'ProjectId' AND is_nullable = 0)
+                        ALTER TABLE [sales].[sales_invoices] ALTER COLUMN [ProjectId] BIGINT NULL;
                     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoices]') AND name = 'WorkOrderNo')
                         ALTER TABLE [sales].[sales_invoices] ADD [WorkOrderNo] NVARCHAR(100) NULL;
                     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoices]') AND name = 'WorkOrderDate')
@@ -1705,6 +1707,8 @@ public class SalesController : Controller
 
                 IF OBJECT_ID('[SalesInvoices]') IS NOT NULL OR OBJECT_ID('[dbo].[SalesInvoices]') IS NOT NULL
                 BEGIN
+                    IF EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoices]') OR object_id = OBJECT_ID('[dbo].[SalesInvoices]')) AND name = 'ProjectId' AND is_nullable = 0)
+                        ALTER TABLE [SalesInvoices] ALTER COLUMN [ProjectId] BIGINT NULL;
                     IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoices]') OR object_id = OBJECT_ID('[dbo].[SalesInvoices]')) AND name = 'WorkOrderNo')
                         ALTER TABLE [SalesInvoices] ADD [WorkOrderNo] NVARCHAR(100) NULL;
                     IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoices]') OR object_id = OBJECT_ID('[dbo].[SalesInvoices]')) AND name = 'WorkOrderDate')
@@ -2374,11 +2378,16 @@ public class SalesController : Controller
     }
 
     [HttpGet]
-    public async Task<IActionResult> ProjectPayment(long? projectId)
+    public async Task<IActionResult> ProjectPayment(long? projectId, long? clientId)
     {
         ViewData["ActiveMenu"] = "Sales";
         var company = await _companyContext.GetCurrentCompanyAsync();
         ViewBag.Company = company;
+
+        ViewBag.Clients = await _db.Clients
+            .OrderBy(c => c.ClientName)
+            .AsNoTracking()
+            .ToListAsync();
 
         ViewBag.Projects = await _db.Projects
             .Include(p => p.Client)
@@ -2392,9 +2401,11 @@ public class SalesController : Controller
             .ToListAsync();
 
         ViewBag.SelectedProjectId = projectId ?? 0;
+        ViewBag.SelectedClientId = clientId ?? 0;
 
         var invoices = await _db.SalesInvoices
             .Include(i => i.Project)
+            .Include(i => i.Client)
             .Where(i => i.OutstandingBalance > 0)
             .OrderByDescending(i => i.InvoiceDate)
             .AsNoTracking()
@@ -2407,8 +2418,8 @@ public class SalesController : Controller
         {
             recentReceipts = await _db.CustomerReceipts
                 .Include(r => r.Project)
+                .Include(r => r.Client)
                 .Include(r => r.Invoice)
-                .Where(r => r.ProjectId != null)
                 .OrderByDescending(r => r.ReceiptDate)
                 .ThenByDescending(r => r.Id)
                 .Take(20)
@@ -2422,8 +2433,8 @@ public class SalesController : Controller
             {
                 recentReceipts = await _db.CustomerReceipts
                     .Include(r => r.Project)
+                    .Include(r => r.Client)
                     .Include(r => r.Invoice)
-                    .Where(r => r.ProjectId != null)
                     .OrderByDescending(r => r.ReceiptDate)
                     .ThenByDescending(r => r.Id)
                     .Take(20)
@@ -2441,17 +2452,56 @@ public class SalesController : Controller
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetInvoicesByProject(long projectId)
+    public async Task<IActionResult> GetProjectsByClient(long clientId)
+    {
+        var projects = await _db.Projects
+            .Where(p => p.ClientId == clientId)
+            .OrderByDescending(p => p.Id)
+            .Select(p => new
+            {
+                id = p.Id,
+                projectCode = p.ProjectCode,
+                projectName = p.ProjectName
+            })
+            .ToListAsync();
+
+        return Json(projects);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GetInvoicesByClient(long clientId)
     {
         var invoices = await _db.SalesInvoices
-            .Where(i => i.ProjectId == projectId && i.OutstandingBalance > 0)
+            .Where(i => i.ClientId == clientId && i.OutstandingBalance > 0)
+            .OrderByDescending(i => i.InvoiceDate)
             .Select(i => new
             {
                 id = i.Id,
                 invoiceNumber = i.InvoiceNumber,
                 invoiceDate = i.InvoiceDate.ToString("dd MMM yyyy"),
                 outstandingBalance = i.OutstandingBalance,
-                totalValue = i.TotalInvoiceValue
+                totalValue = i.TotalInvoiceValue,
+                projectId = i.ProjectId
+            })
+            .ToListAsync();
+
+        return Json(invoices);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GetInvoicesByProject(long projectId)
+    {
+        var invoices = await _db.SalesInvoices
+            .Where(i => i.ProjectId == projectId && i.OutstandingBalance > 0)
+            .OrderByDescending(i => i.InvoiceDate)
+            .Select(i => new
+            {
+                id = i.Id,
+                invoiceNumber = i.InvoiceNumber,
+                invoiceDate = i.InvoiceDate.ToString("dd MMM yyyy"),
+                outstandingBalance = i.OutstandingBalance,
+                totalValue = i.TotalInvoiceValue,
+                projectId = i.ProjectId
             })
             .ToListAsync();
 
@@ -2460,8 +2510,94 @@ public class SalesController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    public async Task<IActionResult> QuickCreateClient(
+        string? clientCode,
+        string clientName,
+        string? billingAddress,
+        string? gstin,
+        string? pan,
+        string? contactPerson,
+        string? phone,
+        string? email,
+        string? stateCode)
+    {
+        var company = await _companyContext.GetCurrentCompanyAsync();
+
+        if (string.IsNullOrWhiteSpace(clientName))
+        {
+            return Json(new { success = false, message = "Client Name is required." });
+        }
+
+        pan = string.IsNullOrWhiteSpace(pan) ? null : pan.Trim().ToUpper();
+        if (pan != null && pan.Length > 25) pan = pan.Substring(0, 25);
+
+        gstin = string.IsNullOrWhiteSpace(gstin) ? null : gstin.Trim().ToUpper();
+        if (gstin != null && gstin.Length > 25) gstin = gstin.Substring(0, 25);
+
+        if (string.IsNullOrWhiteSpace(pan) && !string.IsNullOrWhiteSpace(gstin) && gstin.Length >= 12)
+        {
+            pan = gstin.Substring(2, 10);
+        }
+
+        var stCode = !string.IsNullOrWhiteSpace(stateCode) ? stateCode.Trim() : "";
+        if (string.IsNullOrWhiteSpace(stCode) && !string.IsNullOrWhiteSpace(gstin) && gstin.Length >= 2)
+        {
+            stCode = gstin.Substring(0, 2);
+        }
+        if (string.IsNullOrWhiteSpace(stCode))
+        {
+            stCode = company.StateCode ?? "07";
+        }
+
+        var code = string.IsNullOrWhiteSpace(clientCode) ? $"CL-{DateTime.Now:MMddHHmm}" : clientCode.Trim();
+        var exists = await _db.Clients.AnyAsync(c => c.CompanyId == company.Id && c.ClientCode == code);
+        if (exists)
+        {
+            code = $"CL-{DateTime.Now:MMddHHmmss}";
+        }
+
+        var client = new Client
+        {
+            CompanyId = company.Id,
+            ClientCode = code,
+            ClientName = clientName.Trim(),
+            BillingAddress = string.IsNullOrWhiteSpace(billingAddress) ? "Commercial Address" : billingAddress.Trim(),
+            Gstin = gstin,
+            Pan = pan,
+            ContactPerson = string.IsNullOrWhiteSpace(contactPerson) ? null : contactPerson.Trim(),
+            Phone = string.IsNullOrWhiteSpace(phone) ? null : phone.Trim(),
+            Email = string.IsNullOrWhiteSpace(email) ? null : email.Trim(),
+            StateCode = stCode,
+            CreditDays = 30,
+            IsActive = true
+        };
+
+        _db.Clients.Add(client);
+        await _db.SaveChangesAsync();
+
+        return Json(new
+        {
+            success = true,
+            client = new
+            {
+                id = client.Id,
+                clientCode = client.ClientCode,
+                clientName = client.ClientName,
+                gstin = client.Gstin ?? "",
+                stateCode = client.StateCode,
+                contactPerson = client.ContactPerson ?? "",
+                billingAddress = client.BillingAddress,
+                displayText = $"{client.ClientCode} - {client.ClientName}" + (!string.IsNullOrEmpty(client.Gstin) ? $" ({client.Gstin})" : "")
+            },
+            message = $"Client \"{client.ClientName}\" ({client.ClientCode}) successfully registered in Master Catalogs!"
+        });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> ProjectPayment(
-        long projectId,
+        long? clientId,
+        long? projectId,
         DateTime? paymentReceiveDate,
         string paymentReceiveMode,
         bool isAdvanceReceived,
@@ -2476,10 +2612,26 @@ public class SalesController : Controller
         long? bankAccountId,
         IFormFile? uploadFile)
     {
-        var project = await _db.Projects.Include(p => p.Client).FirstOrDefaultAsync(p => p.Id == projectId);
-        if (project == null)
+        Project? project = null;
+        if (projectId.HasValue && projectId.Value > 0)
         {
-            TempData["ErrorMessage"] = "Please select a valid Project.";
+            project = await _db.Projects.Include(p => p.Client).FirstOrDefaultAsync(p => p.Id == projectId.Value);
+            if (project != null && (!clientId.HasValue || clientId.Value == 0))
+            {
+                clientId = project.ClientId;
+            }
+        }
+
+        if (!clientId.HasValue || clientId.Value == 0)
+        {
+            TempData["ErrorMessage"] = "Please select a valid Client.";
+            return RedirectToAction(nameof(ProjectPayment));
+        }
+
+        var client = await _db.Clients.FindAsync(clientId.Value);
+        if (client == null)
+        {
+            TempData["ErrorMessage"] = "Please select a valid Client.";
             return RedirectToAction(nameof(ProjectPayment));
         }
 
@@ -2562,7 +2714,7 @@ public class SalesController : Controller
         var receipt = new CustomerReceipt
         {
             CompanyId = company.Id,
-            ClientId = project.ClientId,
+            ClientId = client.Id,
             BankAccountId = bank?.Id ?? (await _db.BankAccounts.Select(b => b.Id).FirstOrDefaultAsync()),
             ReceiptNumber = rcptNo,
             ReceiptDate = paymentReceiveDate ?? DateTime.Today,
@@ -2571,7 +2723,7 @@ public class SalesController : Controller
             PaymentMode = string.IsNullOrWhiteSpace(paymentReceiveMode) ? "Netbanking" : paymentReceiveMode,
             TransactionRefNo = isCash ? "CASH" : "N/A",
             Status = "POSTED",
-            ProjectId = project.Id,
+            ProjectId = project?.Id,
             InvoiceId = invoice?.Id,
             IsAdvance = isAdvanceReceived,
             TdsAmount = tdsAmount,
@@ -2580,7 +2732,7 @@ public class SalesController : Controller
             OtherDeductionAmount = otherDeductionAmount,
             NetAmountReceived = netAmountReceive,
             TotalAmountReceived = totalAmountReceive,
-            ExpenseHead = isAdvanceReceived ? "Mobilization Advance" : "Project Milestone Billing",
+            ExpenseHead = isAdvanceReceived ? "Mobilization Advance" : (project != null ? "Project Milestone Billing" : "Direct Client Billing"),
             Remarks = isCash ? $"[Mode: Cash] {paymentReceiveRemarks}" : paymentReceiveRemarks,
             ReceiptDocId = docId
         };
@@ -2624,6 +2776,7 @@ public class SalesController : Controller
             await _db.SaveChangesAsync();
         }
 
+        var partyLabel = project != null ? project.ProjectName : client.ClientName;
         var jv = new JournalEntry
         {
             CompanyId = company.Id,
@@ -2634,8 +2787,8 @@ public class SalesController : Controller
             VoucherType = "RECEIPT",
             SourceEntityType = "ProjectPaymentReceived",
             SourceEntityId = receipt.Id,
-            ProjectId = project.Id,
-            Narration = $"Project Payment: {project.ProjectName} (Invoice: {invoice?.InvoiceNumber ?? "Advance"}) via {(isCash ? "Cash" : "Bank")} - Net ₹{netAmountReceive:N2} (Total ₹{totalAmountReceive:N2}) - {paymentReceiveRemarks}",
+            ProjectId = project?.Id,
+            Narration = $"Payment Received: {partyLabel} (Invoice: {invoice?.InvoiceNumber ?? "Advance"}) via {(isCash ? "Cash" : "Bank")} - Net ₹{netAmountReceive:N2} (Total ₹{totalAmountReceive:N2}) - {paymentReceiveRemarks}",
             TotalDebit = totalAmountReceive,
             TotalCredit = totalAmountReceive,
             IsBalanced = true,
@@ -2648,7 +2801,7 @@ public class SalesController : Controller
         receipt.JournalEntryId = jv.Id;
         await _db.SaveChangesAsync();
 
-        TempData["SuccessMessage"] = $"Project payment of <strong>&#8377; {totalAmountReceive:N2}</strong> recorded successfully! (Receipt No: {rcptNo})";
+        TempData["SuccessMessage"] = $"Payment of <strong>&#8377; {totalAmountReceive:N2}</strong> for <strong>{partyLabel}</strong> recorded successfully! (Receipt No: {rcptNo})";
         return RedirectToAction(nameof(ProjectPayment));
     }
 
@@ -2723,33 +2876,34 @@ public class SalesController : Controller
         Project? project = null;
         Client? client = null;
 
-        if (projectId.HasValue && projectId.Value > 0)
+        var invoiceAgainst = form["invoiceAgainst"].ToString()?.Trim();
+        if (string.IsNullOrEmpty(invoiceAgainst))
+        {
+            invoiceAgainst = (projectId.HasValue && projectId.Value > 0) ? "Project" : "Client";
+        }
+
+        if (invoiceAgainst == "Project" && projectId.HasValue && projectId.Value > 0)
         {
             project = await _db.Projects.Include(p => p.Client).FirstOrDefaultAsync(p => p.Id == projectId.Value);
             if (project != null)
             {
                 client = project.Client ?? await _db.Clients.FindAsync(project.ClientId);
-                if (clientId == null || clientId.Value == 0)
-                {
-                    clientId = project.ClientId;
-                }
+                clientId = project.ClientId;
             }
+        }
+        else if (invoiceAgainst == "Client" || (clientId.HasValue && clientId.Value > 0 && (!projectId.HasValue || projectId.Value == 0)))
+        {
+            if (clientId.HasValue && clientId.Value > 0)
+            {
+                client = await _db.Clients.FindAsync(clientId.Value);
+            }
+            project = null;
+            projectId = null;
         }
 
         if (client == null && clientId.HasValue && clientId.Value > 0)
         {
             client = await _db.Clients.FindAsync(clientId.Value);
-        }
-
-        if (project == null)
-        {
-            project = await _db.Projects.Include(p => p.Client).FirstOrDefaultAsync();
-            if (project != null)
-            {
-                projectId = project.Id;
-                client ??= project.Client ?? await _db.Clients.FindAsync(project.ClientId);
-                clientId ??= project.ClientId;
-            }
         }
 
         if (client == null)
@@ -2776,20 +2930,15 @@ public class SalesController : Controller
             }
         }
 
-        if (project == null)
+        if (invoiceAgainst == "Project" && project == null)
         {
-            project = new Project
+            project = await _db.Projects.Include(p => p.Client).FirstOrDefaultAsync();
+            if (project != null)
             {
-                CompanyId = company.Id,
-                BranchId = branch.Id,
-                ClientId = client.Id,
-                ProjectCode = "PRJ-GEN-01",
-                ProjectName = "Commercial Engineering Services",
-                StartDate = DateTime.Today
-            };
-            _db.Projects.Add(project);
-            await _db.SaveChangesAsync();
-            projectId = project.Id;
+                projectId = project.Id;
+                client = project.Client ?? await _db.Clients.FindAsync(project.ClientId) ?? client;
+                clientId = project.ClientId;
+            }
         }
 
         // Parse line items from form collections
@@ -2822,7 +2971,7 @@ public class SalesController : Controller
             if (i < rates.Count && decimal.TryParse(rates[i], out var parsedRate) && parsedRate >= 0)
                 rate = parsedRate;
 
-            var hsn = (i < hsnCodes.Count && !string.IsNullOrWhiteSpace(hsnCodes[i])) ? hsnCodes[i].Trim() : "998313";
+            var hsn = (i < hsnCodes.Count && !string.IsNullOrWhiteSpace(hsnCodes[i])) ? hsnCodes[i]!.Trim() : "998313";
 
             decimal gRate = 18m;
             if (i < itemGsts.Count && decimal.TryParse(itemGsts[i], out var pGst)) gRate = pGst;
@@ -2890,9 +3039,13 @@ public class SalesController : Controller
             calculatedSgst = fallbackSgst;
             calculatedIgst = 0;
 
+            var fallbackDesc = project != null 
+                ? $"{project.ProjectName} - Execution & Milestone Delivery" 
+                : $"Commercial & Professional Services - {client.ClientName}";
+
             invoiceItems.Add(new SalesInvoiceItem
             {
-                ItemDescription = $"{project.ProjectName} - Execution & Milestone Delivery",
+                ItemDescription = fallbackDesc,
                 HsnSacCode = "998313",
                 Quantity = 1.00m,
                 UnitRate = fallbackTaxable,
@@ -2924,7 +3077,7 @@ public class SalesController : Controller
             CompanyId = company.Id,
             BranchId = branch.Id,
             ClientId = client.Id,
-            ProjectId = project.Id,
+            ProjectId = project?.Id,
             InvoiceNumber = invoiceNumber,
             InvoiceDate = invoiceDate ?? DateTime.Today,
             DueDate = dueDate ?? (invoiceDate ?? DateTime.Today).AddDays(30),
@@ -2981,7 +3134,7 @@ public class SalesController : Controller
             VoucherType = "SALES",
             SourceEntityType = "SalesInvoice",
             SourceEntityId = inv.Id,
-            ProjectId = project.Id,
+            ProjectId = project?.Id,
             Narration = $"Tax Invoice {inv.InvoiceNumber} auto-posted to General Ledger",
             TotalDebit = netPayable,
             TotalCredit = netPayable,
@@ -3217,7 +3370,7 @@ public class ProcurementController : Controller
             if (i < itemRates.Count && decimal.TryParse(itemRates[i], out var pRate) && pRate >= 0)
                 rate = pRate;
 
-            var hsn = (i < itemHsns.Count && !string.IsNullOrWhiteSpace(itemHsns[i])) ? itemHsns[i].Trim() : "998313";
+            var hsn = (i < itemHsns.Count && !string.IsNullOrWhiteSpace(itemHsns[i])) ? itemHsns[i]!.Trim() : "998313";
 
             decimal gst = 0, igst = 0, cgst = 0, sgst = 0;
             if (i < itemGsts.Count && decimal.TryParse(itemGsts[i], out var pGst)) gst = pGst;
