@@ -401,6 +401,57 @@ using (var scope = app.Services.CreateScope())
             app.Logger.LogError(ex, "PurchaseOrders schema migration SQL error: {Message}", ex.Message);
         }
 
+        // Dedicated DirectExpenses Schema Migration & Auto-Creation
+        try
+        {
+            await db.Database.ExecuteSqlRawAsync(@"
+                IF OBJECT_ID('[DirectExpenses]') IS NULL AND OBJECT_ID('[dbo].[DirectExpenses]') IS NULL
+                BEGIN
+                    CREATE TABLE [dbo].[DirectExpenses] (
+                        [Id] BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                        [CompanyId] BIGINT NOT NULL,
+                        [ExpenseHead] NVARCHAR(250) NOT NULL,
+                        [ExpenseHeadId] BIGINT NULL,
+                        [IsVendorApplicable] BIT NOT NULL DEFAULT 0,
+                        [VendorId] BIGINT NULL,
+                        [LedgerId] BIGINT NULL,
+                        [LedgerName] NVARCHAR(250) NOT NULL DEFAULT '',
+                        [PaymentDate] DATETIME2 NOT NULL,
+                        [Amount] DECIMAL(18,2) NOT NULL DEFAULT 0,
+                        [IsPipelineProject] BIT NOT NULL DEFAULT 0,
+                        [ProjectId] BIGINT NULL,
+                        [Purpose] NVARCHAR(MAX) NOT NULL DEFAULT '',
+                        [Remarks] NVARCHAR(MAX) NULL,
+                        [Status] NVARCHAR(50) NOT NULL DEFAULT 'PENDING',
+                        [CreatedByUserId] BIGINT NULL,
+                        [CreatedByUserName] NVARCHAR(150) NULL,
+                        [CreatedAt] DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+                        [ApprovedByUserId] BIGINT NULL,
+                        [ApprovedByUserName] NVARCHAR(150) NULL,
+                        [ApprovedAt] DATETIME2 NULL,
+                        [ApprovalRemarks] NVARCHAR(MAX) NULL,
+                        [DeclinedByUserId] BIGINT NULL,
+                        [DeclinedByUserName] NVARCHAR(150) NULL,
+                        [DeclinedAt] DATETIME2 NULL,
+                        [DeclineReason] NVARCHAR(MAX) NULL,
+                        [SettledByUserId] BIGINT NULL,
+                        [SettledByUserName] NVARCHAR(150) NULL,
+                        [SettledAt] DATETIME2 NULL,
+                        [SettlementPaymentMode] NVARCHAR(100) NULL,
+                        [SettlementReference] NVARCHAR(150) NULL,
+                        [SettlementBankAccountId] BIGINT NULL,
+                        [SettlementBankName] NVARCHAR(150) NULL,
+                        [SettlementNotes] NVARCHAR(MAX) NULL,
+                        [JournalEntryId] BIGINT NULL
+                    );
+                END
+            ");
+        }
+        catch (Exception ex)
+        {
+            app.Logger.LogError(ex, "DirectExpenses schema migration SQL error: {Message}", ex.Message);
+        }
+
         await SeedData.InitializeAsync(db);
     }
     catch (Exception ex)

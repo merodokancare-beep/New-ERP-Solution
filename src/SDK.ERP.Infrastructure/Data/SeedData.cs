@@ -280,7 +280,191 @@ public static class SeedData
                 };
                 context.JournalEntries.Add(jv);
             }
-            await context.SaveChangesAsync();
+        }
+
+        // 9. Seed Direct Expenses & Direct Payments matching screenshot reference data
+        try
+        {
+            if (!await context.DirectExpenses.AnyAsync())
+            {
+                var companyEntity = await context.Companies.FirstOrDefaultAsync();
+                var companyId = companyEntity?.Id ?? 1;
+                var admin = await context.Users.FirstOrDefaultAsync();
+                var adminId = admin?.Id ?? 1;
+                var adminName = admin?.FullName ?? "Admin User";
+
+                var existingProject = await context.Projects.FirstOrDefaultAsync();
+                long? socProjectId = existingProject?.Id;
+
+                var sampleExpenses = new List<DirectExpense>
+                {
+                    new DirectExpense
+                    {
+                        CompanyId = companyId,
+                        ExpenseHead = "Tax Payment",
+                        LedgerName = "GST Payment",
+                        Purpose = "Partial payment made via HDFC OD netbanking against GST payment for the month of September 2026",
+                        PaymentDate = new DateTime(2026, 10, 20),
+                        Amount = 3500000.00m,
+                        IsVendorApplicable = false,
+                        IsPipelineProject = false,
+                        Status = "UNSETTLED",
+                        CreatedByUserId = adminId,
+                        CreatedByUserName = adminName,
+                        CreatedAt = new DateTime(2026, 10, 20, 10, 30, 0),
+                        ApprovedByUserId = adminId,
+                        ApprovedByUserName = adminName,
+                        ApprovedAt = new DateTime(2026, 10, 20, 11, 0, 0),
+                        ApprovalRemarks = "Verified against GST challan. Approved for release."
+                    },
+                    new DirectExpense
+                    {
+                        CompanyId = companyId,
+                        ExpenseHead = "Office Expense",
+                        LedgerName = "Electricity Expenses",
+                        Purpose = "Payment made via IDFC A/c against electricity charges for the month of Sept' 2026 ( Residential )",
+                        PaymentDate = new DateTime(2026, 10, 17),
+                        Amount = 2040.00m,
+                        IsVendorApplicable = false,
+                        IsPipelineProject = false,
+                        Status = "UNSETTLED",
+                        CreatedByUserId = adminId,
+                        CreatedByUserName = adminName,
+                        CreatedAt = new DateTime(2026, 10, 17, 9, 15, 0),
+                        ApprovedByUserId = adminId,
+                        ApprovedByUserName = adminName,
+                        ApprovedAt = new DateTime(2026, 10, 17, 10, 0, 0),
+                        ApprovalRemarks = "Approved standard utility bill."
+                    },
+                    new DirectExpense
+                    {
+                        CompanyId = companyId,
+                        ExpenseHead = "Office Expense",
+                        LedgerName = "Electricity Expenses",
+                        Purpose = "Payment made via IDFC A/c against electricity charges for the month of Sept'2026",
+                        PaymentDate = new DateTime(2026, 10, 17),
+                        Amount = 19792.00m,
+                        IsVendorApplicable = false,
+                        IsPipelineProject = false,
+                        Status = "UNSETTLED",
+                        CreatedByUserId = adminId,
+                        CreatedByUserName = adminName,
+                        CreatedAt = new DateTime(2026, 10, 17, 9, 20, 0),
+                        ApprovedByUserId = adminId,
+                        ApprovedByUserName = adminName,
+                        ApprovedAt = new DateTime(2026, 10, 17, 10, 5, 0),
+                        ApprovalRemarks = "Approved commercial electricity bill."
+                    },
+                    new DirectExpense
+                    {
+                        CompanyId = companyId,
+                        ExpenseHead = "Office Expense",
+                        LedgerName = "ESIC",
+                        Purpose = "Payment made via HDFC current netbanking against ESIC for the month of September 2026",
+                        PaymentDate = new DateTime(2026, 10, 15),
+                        Amount = 11216.00m,
+                        IsVendorApplicable = false,
+                        IsPipelineProject = false,
+                        Status = "UNSETTLED",
+                        CreatedByUserId = adminId,
+                        CreatedByUserName = adminName,
+                        CreatedAt = new DateTime(2026, 10, 15, 14, 0, 0),
+                        ApprovedByUserId = adminId,
+                        ApprovedByUserName = adminName,
+                        ApprovedAt = new DateTime(2026, 10, 15, 14, 45, 0),
+                        ApprovalRemarks = "Statutory ESIC monthly contribution."
+                    },
+                    new DirectExpense
+                    {
+                        CompanyId = companyId,
+                        ExpenseHead = "Business Development",
+                        LedgerName = "Business Development (Project)",
+                        Purpose = "Paid BD at Delhi against SOC Project via ICICI Netbanking (Future payment) from Personal Account for 20% fund release",
+                        PaymentDate = new DateTime(2026, 9, 14),
+                        Amount = 70000.00m,
+                        IsVendorApplicable = false,
+                        IsPipelineProject = true,
+                        ProjectId = socProjectId,
+                        Remarks = "Establishment of Security Operation Centre (SOC) and Network Operating Centre [NOC] at SLDC Sikkim",
+                        Status = "UNSETTLED",
+                        CreatedByUserId = adminId,
+                        CreatedByUserName = adminName,
+                        CreatedAt = new DateTime(2026, 9, 14, 11, 0, 0),
+                        ApprovedByUserId = adminId,
+                        ApprovedByUserName = adminName,
+                        ApprovedAt = new DateTime(2026, 9, 14, 11, 30, 0),
+                        ApprovalRemarks = "Approved against client liaison & milestone release."
+                    },
+                    new DirectExpense
+                    {
+                        CompanyId = companyId,
+                        ExpenseHead = "Project",
+                        LedgerName = "Subcontractor / Site Service Ledger",
+                        Purpose = "Direct milestone payment released to hardware cabling vendor for SOC rack setup",
+                        PaymentDate = DateTime.Today.AddDays(-2),
+                        Amount = 125000.00m,
+                        IsVendorApplicable = true,
+                        IsPipelineProject = true,
+                        ProjectId = socProjectId,
+                        Remarks = "Hardware & Structured Cabling Phase 1",
+                        Status = "PENDING",
+                        CreatedByUserId = adminId,
+                        CreatedByUserName = adminName,
+                        CreatedAt = DateTime.UtcNow.AddDays(-2)
+                    },
+                    new DirectExpense
+                    {
+                        CompanyId = companyId,
+                        ExpenseHead = "Office Expense",
+                        LedgerName = "Internet & Communication",
+                        Purpose = "Office high-speed fiber lease line charges for current month",
+                        PaymentDate = DateTime.Today.AddDays(-10),
+                        Amount = 14500.00m,
+                        IsVendorApplicable = false,
+                        IsPipelineProject = false,
+                        Status = "SETTLED",
+                        CreatedByUserId = adminId,
+                        CreatedByUserName = adminName,
+                        CreatedAt = DateTime.UtcNow.AddDays(-10),
+                        ApprovedByUserId = adminId,
+                        ApprovedByUserName = adminName,
+                        ApprovedAt = DateTime.UtcNow.AddDays(-10),
+                        SettledByUserId = adminId,
+                        SettledByUserName = adminName,
+                        SettledAt = DateTime.UtcNow.AddDays(-9),
+                        SettlementPaymentMode = "NetBanking",
+                        SettlementReference = "HDFC-NET-948201",
+                        SettlementNotes = "Auto-debited from HDFC Current Account"
+                    },
+                    new DirectExpense
+                    {
+                        CompanyId = companyId,
+                        ExpenseHead = "Office Expense",
+                        LedgerName = "Miscellaneous Staff Welfare",
+                        Purpose = "Claim for staff refreshment charges without supporting bill voucher",
+                        PaymentDate = DateTime.Today.AddDays(-5),
+                        Amount = 3500.00m,
+                        IsVendorApplicable = false,
+                        IsPipelineProject = false,
+                        Status = "DECLINED",
+                        CreatedByUserId = adminId,
+                        CreatedByUserName = adminName,
+                        CreatedAt = DateTime.UtcNow.AddDays(-5),
+                        DeclinedByUserId = adminId,
+                        DeclinedByUserName = adminName,
+                        DeclinedAt = DateTime.UtcNow.AddDays(-4),
+                        DeclineReason = "Original tax invoice / voucher receipt not attached. Please resubmit with supporting bill."
+                    }
+                };
+
+                context.DirectExpenses.AddRange(sampleExpenses);
+                await context.SaveChangesAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            // Logging or fallback if table not yet created
+            System.Diagnostics.Debug.WriteLine($"DirectExpenses seed notice: {ex.Message}");
         }
     }
 }

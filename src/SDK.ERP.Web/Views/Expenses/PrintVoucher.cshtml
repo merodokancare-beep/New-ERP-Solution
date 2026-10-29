@@ -1,0 +1,234 @@
+@model SDK.ERP.Domain.Entities.Accounting.DirectExpense
+@{
+    Layout = null;
+    var company = ViewBag.Company as SDK.ERP.Domain.Entities.Admin.Company;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Payment Release Voucher #@Model.Id - @(company?.CompanyName ?? "ERP")</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <style>
+        body {
+            background-color: #F8FAFC;
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+            color: #1E293B;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .voucher-container {
+            max-width: 820px;
+            margin: 0 auto;
+            background: #FFFFFF;
+            border: 1px solid #CBD5E1;
+            border-radius: 8px;
+            padding: 36px 42px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        }
+
+        .voucher-header {
+            border-bottom: 2px solid #0284C7;
+            padding-bottom: 16px;
+            margin-bottom: 24px;
+        }
+
+        .company-name {
+            font-size: 22px;
+            font-weight: 800;
+            color: #0F172A;
+            letter-spacing: -0.3px;
+        }
+
+        .voucher-title {
+            font-size: 17px;
+            font-weight: 700;
+            color: #0284C7;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .voucher-table {
+            width: 100%;
+            margin-bottom: 24px;
+            border: 1px solid #E2E8F0;
+        }
+
+        .voucher-table th, .voucher-table td {
+            padding: 10px 14px;
+            border: 1px solid #E2E8F0;
+            font-size: 13px;
+        }
+
+        .voucher-table th {
+            background-color: #F1F5F9;
+            font-weight: 600;
+            color: #475569;
+            width: 30%;
+        }
+
+        .signature-box {
+            border-top: 1px dashed #94A3B8;
+            padding-top: 8px;
+            text-align: center;
+            font-size: 12px;
+            color: #475569;
+            margin-top: 60px;
+        }
+
+        .btn-print {
+            background: #0284C7;
+            color: #FFFFFF;
+            border: none;
+            padding: 8px 24px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 13.5px;
+            cursor: pointer;
+        }
+
+        .btn-print:hover {
+            background: #0369A1;
+        }
+
+        @@media print {
+            body {
+                background: #FFFFFF;
+                padding: 0;
+            }
+            .voucher-container {
+                border: none;
+                box-shadow: none;
+                padding: 10px 20px;
+                max-width: 100%;
+            }
+            .no-print {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="voucher-container">
+        <!-- Print Toolbar -->
+        <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom no-print">
+            <button onclick="window.close()" class="btn btn-sm btn-outline-secondary">
+                <i class="fa-solid fa-arrow-left me-1"></i> Close
+            </button>
+            <button onclick="window.print()" class="btn-print">
+                <i class="fa-solid fa-print me-1"></i> Print Voucher
+            </button>
+        </div>
+
+        <!-- Header -->
+        <div class="voucher-header d-flex justify-content-between align-items-start">
+            <div>
+                <div class="company-name">@(company?.CompanyName ?? "SDK SOLUTIONS PRIVATE LIMITED")</div>
+                <div style="font-size: 12px; color: #64748B; margin-top: 2px;">
+                    @(company?.AddressLine1 ?? "Connaught Place, Central Business District, New Delhi")<br />
+                    GSTIN: <strong>@(company?.Gstin ?? "07AAAAA0000A1Z5")</strong> | PAN: <strong>@(company?.Pan ?? "AAAAA0000A")</strong>
+                </div>
+            </div>
+            <div class="text-end">
+                <div class="voucher-title">DIRECT PAYMENT VOUCHER</div>
+                <div class="fw-bold" style="font-size: 15px; color: #0F172A;">Voucher No: DP-@(Model.Id.ToString("D5"))</div>
+                <div style="font-size: 12px; color: #64748B;">Date: <strong>@Model.PaymentDate.ToString("dd MMM yyyy")</strong></div>
+                <span class="badge @(Model.Status == "SETTLED" ? "bg-success" : Model.Status == "UNSETTLED" ? "bg-info text-dark" : "bg-warning text-dark") mt-2">
+                    STATUS: @Model.Status
+                </span>
+            </div>
+        </div>
+
+        <!-- Details Table -->
+        <table class="voucher-table">
+            <tbody>
+                <tr>
+                    <th>Expense Head</th>
+                    <td class="fw-bold text-dark">@Model.ExpenseHead</td>
+                </tr>
+                <tr>
+                    <th>Ledger Account</th>
+                    <td>@(string.IsNullOrWhiteSpace(Model.LedgerName) ? "General Ledger" : Model.LedgerName)</td>
+                </tr>
+                <tr>
+                    <th>Disbursement Purpose</th>
+                    <td>@Model.Purpose</td>
+                </tr>
+                @if (Model.IsVendorApplicable && Model.Vendor != null)
+                {
+                    <tr>
+                        <th>Beneficiary Vendor</th>
+                        <td><strong>@Model.Vendor.VendorName</strong> (GSTIN: @(Model.Vendor.Gstin ?? "N/A"))</td>
+                    </tr>
+                }
+                @if (Model.IsPipelineProject && (Model.Project != null || !string.IsNullOrWhiteSpace(Model.Remarks)))
+                {
+                    <tr>
+                        <th>Associated Project</th>
+                        <td>@(Model.Project?.ProjectName ?? Model.Remarks)</td>
+                    </tr>
+                }
+                <tr>
+                    <th>Amount Disbursed</th>
+                    <td class="fw-bold fs-5 text-success">
+                        &#8377; @Model.Amount.ToString("N2")
+                    </td>
+                </tr>
+                @if (!string.IsNullOrWhiteSpace(Model.Remarks))
+                {
+                    <tr>
+                        <th>Remarks / Notes</th>
+                        <td>@Model.Remarks</td>
+                    </tr>
+                }
+                @if (Model.Status == "SETTLED")
+                {
+                    <tr>
+                        <th>Settlement Details</th>
+                        <td>
+                            Mode: <strong>@Model.SettlementPaymentMode</strong> |
+                            Ref: <strong>@(Model.SettlementReference ?? "N/A")</strong> |
+                            Date: <strong>@(Model.SettledAt?.ToString("dd MMM yyyy") ?? "N/A")</strong>
+                            @if (!string.IsNullOrWhiteSpace(Model.SettlementBankName))
+                            {
+                                <div>Bank: @Model.SettlementBankName</div>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <!-- Signatures & Authorization Blocks -->
+        <div class="row pt-4">
+            <div class="col-4">
+                <div class="signature-box">
+                    <strong>@(Model.CreatedByUserName ?? "Prepared By")</strong><br />
+                    <span>Initiated / Prepared</span><br />
+                    <small class="text-muted">@Model.CreatedAt.ToString("dd/MM/yyyy HH:mm")</small>
+                </div>
+            </div>
+            <div class="col-4">
+                <div class="signature-box">
+                    <strong>@(Model.ApprovedByUserName ?? (Model.Status != "PENDING" ? "Authorized Officer" : "Pending Approval"))</strong><br />
+                    <span>Checked &amp; Approved</span><br />
+                    <small class="text-muted">@(Model.ApprovedAt?.ToString("dd/MM/yyyy HH:mm") ?? "-")</small>
+                </div>
+            </div>
+            <div class="col-4">
+                <div class="signature-box">
+                    <strong>@(Model.SettledByUserName ?? (Model.Status == "SETTLED" ? "Cashier / Finance" : "Awaiting Settlement"))</strong><br />
+                    <span>Disbursed &amp; Paid</span><br />
+                    <small class="text-muted">@(Model.SettledAt?.ToString("dd/MM/yyyy") ?? "-")</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="text-center text-muted mt-5" style="font-size: 11px;">
+            This is a computer-generated voucher from @(company?.CompanyName ?? "SDK Solutions ERP"). All accounting entries have been logged in accordance with General Ledger standards.
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,845 @@
+@model IEnumerable<SDK.ERP.Domain.Entities.Accounting.DirectExpense>
+@{
+    ViewData["Title"] = "Payments > Direct Payments";
+    ViewData["ActiveMenu"] = ViewBag.ActiveTab == "pending" ? "ExpensesApproval" : "Expenses";
+
+    var activeTab = (ViewBag.ActiveTab as string ?? "unsettled").ToLowerInvariant();
+    var search = ViewBag.Search as string ?? string.Empty;
+    var unsettledCount = ViewBag.UnsettledCount as int? ?? 0;
+    var settledCount = ViewBag.SettledCount as int? ?? 0;
+    var pendingCount = ViewBag.PendingCount as int? ?? 0;
+    var declinedCount = ViewBag.DeclinedCount as int? ?? 0;
+
+    var pageNum = ViewBag.Page as int? ?? 1;
+    var pageSize = ViewBag.PageSize as int? ?? 10;
+    var totalRecords = ViewBag.TotalRecords as int? ?? 0;
+    var totalPages = ViewBag.TotalPages as int? ?? 1;
+
+    var bankAccounts = ViewBag.BankAccounts as IEnumerable<SDK.ERP.Domain.Entities.Banking.BankAccount> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Banking.BankAccount>();
+    var selectedProjectId = ViewBag.SelectedProjectId as long?;
+    var projects = ViewBag.Projects as IEnumerable<SDK.ERP.Domain.Entities.Projects.Project> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Projects.Project>();
+    var selectedProject = selectedProjectId.HasValue ? projects.FirstOrDefault(p => p.Id == selectedProjectId.Value) : null;
+}
+
+<style>
+    .direct-payments-wrapper {
+        background: #ffffff;
+        border: 1px solid #E2E8F0;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        padding: 20px 24px;
+        margin-top: 10px;
+    }
+
+    .page-title-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 20px;
+        padding-bottom: 14px;
+        border-bottom: 1px solid #F1F5F9;
+    }
+
+    .page-title-text {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 19px;
+        font-weight: 700;
+        color: #2D3748;
+    }
+
+    .page-title-text i {
+        color: #4A5568;
+        font-size: 18px;
+    }
+
+    .btn-top-monthly {
+        background: #22C55E;
+        color: #FFFFFF;
+        border: none;
+        padding: 7px 18px;
+        border-radius: 6px;
+        font-size: 13.5px;
+        font-weight: 600;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: background 0.15s ease;
+    }
+
+    .btn-top-monthly:hover {
+        background: #16A34A;
+        color: #FFFFFF;
+    }
+
+    .btn-top-add {
+        background: #0284C7;
+        color: #FFFFFF;
+        border: none;
+        padding: 7px 18px;
+        border-radius: 6px;
+        font-size: 13.5px;
+        font-weight: 600;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: background 0.15s ease;
+    }
+
+    .btn-top-add:hover {
+        background: #0369A1;
+        color: #FFFFFF;
+    }
+
+    /* Search Bar */
+    .search-input-group {
+        display: flex;
+        max-width: 100%;
+        margin-bottom: 20px;
+    }
+
+    .search-input-field {
+        flex-grow: 1;
+        border: 1px solid #D1D5DB;
+        border-right: none;
+        border-radius: 6px 0 0 6px;
+        padding: 8px 14px;
+        font-size: 13.5px;
+        color: #1F2937;
+        outline: none;
+    }
+
+    .search-input-field:focus {
+        border-color: #F59E0B;
+        box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.15);
+    }
+
+    .search-btn-amber {
+        background: #F59E0B;
+        color: #FFFFFF;
+        border: 1px solid #F59E0B;
+        border-radius: 0 6px 6px 0;
+        padding: 8px 18px;
+        font-size: 14px;
+        cursor: pointer;
+        transition: background 0.15s ease;
+    }
+
+    .search-btn-amber:hover {
+        background: #D97706;
+    }
+
+    /* Filter Tabs Matching Reference Screenshot */
+    .filter-tabs-bar {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        margin-bottom: 18px;
+    }
+
+    .filter-tab-pill {
+        padding: 7px 20px;
+        border-radius: 4px;
+        font-size: 13px;
+        font-weight: 600;
+        text-decoration: none;
+        color: #4B5563;
+        background: #F3F4F6;
+        transition: all 0.15s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .filter-tab-pill:hover {
+        background: #E5E7EB;
+        color: #1F2937;
+    }
+
+    /* Teal tab style matching screenshot */
+    .filter-tab-pill.active {
+        background: #009688;
+        color: #FFFFFF;
+        box-shadow: 0 1px 2px rgba(0, 150, 136, 0.2);
+    }
+
+    .filter-tab-badge {
+        font-size: 10.5px;
+        padding: 2px 7px;
+        border-radius: 9999px;
+        background: rgba(255, 255, 255, 0.25);
+        color: inherit;
+    }
+
+    .filter-tab-pill:not(.active) .filter-tab-badge {
+        background: #E5E7EB;
+        color: #4B5563;
+    }
+
+    /* Table Matching Reference Screenshot */
+    .table-payments {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+        margin-bottom: 0;
+    }
+
+    .table-payments thead th {
+        background: #C7D2FE;
+        background: linear-gradient(to bottom, #E2E8F0, #CBD5E1);
+        color: #1E293B;
+        font-weight: 700;
+        padding: 10px 14px;
+        border: 1px solid #CBD5E1;
+        font-size: 12.5px;
+        letter-spacing: 0.2px;
+    }
+
+    .table-payments tbody td {
+        padding: 12px 14px;
+        border: 1px solid #E2E8F0;
+        vertical-align: middle;
+        color: #334155;
+    }
+
+    .table-payments tbody tr:nth-child(even) {
+        background-color: #F8FAFC;
+    }
+
+    .table-payments tbody tr:hover {
+        background-color: #F1F5F9;
+    }
+
+    .expense-head-title {
+        font-weight: 600;
+        color: #1E293B;
+        margin-bottom: 2px;
+    }
+
+    .expense-head-ledger {
+        font-size: 11.5px;
+        color: #64748B;
+        font-weight: 500;
+    }
+
+    .amount-cell {
+        font-weight: 700;
+        color: #0F172A;
+        text-align: right;
+        font-size: 13.5px;
+        white-space: nowrap;
+    }
+
+    /* Action Links Matching Screenshot */
+    .action-links {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 12.5px;
+        font-weight: 600;
+    }
+
+    .action-link-settle {
+        color: #16A34A;
+        text-decoration: none;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .action-link-settle:hover {
+        color: #15803D;
+        text-decoration: underline;
+    }
+
+    .action-link-approve {
+        color: #0D9488;
+        text-decoration: none;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .action-link-approve:hover {
+        color: #0F766E;
+        text-decoration: underline;
+    }
+
+    .action-link-decline {
+        color: #DC2626;
+        text-decoration: none;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .action-link-decline:hover {
+        color: #B91C1C;
+        text-decoration: underline;
+    }
+
+    .action-link-edit {
+        color: #0D9488;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .action-link-edit:hover {
+        color: #0F766E;
+        text-decoration: underline;
+    }
+
+    .action-link-print {
+        color: #0284C7;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .action-link-print:hover {
+        color: #0369A1;
+        text-decoration: underline;
+    }
+
+    /* Table Footer Matching Screenshot */
+    .table-footer-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 14px;
+        background: #F8FAFC;
+        border: 1px solid #E2E8F0;
+        border-top: none;
+        border-radius: 0 0 6px 6px;
+        font-size: 12.5px;
+        color: #475569;
+    }
+
+    .pagination-controls {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .btn-pagination {
+        background: #FFFFFF;
+        border: 1px solid #CBD5E1;
+        border-radius: 4px;
+        padding: 3px 8px;
+        font-size: 12px;
+        color: #334155;
+        text-decoration: none;
+        cursor: pointer;
+    }
+
+    .btn-pagination:hover:not(:disabled) {
+        background: #F1F5F9;
+        color: #0F172A;
+    }
+
+    .btn-pagination:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+</style>
+
+<div class="container-fluid px-3 py-2">
+    <!-- Success & Error Messages -->
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show d-flex align-items-center mb-3 py-2 px-3 shadow-sm" role="alert" style="border-radius: 6px; font-size: 13.5px;">
+            <i class="fa-solid fa-circle-check fs-5 me-2 text-success"></i>
+            <div>@Html.Raw(TempData["SuccessMessage"])</div>
+            <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    @if (TempData["WarningMessage"] != null)
+    {
+        <div class="alert alert-warning alert-dismissible fade show d-flex align-items-center mb-3 py-2 px-3 shadow-sm" role="alert" style="border-radius: 6px; font-size: 13.5px;">
+            <i class="fa-solid fa-triangle-exclamation fs-5 me-2 text-warning"></i>
+            <div>@Html.Raw(TempData["WarningMessage"])</div>
+            <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show d-flex align-items-center mb-3 py-2 px-3 shadow-sm" role="alert" style="border-radius: 6px; font-size: 13.5px;">
+            <i class="fa-solid fa-circle-exclamation fs-5 me-2 text-danger"></i>
+            <div>@Html.Raw(TempData["ErrorMessage"])</div>
+            <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    <div class="direct-payments-wrapper">
+        <!-- TOP TITLE BAR -->
+        <div class="page-title-bar">
+            <div class="page-title-text">
+                <i class="fa-solid fa-reply"></i>
+                <span>Payments &gt; Direct Payments</span>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <a asp-action="MonthlyReport" class="btn-top-monthly">
+                    <i class="fa-solid fa-arrow-down-to-bracket"></i> Monthly Report
+                </a>
+                <a asp-action="Create" class="btn-top-add">
+                    <i class="fa-solid fa-plus"></i> Add
+                </a>
+            </div>
+        </div>
+
+        <!-- SEARCH INPUT -->
+        <form method="get" asp-action="Index">
+            <input type="hidden" name="tab" value="@activeTab" />
+            @if (selectedProjectId.HasValue)
+            {
+                <input type="hidden" name="projectId" value="@selectedProjectId.Value" />
+            }
+            <div class="search-input-group">
+                <input type="text" name="search" value="@search" class="search-input-field" placeholder="Search By Purpose or Project..." />
+                <button type="submit" class="search-btn-amber" title="Search">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                </button>
+            </div>
+        </form>
+
+        @if (selectedProject != null)
+        {
+            <div class="d-flex align-items-center gap-2 mb-3 p-2 bg-light border rounded" style="font-size: 12.5px;">
+                <i class="fa-solid fa-filter text-primary"></i>
+                <span>Showing expenses for project: <strong>@selectedProject.ProjectName</strong> (@selectedProject.ProjectCode)</span>
+                <a asp-action="Index" asp-route-tab="@activeTab" class="btn btn-sm btn-outline-danger py-0 px-2 ms-auto" style="font-size: 11px;">
+                    <i class="fa-solid fa-xmark me-1"></i> Clear Filter
+                </a>
+            </div>
+        }
+
+        <!-- FILTER TABS MATCHING REFERENCE SCREENSHOT -->
+        <div class="filter-tabs-bar">
+            <a asp-action="Index" asp-route-tab="unsettled" asp-route-search="@search" asp-route-projectId="@selectedProjectId" class="filter-tab-pill @(activeTab == "unsettled" ? "active" : "")">
+                Unsettled <span class="filter-tab-badge">@unsettledCount</span>
+            </a>
+            <a asp-action="Index" asp-route-tab="settled" asp-route-search="@search" asp-route-projectId="@selectedProjectId" class="filter-tab-pill @(activeTab == "settled" ? "active" : "")">
+                Settled <span class="filter-tab-badge">@settledCount</span>
+            </a>
+            <a asp-action="Index" asp-route-tab="pending" asp-route-search="@search" asp-route-projectId="@selectedProjectId" class="filter-tab-pill @(activeTab == "pending" ? "active" : "")">
+                Pending <span class="filter-tab-badge">@pendingCount</span>
+            </a>
+            <a asp-action="Index" asp-route-tab="declined" asp-route-search="@search" asp-route-projectId="@selectedProjectId" class="filter-tab-pill @(activeTab == "declined" ? "active" : "")">
+                Declined <span class="filter-tab-badge">@declinedCount</span>
+            </a>
+        </div>
+
+        <!-- TABLE MATCHING REFERENCE SCREENSHOT -->
+        <div class="table-responsive">
+            <table class="table-payments">
+                <thead>
+                    <tr>
+                        <th style="width: 110px;">Date</th>
+                        <th style="width: 220px;">Expense Head</th>
+                        <th>Purpose</th>
+                        <th style="width: 220px;">Project</th>
+                        <th style="width: 140px; text-align: right;">Total</th>
+                        <th style="width: 120px;">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model != null && Model.Any())
+                    {
+                        @foreach (var item in Model)
+                        {
+                            <tr>
+                                <!-- Date -->
+                                <td style="white-space: nowrap;">
+                                    <span class="fw-semibold text-dark">@item.PaymentDate.ToString("dd MMM yyyy")</span>
+                                </td>
+
+                                <!-- Expense Head with Ledger Subtitle -->
+                                <td>
+                                    <div class="expense-head-title">@item.ExpenseHead</div>
+                                    <div class="expense-head-ledger">Ledger - @(string.IsNullOrWhiteSpace(item.LedgerName) ? "General" : item.LedgerName)</div>
+                                    @if (item.IsVendorApplicable && item.Vendor != null)
+                                    {
+                                        <div class="small text-primary mt-1" style="font-size: 11px;">
+                                            <i class="fa-solid fa-truck-ramp-box me-1"></i>Vendor: <strong>@item.Vendor.VendorName</strong>
+                                        </div>
+                                    }
+                                </td>
+
+                                <!-- Purpose -->
+                                <td>
+                                    <div style="line-height: 1.45;">@item.Purpose</div>
+                                    @if (!string.IsNullOrWhiteSpace(item.Remarks))
+                                    {
+                                        <div class="small text-muted mt-1" style="font-size: 11.5px;">
+                                            <i class="fa-regular fa-comment-dots me-1"></i>@item.Remarks
+                                        </div>
+                                    }
+                                    @if (item.Status == "DECLINED" && !string.IsNullOrWhiteSpace(item.DeclineReason))
+                                    {
+                                        <div class="small text-danger mt-1 fw-semibold" style="font-size: 11.5px;">
+                                            <i class="fa-solid fa-circle-xmark me-1"></i>Decline Reason: @item.DeclineReason
+                                        </div>
+                                    }
+                                    @if (item.Status == "SETTLED" && !string.IsNullOrWhiteSpace(item.SettlementReference))
+                                    {
+                                        <div class="small text-success mt-1" style="font-size: 11.5px;">
+                                            <i class="fa-solid fa-receipt me-1"></i>Ref: @item.SettlementReference (@item.SettlementPaymentMode)
+                                        </div>
+                                    }
+                                </td>
+
+                                <!-- Project -->
+                                <td>
+                                    @if (item.IsPipelineProject && item.Project != null)
+                                    {
+                                        <span class="fw-semibold text-dark" style="font-size: 12px;">@item.Project.ProjectName</span>
+                                    }
+                                    else if (item.IsPipelineProject && !string.IsNullOrWhiteSpace(item.Remarks) && item.Remarks.Contains("Establishment"))
+                                    {
+                                        <span class="fw-semibold text-dark" style="font-size: 12px;">@item.Remarks</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">N/A</span>
+                                    }
+                                </td>
+
+                                <!-- Total -->
+                                <td class="amount-cell">
+                                    &#8377; @item.Amount.ToString("N2")
+                                </td>
+
+                                <!-- Action Buttons According to Tab / Approval Cycle -->
+                                <td>
+                                    <div class="action-links">
+                                        @if (activeTab == "unsettled")
+                                        {
+                                            <a href="javascript:void(0)" class="action-link-settle" onclick="openSettleModal(@item.Id, '@item.ExpenseHead', '@item.Amount.ToString("N2")')">
+                                                <i class="fa-solid fa-check"></i> Settle
+                                            </a>
+                                            <a asp-action="Edit" asp-route-id="@item.Id" class="action-link-edit">
+                                                <i class="fa-solid fa-pencil"></i> Edit
+                                            </a>
+                                            <a asp-action="PrintVoucher" asp-route-id="@item.Id" target="_blank" class="action-link-print">
+                                                <i class="fa-solid fa-print"></i> Print
+                                            </a>
+                                        }
+                                        else if (activeTab == "pending")
+                                        {
+                                            <a href="javascript:void(0)" class="action-link-approve" onclick="openApproveModal(@item.Id, '@item.ExpenseHead', '@item.Amount.ToString("N2")')">
+                                                <i class="fa-solid fa-check-double"></i> Approve
+                                            </a>
+                                            <a href="javascript:void(0)" class="action-link-decline" onclick="openDeclineModal(@item.Id, '@item.ExpenseHead')">
+                                                <i class="fa-solid fa-xmark"></i> Decline
+                                            </a>
+                                            <a asp-action="Edit" asp-route-id="@item.Id" class="action-link-edit">
+                                                <i class="fa-solid fa-pencil"></i> Edit
+                                            </a>
+                                            <a asp-action="PrintVoucher" asp-route-id="@item.Id" target="_blank" class="action-link-print">
+                                                <i class="fa-solid fa-print"></i> Print
+                                            </a>
+                                        }
+                                        else if (activeTab == "settled")
+                                        {
+                                            <a asp-action="PrintVoucher" asp-route-id="@item.Id" target="_blank" class="action-link-print">
+                                                <i class="fa-solid fa-print"></i> Print
+                                            </a>
+                                            <a href="javascript:void(0)" class="action-link-edit" onclick="openViewModal(@item.Id, '@item.ExpenseHead', '@item.Amount.ToString("N2")', '@item.SettlementPaymentMode', '@(item.SettlementReference ?? "N/A")', '@(item.SettledAt?.ToString("dd MMM yyyy") ?? "N/A")', '@(item.SettledByUserName ?? "Finance")')">
+                                                <i class="fa-solid fa-eye"></i> View
+                                            </a>
+                                        }
+                                        else if (activeTab == "declined")
+                                        {
+                                            <a asp-action="Edit" asp-route-id="@item.Id" class="action-link-edit" title="Edit and resubmit for approval">
+                                                <i class="fa-solid fa-arrow-rotate-left"></i> Resubmit
+                                            </a>
+                                            <a asp-action="PrintVoucher" asp-route-id="@item.Id" target="_blank" class="action-link-print">
+                                                <i class="fa-solid fa-print"></i> Print
+                                            </a>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="6" class="text-center py-5 text-muted">
+                                <i class="fa-solid fa-receipt fs-3 text-secondary mb-2 d-block"></i>
+                                <span>No direct payments found in <strong>@activeTab.ToUpper()</strong> status.</span>
+                                @if (activeTab != "unsettled")
+                                {
+                                    <div class="mt-2">
+                                        <a asp-action="Index" asp-route-tab="unsettled" class="btn btn-sm btn-outline-secondary">View Unsettled Payments</a>
+                                    </div>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <!-- FOOTER BAR MATCHING REFERENCE SCREENSHOT -->
+        <div class="table-footer-bar">
+            <div>
+                <strong>@totalRecords Record(s)</strong>
+            </div>
+            <div class="d-flex align-items-center gap-3">
+                <div class="d-flex align-items-center gap-1">
+                    <span>Page Size:</span>
+                    <select onchange="location.href='@Url.Action("Index", new { tab = activeTab, search = search, page = 1 })&pageSize=' + this.value" class="form-select form-select-sm" style="width: 70px; display: inline-block;">
+                        <option value="10" selected="@(pageSize == 10)">10</option>
+                        <option value="25" selected="@(pageSize == 25)">25</option>
+                        <option value="50" selected="@(pageSize == 50)">50</option>
+                    </select>
+                </div>
+
+                <div class="pagination-controls">
+                    <a href="@Url.Action("Index", new { tab = activeTab, search = search, page = 1, pageSize = pageSize })"
+                       class="btn-pagination @(pageNum <= 1 ? "disabled" : "")" title="First Page">
+                        <i class="fa-solid fa-angles-left"></i>
+                    </a>
+                    <a href="@Url.Action("Index", new { tab = activeTab, search = search, page = Math.Max(1, pageNum - 1), pageSize = pageSize })"
+                       class="btn-pagination @(pageNum <= 1 ? "disabled" : "")" title="Previous Page">
+                        <i class="fa-solid fa-angle-left"></i>
+                    </a>
+                    <span class="px-2">Page <strong>@pageNum</strong> of <strong>@totalPages</strong></span>
+                    <a href="@Url.Action("Index", new { tab = activeTab, search = search, page = Math.Min(totalPages, pageNum + 1), pageSize = pageSize })"
+                       class="btn-pagination @(pageNum >= totalPages ? "disabled" : "")" title="Next Page">
+                        <i class="fa-solid fa-angle-right"></i>
+                    </a>
+                    <a href="@Url.Action("Index", new { tab = activeTab, search = search, page = totalPages, pageSize = pageSize })"
+                       class="btn-pagination @(pageNum >= totalPages ? "disabled" : "")" title="Last Page">
+                        <i class="fa-solid fa-angles-right"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: SETTLE PAYMENT -->
+<div class="modal fade" id="settleModal" tabindex="-1" aria-labelledby="settleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <form method="post" asp-action="Settle">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" id="settleExpenseId" />
+                <div class="modal-header bg-success text-white py-3">
+                    <h5 class="modal-title fs-6 fw-bold" id="settleModalLabel">
+                        <i class="fa-solid fa-circle-check me-2"></i>Settle Direct Payment
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="alert alert-light border mb-3 py-2 px-3">
+                        <div class="small text-muted">Expense Head: <strong id="settleExpenseHead" class="text-dark"></strong></div>
+                        <div class="small text-muted">Disbursement Amount: <strong id="settleAmount" class="text-success fs-6"></strong></div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold" style="font-size: 13px;">Payment Mode <span class="text-danger">*</span></label>
+                        <select name="settlementMode" class="form-select form-select-sm" required>
+                            <option value="NetBanking" selected>NetBanking / OD NetBanking</option>
+                            <option value="NEFT">NEFT Transfer</option>
+                            <option value="RTGS">RTGS Transfer</option>
+                            <option value="Cheque">Cheque</option>
+                            <option value="UPI">UPI / Instant Transfer</option>
+                            <option value="Cash">Cash Counter</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold" style="font-size: 13px;">Disbursing Bank / Cash Account</label>
+                        <select name="bankAccountId" class="form-select form-select-sm">
+                            <option value="">-- Select Bank Account --</option>
+                            @foreach (var b in bankAccounts)
+                            {
+                                <option value="@b.Id">@b.BankName - A/C @b.AccountNumber (Bal: &#8377;@b.BookBalance.ToString("N2"))</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-semibold" style="font-size: 13px;">Payment Reference / UTR</label>
+                            <input type="text" name="referenceNo" class="form-control form-control-sm" placeholder="UTR / Cheque No" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-semibold" style="font-size: 13px;">Settlement Date <span class="text-danger">*</span></label>
+                            <input type="date" name="settlementDate" class="form-control form-control-sm" value="@DateTime.Today.ToString("yyyy-MM-dd")" required />
+                        </div>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label fw-semibold" style="font-size: 13px;">Settlement Notes</label>
+                        <textarea name="settlementNotes" rows="2" class="form-control form-control-sm" placeholder="Voucher / disbursement remarks..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer py-2 px-4 bg-light">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-sm btn-success px-4">
+                        <i class="fa-solid fa-check me-1"></i>Confirm &amp; Settle Payment
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: APPROVE EXPENSE -->
+<div class="modal fade" id="approveModal" tabindex="-1" aria-labelledby="approveModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <form method="post" asp-action="Approve">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" id="approveExpenseId" />
+                <div class="modal-header bg-teal text-white py-3" style="background-color: #009688;">
+                    <h5 class="modal-title fs-6 fw-bold" id="approveModalLabel">
+                        <i class="fa-solid fa-clipboard-check me-2"></i>Authorize Direct Payment
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <p class="mb-2">Are you sure you want to approve this direct payment request?</p>
+                    <div class="alert alert-light border mb-3 py-2 px-3">
+                        <div class="small text-muted">Expense Head: <strong id="approveExpenseHead" class="text-dark"></strong></div>
+                        <div class="small text-muted">Amount: <strong id="approveAmount" class="text-primary fs-6"></strong></div>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label fw-semibold" style="font-size: 13px;">Approval Remarks (Optional)</label>
+                        <textarea name="approvalRemarks" rows="2" class="form-control form-control-sm" placeholder="e.g. Verified against milestone release and authorized for payment disbursement."></textarea>
+                    </div>
+                    <small class="text-muted"><i class="fa-solid fa-circle-info me-1"></i>Approving will transition the expense to the <strong>Unsettled</strong> queue for finance disbursement.</small>
+                </div>
+                <div class="modal-footer py-2 px-4 bg-light">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-sm text-white px-4" style="background-color: #009688;">
+                        <i class="fa-solid fa-check me-1"></i>Authorize Payment
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: DECLINE EXPENSE -->
+<div class="modal fade" id="declineModal" tabindex="-1" aria-labelledby="declineModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <form method="post" asp-action="Decline">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" id="declineExpenseId" />
+                <div class="modal-header bg-danger text-white py-3">
+                    <h5 class="modal-title fs-6 fw-bold" id="declineModalLabel">
+                        <i class="fa-solid fa-ban me-2"></i>Decline Direct Payment Request
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <p class="mb-2">Please state the reason for declining this payment request:</p>
+                    <div class="alert alert-light border mb-3 py-2 px-3">
+                        <div class="small text-muted">Expense Head: <strong id="declineExpenseHead" class="text-dark"></strong></div>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label fw-semibold" style="font-size: 13px;">Decline Reason <span class="text-danger">*</span></label>
+                        <textarea name="reason" rows="3" class="form-control form-control-sm" placeholder="Provide reason so the initiator can correct and resubmit..." required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer py-2 px-4 bg-light">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-sm btn-danger px-4">
+                        <i class="fa-solid fa-ban me-1"></i>Decline Request
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: VIEW SETTLED DETAILS -->
+<div class="modal fade" id="viewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-primary text-white py-3">
+                <h5 class="modal-title fs-6 fw-bold">
+                    <i class="fa-solid fa-circle-info me-2"></i>Settlement Audit Details
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="list-group list-group-flush border rounded">
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <span class="text-muted">Expense Head:</span>
+                        <strong id="viewHead"></strong>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <span class="text-muted">Total Amount Paid:</span>
+                        <strong id="viewAmount" class="text-success fs-6"></strong>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <span class="text-muted">Payment Mode:</span>
+                        <span id="viewMode" class="badge bg-info text-dark"></span>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <span class="text-muted">Bank Reference / UTR:</span>
+                        <strong id="viewRef"></strong>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <span class="text-muted">Settlement Date:</span>
+                        <span id="viewDate"></span>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <span class="text-muted">Settled By User:</span>
+                        <span id="viewUser"></span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer py-2 px-4 bg-light">
+                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function openSettleModal(id, head, amount) {
+            document.getElementById('settleExpenseId').value = id;
+            document.getElementById('settleExpenseHead').textContent = head;
+            document.getElementById('settleAmount').innerHTML = '&#8377; ' + amount;
+            new bootstrap.Modal(document.getElementById('settleModal')).show();
+        }
+
+        function openApproveModal(id, head, amount) {
+            document.getElementById('approveExpenseId').value = id;
+            document.getElementById('approveExpenseHead').textContent = head;
+            document.getElementById('approveAmount').innerHTML = '&#8377; ' + amount;
+            new bootstrap.Modal(document.getElementById('approveModal')).show();
+        }
+
+        function openDeclineModal(id, head) {
+            document.getElementById('declineExpenseId').value = id;
+            document.getElementById('declineExpenseHead').textContent = head;
+            new bootstrap.Modal(document.getElementById('declineModal')).show();
+        }
+
+        function openViewModal(id, head, amount, mode, ref, date, user) {
+            document.getElementById('viewHead').textContent = head;
+            document.getElementById('viewAmount').innerHTML = '&#8377; ' + amount;
+            document.getElementById('viewMode').textContent = mode;
+            document.getElementById('viewRef').textContent = ref;
+            document.getElementById('viewDate').textContent = date;
+            document.getElementById('viewUser').textContent = user;
+            new bootstrap.Modal(document.getElementById('viewModal')).show();
+        }
+    </script>
+}

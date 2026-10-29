@@ -1,0 +1,222 @@
+@model IEnumerable<SDK.ERP.Domain.Entities.Accounting.DirectExpense>
+@{
+    ViewData["Title"] = "Monthly Direct Payments & Expenses Report";
+    ViewData["ActiveMenu"] = "Expenses";
+
+    var selectedYear = ViewBag.SelectedYear as int? ?? DateTime.Today.Year;
+    var selectedMonth = ViewBag.SelectedMonth as int? ?? DateTime.Today.Month;
+    var company = ViewBag.Company as SDK.ERP.Domain.Entities.Admin.Company;
+
+    var monthName = new DateTime(selectedYear, selectedMonth, 1).ToString("MMMM yyyy");
+    var totalAmount = Model?.Sum(m => m.Amount) ?? 0;
+    var settledAmount = Model?.Where(m => m.Status == "SETTLED").Sum(m => m.Amount) ?? 0;
+    var unsettledAmount = Model?.Where(m => m.Status == "UNSETTLED").Sum(m => m.Amount) ?? 0;
+    var pendingAmount = Model?.Where(m => m.Status == "PENDING").Sum(m => m.Amount) ?? 0;
+}
+
+<style>
+    .report-card {
+        background: #ffffff;
+        border: 1px solid #E2E8F0;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        padding: 24px 30px;
+        margin-top: 10px;
+    }
+
+    .report-title-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 24px;
+        padding-bottom: 14px;
+        border-bottom: 1px solid #F1F5F9;
+    }
+
+    .stat-box {
+        background: #F8FAFC;
+        border: 1px solid #E2E8F0;
+        border-radius: 8px;
+        padding: 16px 20px;
+    }
+
+    .stat-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: #64748B;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .stat-value {
+        font-size: 20px;
+        font-weight: 700;
+        color: #0F172A;
+        margin-top: 4px;
+    }
+
+    .report-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+        margin-top: 16px;
+    }
+
+    .report-table th {
+        background: #F1F5F9;
+        color: #334155;
+        font-weight: 700;
+        padding: 10px 14px;
+        border: 1px solid #CBD5E1;
+    }
+
+    .report-table td {
+        padding: 10px 14px;
+        border: 1px solid #E2E8F0;
+        vertical-align: middle;
+    }
+
+    @@media print {
+        .no-print {
+            display: none !important;
+        }
+        .report-card {
+            border: none;
+            box-shadow: none;
+            padding: 0;
+        }
+    }
+</style>
+
+<div class="container-fluid px-3 py-2">
+    <div class="report-card">
+        <!-- Title and actions -->
+        <div class="report-title-bar">
+            <div>
+                <a asp-action="Index" class="btn btn-sm btn-outline-secondary me-2 no-print">
+                    <i class="fa-solid fa-arrow-left me-1"></i> Back
+                </a>
+                <span class="fs-5 fw-bold text-dark">Monthly Direct Payments Report: @monthName</span>
+            </div>
+            <div class="d-flex align-items-center gap-2 no-print">
+                <form method="get" asp-action="MonthlyReport" class="d-inline-flex gap-2">
+                    <select name="month" class="form-select form-select-sm" style="width: 140px;">
+                        @for (int m = 1; m <= 12; m++)
+                        {
+                            <option value="@m" selected="@(m == selectedMonth)">@(new DateTime(2026, m, 1).ToString("MMMM"))</option>
+                        }
+                    </select>
+                    <select name="year" class="form-select form-select-sm" style="width: 100px;">
+                        <option value="2025" selected="@(selectedYear == 2025)">2025</option>
+                        <option value="2026" selected="@(selectedYear == 2026)">2026</option>
+                        <option value="2027" selected="@(selectedYear == 2027)">2027</option>
+                    </select>
+                    <button type="submit" class="btn btn-sm btn-primary">Filter</button>
+                </form>
+                <button onclick="window.print()" class="btn btn-sm btn-success">
+                    <i class="fa-solid fa-print me-1"></i> Print
+                </button>
+            </div>
+        </div>
+
+        <!-- Summary KPI Cards -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-3">
+                <div class="stat-box">
+                    <div class="stat-label">Total Monthly Expenses</div>
+                    <div class="stat-value text-primary">&#8377; @totalAmount.ToString("N2")</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-box">
+                    <div class="stat-label">Settled / Paid</div>
+                    <div class="stat-value text-success">&#8377; @settledAmount.ToString("N2")</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-box">
+                    <div class="stat-label">Unsettled (Approved)</div>
+                    <div class="stat-value text-warning">&#8377; @unsettledAmount.ToString("N2")</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-box">
+                    <div class="stat-label">Pending Review</div>
+                    <div class="stat-value text-secondary">&#8377; @pendingAmount.ToString("N2")</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detailed Line Item Table -->
+        <div class="table-responsive">
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th style="width: 100px;">Date</th>
+                        <th style="width: 180px;">Expense Head</th>
+                        <th style="width: 160px;">Ledger</th>
+                        <th>Purpose &amp; Remarks</th>
+                        <th style="width: 160px;">Project / Vendor</th>
+                        <th style="width: 110px;">Status</th>
+                        <th style="width: 130px; text-align: right;">Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model != null && Model.Any())
+                    {
+                        @foreach (var exp in Model)
+                        {
+                            <tr>
+                                <td>@exp.PaymentDate.ToString("dd MMM yyyy")</td>
+                                <td><strong>@exp.ExpenseHead</strong></td>
+                                <td class="text-muted">@(string.IsNullOrWhiteSpace(exp.LedgerName) ? "General Ledger" : exp.LedgerName)</td>
+                                <td>
+                                    <div>@exp.Purpose</div>
+                                    @if (!string.IsNullOrWhiteSpace(exp.Remarks))
+                                    {
+                                        <small class="text-muted">@exp.Remarks</small>
+                                    }
+                                </td>
+                                <td>
+                                    @if (exp.IsVendorApplicable && exp.Vendor != null)
+                                    {
+                                        <span class="badge bg-light text-dark border">Vendor: @exp.Vendor.VendorName</span>
+                                    }
+                                    @if (exp.IsPipelineProject && (exp.Project != null || !string.IsNullOrWhiteSpace(exp.Remarks)))
+                                    {
+                                        <div class="small text-primary">@(exp.Project?.ProjectName ?? exp.Remarks)</div>
+                                    }
+                                </td>
+                                <td>
+                                    <span class="badge @(exp.Status == "SETTLED" ? "bg-success" : exp.Status == "UNSETTLED" ? "bg-teal text-white" : exp.Status == "PENDING" ? "bg-warning text-dark" : "bg-danger")"
+                                          style="background-color: @(exp.Status == "UNSETTLED" ? "#009688" : ""); font-size: 11px;">
+                                        @exp.Status
+                                    </span>
+                                </td>
+                                <td style="text-align: right; font-weight: 700;">
+                                    &#8377; @exp.Amount.ToString("N2")
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="7" class="text-center py-4 text-muted">
+                                No direct payments or expenses recorded for @monthName.
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr style="background: #F8FAFC; font-weight: 700;">
+                        <td colspan="6" style="text-align: right;">Total (@monthName):</td>
+                        <td style="text-align: right; font-size: 14px;" class="text-success">
+                            &#8377; @totalAmount.ToString("N2")
+                        </td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>

@@ -82,6 +82,17 @@
                     <span class="flex-grow-1">Office Inventory</span>
                 </a>
 
+                <!-- EXPENSES -->
+                <div class="nav-section-title">EXPENSES</div>
+                <a class="nav-item-link @(activeMenu == "Expenses" ? "active" : "")" asp-controller="Expenses" asp-action="Index" title="Direct Payments" data-bs-toggle="tooltip" data-bs-placement="right">
+                    <span class="nav-icon-badge amber"><i class="fa-solid fa-money-bill-transfer"></i></span>
+                    <span class="flex-grow-1">Direct Payments</span>
+                </a>
+                <a class="nav-item-link @(activeMenu == "ExpensesApproval" ? "active" : "")" asp-controller="Expenses" asp-action="Index" asp-route-tab="pending" title="Direct Payments Approval" data-bs-toggle="tooltip" data-bs-placement="right">
+                    <span class="nav-icon-badge green"><i class="fa-solid fa-clipboard-check"></i></span>
+                    <span class="flex-grow-1">Direct Payments Approval</span>
+                </a>
+
                 <!-- FINANCIALS & TAX -->
                 <div class="nav-section-title">FINANCIALS &amp; TAXATION</div>
                 <a class="nav-item-link @(activeMenu == "Accounts" ? "active" : "")" asp-controller="Accounts" asp-action="Index" title="General Ledger & COA" data-bs-toggle="tooltip" data-bs-placement="right">
@@ -222,6 +233,13 @@
                                             <div class="quick-action-text">
                                                 <span class="quick-action-title">Bank / Cheque</span>
                                                 <span class="quick-action-desc">BRS &amp; Clearance</span>
+                                            </div>
+                                        </a>
+                                        <a href="/Expenses/Create" class="quick-action-card" data-shortcut="expense">
+                                            <div class="quick-icon-box amber"><i class="fa-solid fa-money-bill-transfer"></i></div>
+                                            <div class="quick-action-text">
+                                                <span class="quick-action-title">Direct Payment</span>
+                                                <span class="quick-action-desc">Add Expense Release</span>
                                             </div>
                                         </a>
                                         <a href="/Accounts" class="quick-action-card" data-shortcut="journal">

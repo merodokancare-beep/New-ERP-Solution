@@ -946,6 +946,18 @@ public class ProjectsController : Controller
                 .Where(e => e.ProjectId == project.Id)
                 .OrderByDescending(e => e.ExpenseDate)
                 .AsNoTracking().ToListAsync();
+            try
+            {
+                ViewBag.DirectExpenses = await _db.DirectExpenses
+                    .Include(d => d.Vendor)
+                    .Where(d => d.ProjectId == project.Id)
+                    .OrderByDescending(d => d.PaymentDate)
+                    .AsNoTracking().ToListAsync();
+            }
+            catch
+            {
+                ViewBag.DirectExpenses = new List<DirectExpense>();
+            }
             ViewBag.Milestones = await _db.ProjectMilestones.Where(m => m.ProjectId == project.Id).AsNoTracking().ToListAsync();
             ViewBag.Documents = await _db.DocumentAttachments.Where(d => (d.EntityType == "Project" || d.EntityType == "ProjectClosure" || d.EntityType == "ProjectExpense" || d.EntityType == "DeliveryChallan") && d.EntityId == project.Id).OrderByDescending(d => d.UploadedAt).AsNoTracking().ToListAsync();
             ViewBag.Users = await _db.Users.Where(u => u.IsActive).OrderBy(u => u.FullName).AsNoTracking().ToListAsync();
@@ -957,6 +969,7 @@ public class ProjectsController : Controller
             ViewBag.ClientPos = new List<ProjectPo>();
             ViewBag.Deliveries = new List<ProjectDelivery>();
             ViewBag.Expenses = new List<ProjectExpense>();
+            ViewBag.DirectExpenses = new List<DirectExpense>();
             ViewBag.Milestones = new List<ProjectMilestone>();
             ViewBag.Documents = new List<DocumentAttachment>();
             ViewBag.Users = new List<User>();

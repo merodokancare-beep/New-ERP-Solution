@@ -1,0 +1,330 @@
+@model SDK.ERP.Domain.Entities.Accounting.DirectExpense
+@{
+    ViewData["Title"] = "Payments - Edit Direct Payment";
+    ViewData["ActiveMenu"] = "Expenses";
+
+    var expenseHeads = ViewBag.ExpenseHeads as IEnumerable<string> ?? Enumerable.Empty<string>();
+    var vendors = ViewBag.Vendors as IEnumerable<SDK.ERP.Domain.Entities.MasterData.Vendor> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.MasterData.Vendor>();
+    var ledgers = ViewBag.Ledgers as IEnumerable<string> ?? Enumerable.Empty<string>();
+    var projects = ViewBag.Projects as IEnumerable<SDK.ERP.Domain.Entities.Projects.Project> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Projects.Project>();
+}
+
+<style>
+    .payment-form-card {
+        background: #ffffff;
+        border: 1px solid #E2E8F0;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        padding: 24px 30px;
+        margin-top: 10px;
+    }
+
+    .page-main-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 19px;
+        font-weight: 700;
+        color: #2D3748;
+        margin-bottom: 20px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid #F1F5F9;
+    }
+
+    .page-main-header i {
+        color: #4A5568;
+        font-size: 18px;
+    }
+
+    .form-field-label {
+        font-size: 13px;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 6px;
+        display: block;
+    }
+
+    .form-field-label .text-danger {
+        color: #EF4444 !important;
+        font-weight: 700;
+    }
+
+    .form-field-input {
+        font-size: 13.5px;
+        border: 1px solid #D1D5DB;
+        border-radius: 6px;
+        padding: 8px 12px;
+        color: #1F2937;
+        width: 100%;
+        transition: all 0.15s ease-in-out;
+        background-color: #FFFFFF;
+    }
+
+    .form-field-input:focus {
+        border-color: #0284C7;
+        box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
+        outline: none;
+    }
+
+    .form-field-input:disabled,
+    .form-field-input[readonly] {
+        background-color: #F9FAFB;
+        color: #9CA3AF;
+        cursor: not-allowed;
+    }
+
+    .vendor-checkbox-label {
+        font-size: 13px;
+        font-weight: 600;
+        color: #1F2937;
+        margin-bottom: 6px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+    }
+
+    .vendor-checkbox-label small {
+        font-size: 11.5px;
+        font-weight: 400;
+        color: #6B7280;
+    }
+
+    .btn-action-back {
+        background: #F3F4F6;
+        color: #4B5563;
+        border: 1px solid #D1D5DB;
+        padding: 7px 24px;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 13.5px;
+        text-decoration: none;
+        transition: all 0.15s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .btn-action-back:hover {
+        background: #E5E7EB;
+        color: #1F2937;
+    }
+
+    .btn-action-save {
+        background: #22C55E;
+        color: #FFFFFF;
+        border: none;
+        padding: 8px 30px;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 13.5px;
+        box-shadow: 0 1px 2px rgba(34, 197, 94, 0.2);
+        transition: all 0.15s ease;
+    }
+
+    .btn-action-save:hover {
+        background: #16A34A;
+        color: #FFFFFF;
+    }
+
+    .form-check-input-custom {
+        width: 17px;
+        height: 17px;
+        margin-top: 0;
+        border: 1.5px solid #9CA3AF;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+    .form-check-input-custom:checked {
+        background-color: #0284C7;
+        border-color: #0284C7;
+    }
+</style>
+
+<div class="container-fluid px-3 py-2">
+    <div class="payment-form-card">
+        <div class="page-main-header">
+            <a asp-action="Index" class="text-decoration-none text-muted me-1" title="Back to Direct Payments">
+                <i class="fa-solid fa-reply"></i>
+            </a>
+            <span>Payments - Edit Direct Payment (#@Model.Id)</span>
+            <span class="badge @(Model.Status == "PENDING" ? "bg-warning text-dark" : Model.Status == "DECLINED" ? "bg-danger" : "bg-teal text-white") ms-auto" style="font-size: 12px; background-color: @(Model.Status == "UNSETTLED" ? "#009688" : "");">
+                @Model.Status
+            </span>
+        </div>
+
+        @if (Model.Status == "DECLINED" && !string.IsNullOrWhiteSpace(Model.DeclineReason))
+        {
+            <div class="alert alert-danger py-2 px-3 mb-4" role="alert" style="font-size: 13px;">
+                <i class="fa-solid fa-circle-xmark me-1"></i>
+                <strong>Previous Decline Reason:</strong> @Model.DeclineReason
+                <div class="small mt-1 text-dark">Updating and saving this record will automatically resubmit it to <strong>PENDING</strong> for re-approval.</div>
+            </div>
+        }
+
+        <form method="post" asp-action="Edit" id="directPaymentForm">
+            @Html.AntiForgeryToken()
+            <input type="hidden" asp-for="Id" />
+
+            <!-- ROW 1: Expense Head & Vendor -->
+            <div class="row g-4 mb-3">
+                <div class="col-md-6">
+                    <label class="form-field-label" for="ExpenseHead">
+                        Expense Head <span class="text-danger">*</span>
+                    </label>
+                    <select asp-for="ExpenseHead" class="form-field-input form-select" id="ExpenseHead" required>
+                        <option value="">-- Select Expense Head --</option>
+                        @foreach (var head in expenseHeads)
+                        {
+                            <option value="@head" selected="@(head == Model?.ExpenseHead)">@head</option>
+                        }
+                    </select>
+                    <span asp-validation-for="ExpenseHead" class="text-danger small"></span>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="vendor-checkbox-label" for="IsVendorApplicable">
+                        <input type="checkbox" asp-for="IsVendorApplicable" class="form-check-input-custom" id="IsVendorApplicable" />
+                        <span>Vendor</span>
+                        <small>(check if applicable)</small>
+                    </label>
+                    <select asp-for="VendorId" class="form-field-input form-select" id="VendorId">
+                        <option value="">-- Select Vendor --</option>
+                        @foreach (var v in vendors)
+                        {
+                            <option value="@v.Id" selected="@(v.Id == Model?.VendorId)">@v.VendorName</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            <!-- ROW 2: Ledger, Payment Date, Amount -->
+            <div class="row g-4 mb-3">
+                <div class="col-md-4">
+                    <label class="form-field-label" for="LedgerName">
+                        Ledger <span class="text-danger">*</span>
+                    </label>
+                    <select asp-for="LedgerName" class="form-field-input form-select" id="LedgerName" required>
+                        <option value="">-- Select Ledger --</option>
+                        @foreach (var l in ledgers)
+                        {
+                            <option value="@l" selected="@(l == Model?.LedgerName)">@l</option>
+                        }
+                    </select>
+                    <span asp-validation-for="LedgerName" class="text-danger small"></span>
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-field-label" for="PaymentDate">
+                        Payment Date <span class="text-danger">*</span>
+                    </label>
+                    <input type="date" asp-for="PaymentDate" class="form-field-input form-control" id="PaymentDate"
+                           value="@(Model?.PaymentDate.ToString("yyyy-MM-dd"))" required />
+                    <span asp-validation-for="PaymentDate" class="text-danger small"></span>
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-field-label" for="Amount">
+                        Amount <span class="text-danger">*</span>
+                    </label>
+                    <input type="number" step="0.01" min="0.01" asp-for="Amount" class="form-field-input form-control" id="Amount" required />
+                    <span asp-validation-for="Amount" class="text-danger small"></span>
+                </div>
+            </div>
+
+            <!-- ROW 3: Related to Pipeline Project & Project Dropdown -->
+            <div class="row g-4 mb-3">
+                <div class="col-12">
+                    <div class="form-check mb-2">
+                        <input type="checkbox" asp-for="IsPipelineProject" class="form-check-input-custom" id="IsPipelineProject" />
+                        <label class="form-check-label ms-1 fw-semibold text-dark" for="IsPipelineProject" style="font-size: 13px;">
+                            Related to Pipeline Project? If yes, select the Project below.
+                        </label>
+                    </div>
+
+                    <label class="form-field-label" for="ProjectId">
+                        Project (if applicable)
+                    </label>
+                    <select asp-for="ProjectId" class="form-field-input form-select" id="ProjectId">
+                        <option value="">-- Select Project --</option>
+                        @foreach (var p in projects)
+                        {
+                            <option value="@p.Id" selected="@(p.Id == Model?.ProjectId)">@p.ProjectName (@p.ProjectCode)</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            <!-- ROW 4: Purpose -->
+            <div class="row g-4 mb-3">
+                <div class="col-12">
+                    <label class="form-field-label" for="Purpose">
+                        Purpose <span class="text-danger">*</span>
+                    </label>
+                    <input type="text" asp-for="Purpose" class="form-field-input form-control" id="Purpose" required />
+                    <span asp-validation-for="Purpose" class="text-danger small"></span>
+                </div>
+            </div>
+
+            <!-- ROW 5: Remarks -->
+            <div class="row g-4 mb-4">
+                <div class="col-12">
+                    <label class="form-field-label" for="Remarks">
+                        Remarks
+                    </label>
+                    <textarea asp-for="Remarks" class="form-field-input form-control" id="Remarks" rows="3"></textarea>
+                </div>
+            </div>
+
+            <!-- FOOTER BUTTONS -->
+            <div class="d-flex justify-content-between align-items-center pt-3 border-top">
+                <a asp-action="Index" class="btn-action-back">
+                    Back
+                </a>
+                <button type="submit" class="btn-action-save">
+                    @(Model?.Status == "DECLINED" ? "Update & Resubmit" : "Save Changes")
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const vendorCheckbox = document.getElementById('IsVendorApplicable');
+            const vendorSelect = document.getElementById('VendorId');
+
+            const projectCheckbox = document.getElementById('IsPipelineProject');
+            const projectSelect = document.getElementById('ProjectId');
+
+            function toggleVendor() {
+                if (vendorCheckbox.checked) {
+                    vendorSelect.removeAttribute('disabled');
+                    vendorSelect.style.backgroundColor = '#FFFFFF';
+                } else {
+                    vendorSelect.setAttribute('disabled', 'disabled');
+                    vendorSelect.style.backgroundColor = '#F9FAFB';
+                }
+            }
+
+            function toggleProject() {
+                if (projectCheckbox.checked) {
+                    projectSelect.removeAttribute('disabled');
+                    projectSelect.style.backgroundColor = '#FFFFFF';
+                } else {
+                    projectSelect.setAttribute('disabled', 'disabled');
+                    projectSelect.style.backgroundColor = '#F9FAFB';
+                }
+            }
+
+            toggleVendor();
+            toggleProject();
+
+            vendorCheckbox.addEventListener('change', toggleVendor);
+            projectCheckbox.addEventListener('change', toggleProject);
+        });
+    </script>
+}

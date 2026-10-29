@@ -89,6 +89,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<ChartOfAccount> ChartOfAccounts => Set<ChartOfAccount>();
     public DbSet<JournalEntry> JournalEntries => Set<JournalEntry>();
     public DbSet<JournalLine> JournalLines => Set<JournalLine>();
+    public DbSet<DirectExpense> DirectExpenses => Set<DirectExpense>();
 
     // Domain 8: Tax & GST
     public DbSet<GstTransaction> GstTransactions => Set<GstTransaction>();
@@ -143,6 +144,7 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<GstTransaction>().HasQueryFilter(e => _tenantProvider == null || _tenantProvider.CurrentCompanyId == 0 || e.CompanyId == _tenantProvider.CurrentCompanyId);
         modelBuilder.Entity<Employee>().HasQueryFilter(e => _tenantProvider == null || _tenantProvider.CurrentCompanyId == 0 || e.CompanyId == _tenantProvider.CurrentCompanyId);
         modelBuilder.Entity<FixedAsset>().HasQueryFilter(e => _tenantProvider == null || _tenantProvider.CurrentCompanyId == 0 || e.CompanyId == _tenantProvider.CurrentCompanyId);
+        modelBuilder.Entity<DirectExpense>().HasQueryFilter(e => _tenantProvider == null || _tenantProvider.CurrentCompanyId == 0 || e.CompanyId == _tenantProvider.CurrentCompanyId);
     }
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
