@@ -1,0 +1,1583 @@
+@model SDK.ERP.Application.ViewModels.PettyCashViewModel
+@{
+    ViewData["Title"] = "Petty Cash Management";
+    ViewData["ActiveMenu"] = "PettyCash";
+    var activeTab = Model.ActiveTab ?? "overview";
+}
+
+<style>
+    .kpi-card {
+        border-radius: 12px;
+        border: 1px solid #E2E8F0;
+        background: #FFFFFF;
+        padding: 1.25rem 1.5rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .kpi-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+    .kpi-title {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-weight: 600;
+        color: #64748B;
+        margin-bottom: 6px;
+    }
+    .kpi-value {
+        font-size: 24px;
+        font-weight: 700;
+        color: #1E293B;
+        line-height: 1.2;
+    }
+    .kpi-sub {
+        font-size: 12px;
+        color: #94A3B8;
+        margin-top: 4px;
+    }
+    .nav-tabs-custom .nav-link {
+        font-weight: 600;
+        font-size: 13.5px;
+        color: #64748B;
+        border: none;
+        border-bottom: 2px solid transparent;
+        padding: 10px 18px;
+    }
+    .nav-tabs-custom .nav-link.active {
+        color: var(--erp-primary, #0F172A);
+        border-bottom: 2px solid #2563EB;
+        background: transparent;
+    }
+    .badge-soft-success {
+        background-color: #DCFCE7;
+        color: #166534;
+        font-weight: 600;
+    }
+    .badge-soft-warning {
+        background-color: #FEF3C7;
+        color: #92400E;
+        font-weight: 600;
+    }
+    .badge-soft-primary {
+        background-color: #DBEAFE;
+        color: #1E40AF;
+        font-weight: 600;
+    }
+    .badge-soft-secondary {
+        background-color: #F1F5F9;
+        color: #475569;
+        font-weight: 600;
+    }
+    .badge-soft-danger {
+        background-color: #FEE2E2;
+        color: #991B1B;
+        font-weight: 600;
+    }
+    .badge-soft-info {
+        background-color: #E0F2FE;
+        color: #0369A1;
+        font-weight: 600;
+    }
+</style>
+
+<div class="container-fluid px-4 py-3">
+
+    <!-- Header & Action Bar -->
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+        <div>
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-amber-subtle text-amber-emphasis p-2 rounded-3 border" style="background: #FEF3C7; color: #B45309; border-color: #FDE68A !important;">
+                    <i class="fa-solid fa-wallet fs-5"></i>
+                </span>
+                <div>
+                    <h3 class="mb-0 fw-bold" style="color: var(--erp-primary, #0F172A); font-size: 22px;">Petty Cash Management</h3>
+                    <p class="text-muted mb-0" style="font-size: 13px;">Imprest Float &bull; Bank Withdrawals &bull; Utilisation Vouchers &bull; FIFO / Manual Allocation</p>
+                </div>
+            </div>
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <button type="button" class="btn btn-outline-primary btn-sm px-3" data-bs-toggle="modal" data-bs-target="#newWithdrawalModal">
+                <i class="fa-solid fa-money-bill-transfer me-1 text-primary"></i> + Cash Inflow / Withdrawal
+            </button>
+            <button type="button" class="btn btn-primary btn-sm px-3" data-bs-toggle="modal" data-bs-target="#newUtilisationModal" style="background: #2563EB; border-color: #2563EB;">
+                <i class="fa-solid fa-receipt me-1"></i> + Record Cash Expense
+            </button>
+            <form asp-controller="PettyCash" asp-action="AutoAllocateFifo" method="post" class="d-inline" onsubmit="return confirm('Run FIFO auto-allocation across all unallocated approved cash vouchers?');">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-success btn-sm px-3" title="Auto-match oldest cash withdrawals to unallocated expenses">
+                    <i class="fa-solid fa-bolt me-1"></i> Auto-Allocate (FIFO)
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Alert Notifications -->
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show d-flex align-items-center gap-2 py-2 px-3 mb-4" role="alert" style="border-radius: 8px;">
+            <i class="fa-solid fa-circle-check text-success fs-5"></i>
+            <div class="flex-grow-1" style="font-size: 13.5px;">@TempData["SuccessMessage"]</div>
+            <button type="button" class="btn-close py-2" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show d-flex align-items-center gap-2 py-2 px-3 mb-4" role="alert" style="border-radius: 8px;">
+            <i class="fa-solid fa-triangle-exclamation text-danger fs-5"></i>
+            <div class="flex-grow-1" style="font-size: 13.5px;">@TempData["ErrorMessage"]</div>
+            <button type="button" class="btn-close py-2" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    <!-- Executive KPI Row -->
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="kpi-card border-start border-4 border-primary">
+                <div class="kpi-title d-flex justify-content-between align-items-center">
+                    <span>Total Cash Inflow</span>
+                    <i class="fa-solid fa-circle-arrow-down text-primary"></i>
+                </div>
+                <div class="kpi-value text-primary">&#8377; @Model.TotalCashInflow.ToString("N2")</div>
+                <div class="kpi-sub">@Model.Withdrawals.Count total withdrawal &amp; receipt records</div>
+            </div>
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="kpi-card border-start border-4 border-danger">
+                <div class="kpi-title d-flex justify-content-between align-items-center">
+                    <span>Total Cash Utilised</span>
+                    <i class="fa-solid fa-circle-arrow-up text-danger"></i>
+                </div>
+                <div class="kpi-value text-danger">&#8377; @Model.TotalCashUtilised.ToString("N2")</div>
+                <div class="kpi-sub">@Model.Utilisations.Count(u => u.Status != "DRAFT") approved/posted expense vouchers</div>
+            </div>
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="kpi-card border-start border-4 @(Model.CashInHand < 0 ? "border-danger bg-danger-subtle" : "border-success")">
+                <div class="kpi-title d-flex justify-content-between align-items-center">
+                    <span>Net Cash in Hand</span>
+                    <i class="fa-solid @(Model.CashInHand < 0 ? "fa-circle-exclamation text-danger" : "fa-vault text-success")"></i>
+                </div>
+                <div class="kpi-value @(Model.CashInHand < 0 ? "text-danger" : "text-success")">&#8377; @Model.CashInHand.ToString("N2")</div>
+                <div class="kpi-sub">
+                    @if (Model.CashInHand < 0)
+                    {
+                        <span class="text-danger fw-bold"><i class="fa-solid fa-triangle-exclamation me-1"></i>Deficit! Exceeded Inflow Float</span>
+                    }
+                    else
+                    {
+                        <span>Current physical imprest cash float</span>
+                    }
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="kpi-card border-start border-4 border-warning">
+                <div class="kpi-title d-flex justify-content-between align-items-center">
+                    <span>Allocated / Matched</span>
+                    <i class="fa-solid fa-link text-warning"></i>
+                </div>
+                <div class="kpi-value text-dark">&#8377; @Model.TotalAllocated.ToString("N2")</div>
+                <div class="kpi-sub">
+                    @if (Model.UnallocatedUtilisation > 0)
+                    {
+                        <span class="text-danger fw-semibold">&#8377; @Model.UnallocatedUtilisation.ToString("N2") unallocated</span>
+                    }
+                    else
+                    {
+                        <span class="text-success fw-semibold"><i class="fa-solid fa-check-double me-1"></i>100% Fully Matched</span>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <ul class="nav nav-tabs nav-tabs-custom border-bottom mb-4" id="pettyCashTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link @(activeTab == "overview" ? "active" : "")" id="tab-overview-btn" data-bs-toggle="tab" data-bs-target="#tab-overview" type="button" role="tab">
+                <i class="fa-solid fa-chart-pie me-1"></i> Overview &amp; Cash Book
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link @(activeTab == "withdrawals" ? "active" : "")" id="tab-withdrawals-btn" data-bs-toggle="tab" data-bs-target="#tab-withdrawals" type="button" role="tab">
+                <i class="fa-solid fa-arrow-down-long me-1 text-primary"></i> 1. Cash Inflows &amp; Withdrawals
+                <span class="badge bg-secondary-subtle text-secondary ms-1 rounded-pill">@Model.Withdrawals.Count</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link @(activeTab == "utilisations" ? "active" : "")" id="tab-utilisations-btn" data-bs-toggle="tab" data-bs-target="#tab-utilisations" type="button" role="tab">
+                <i class="fa-solid fa-arrow-up-long me-1 text-danger"></i> 2. Cash Utilisation (Expenses)
+                <span class="badge bg-secondary-subtle text-secondary ms-1 rounded-pill">@Model.Utilisations.Count</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link @(activeTab == "allocations" ? "active" : "")" id="tab-allocations-btn" data-bs-toggle="tab" data-bs-target="#tab-allocations" type="button" role="tab">
+                <i class="fa-solid fa-link me-1 text-success"></i> 3. Fund Traceability &amp; Settlement
+                <span class="badge bg-secondary-subtle text-secondary ms-1 rounded-pill">@Model.Allocations.Count</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link @(activeTab == "bankaccounts" ? "active" : "")" id="tab-bankaccounts-btn" data-bs-toggle="tab" data-bs-target="#tab-bankaccounts" type="button" role="tab">
+                <i class="fa-solid fa-building-columns me-1"></i> Bank Accounts &amp; BRS
+                <span class="badge bg-secondary-subtle text-secondary ms-1 rounded-pill">@Model.BankAccounts.Count</span>
+            </button>
+        </li>
+    </ul>
+
+    <!-- Tab Contents -->
+    <div class="tab-content" id="pettyCashTabsContent">
+
+        <!-- ========================================== -->
+        <!-- TAB 1: OVERVIEW & CASH BOOK               -->
+        <!-- ========================================== -->
+        <div class="tab-pane fade @(activeTab == "overview" ? "show active" : "")" id="tab-overview" role="tabpanel">
+            <div class="row g-4">
+                <div class="col-12 col-lg-8">
+                    <div class="card border-0 shadow-sm rounded-3 mb-4">
+                        <div class="card-header bg-white py-3 d-flex align-items-center justify-content-between border-bottom">
+                            <h6 class="mb-0 fw-bold text-dark"><i class="fa-solid fa-book-bookmark me-2 text-primary"></i>Daily Petty Cash Ledger Book</h6>
+                            <span class="text-muted" style="font-size: 12.5px;">Chronological Inflows &amp; Outflows</span>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0" style="font-size: 13px;">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th class="ps-3">Date</th>
+                                            <th>Type</th>
+                                            <th>Ref / Voucher</th>
+                                            <th>Party / Custodian</th>
+                                            <th>Purpose</th>
+                                            <th class="text-end">Cash In (&#8377;)</th>
+                                            <th class="text-end">Cash Out (&#8377;)</th>
+                                            <th class="pe-3 text-center">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @{
+                                            var entries = Model.Withdrawals.Select(w => new {
+                                                Date = w.WithdrawalDate,
+                                                IsCredit = true,
+                                                RefNo = w.ReferenceNumber,
+                                                Source = w.SourceType,
+                                                Party = w.WithdrawnBy,
+                                                Purpose = w.Purpose,
+                                                AmountIn = w.Amount,
+                                                AmountOut = 0m,
+                                                Status = w.Status
+                                            }).Concat(Model.Utilisations.Select(u => new {
+                                                Date = u.ExpenseDate,
+                                                IsCredit = false,
+                                                RefNo = u.VoucherNumber,
+                                                Source = u.ExpenseCategory,
+                                                Party = u.Payee,
+                                                Purpose = u.Purpose,
+                                                AmountIn = 0m,
+                                                AmountOut = u.Amount,
+                                                Status = u.Status
+                                            })).OrderByDescending(x => x.Date).Take(15).ToList();
+                                        }
+                                        @if (entries.Any())
+                                        {
+                                            @foreach (var item in entries)
+                                            {
+                                                <tr>
+                                                    <td class="ps-3 text-nowrap">@item.Date.ToString("dd MMM yyyy")</td>
+                                                    <td>
+                                                        @if (item.IsCredit)
+                                                        {
+                                                            <span class="badge badge-soft-success"><i class="fa-solid fa-arrow-down me-1"></i>Inflow</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="badge badge-soft-danger"><i class="fa-solid fa-arrow-up me-1"></i>Outflow</span>
+                                                        }
+                                                    </td>
+                                                    <td class="fw-semibold">@item.RefNo</td>
+                                                    <td>@item.Party</td>
+                                                    <td class="text-truncate" style="max-width: 220px;" title="@item.Purpose">@item.Purpose</td>
+                                                    <td class="text-end text-success fw-bold">@(item.AmountIn > 0 ? item.AmountIn.ToString("N2") : "-")</td>
+                                                    <td class="text-end text-danger fw-bold">@(item.AmountOut > 0 ? item.AmountOut.ToString("N2") : "-")</td>
+                                                    <td class="pe-3 text-center">
+                                                        <span class="badge badge-soft-secondary">@item.Status</span>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <tr>
+                                                <td colspan="8" class="text-center py-4 text-muted">No transactions recorded yet in cash book.</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-lg-4">
+                    <!-- Imprest Summary Box -->
+                    <div class="card border-0 shadow-sm rounded-3 mb-4">
+                        <div class="card-header bg-white py-3 border-bottom">
+                            <h6 class="mb-0 fw-bold text-dark"><i class="fa-solid fa-shield-halved me-2 text-warning"></i>Imprest Float Health</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between mb-1" style="font-size: 13px;">
+                                    <span class="text-muted">Utilisation Ratio</span>
+                                    <span class="fw-bold">@(Model.TotalCashInflow > 0 ? ((Model.TotalCashUtilised / Model.TotalCashInflow) * 100).ToString("N1") : "0")%</span>
+                                </div>
+                                <div class="progress" style="height: 8px;">
+                                    @{
+                                        var pct = Model.TotalCashInflow > 0 ? Math.Min(100, (int)((Model.TotalCashUtilised / Model.TotalCashInflow) * 100)) : 0;
+                                    }
+                                    <div class="progress-bar @(pct > 85 ? "bg-danger" : pct > 60 ? "bg-warning" : "bg-primary")" role="progressbar" style="width: @pct%;"></div>
+                                </div>
+                            </div>
+
+                            <ul class="list-group list-group-flush" style="font-size: 13px;">
+                                <li class="list-group-item d-flex justify-content-between px-0 py-2">
+                                    <span class="text-muted">Open Bank Withdrawals</span>
+                                    <span class="badge bg-primary">@Model.OpenWithdrawalsCount open/partly utilised</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between px-0 py-2">
+                                    <span class="text-muted">Available Inflow Float</span>
+                                    <span class="fw-bold text-success">&#8377; @Model.UnutilisedInflow.ToString("N2")</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between px-0 py-2">
+                                    <span class="text-muted">Unallocated Vouchers</span>
+                                    <span class="fw-bold text-danger">&#8377; @Model.UnallocatedUtilisation.ToString("N2")</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between px-0 py-2">
+                                    <span class="text-muted">Allocation Strategy</span>
+                                    <span class="badge badge-soft-info">FIFO Oldest-First + Manual</span>
+                                </li>
+                            </ul>
+
+                            <div class="d-grid gap-2 mt-3">
+                                <button type="button" class="btn btn-outline-primary btn-sm" onclick="bootstrap.Tab.getInstance(document.querySelector('#tab-allocations-btn')).show();">
+                                    <i class="fa-solid fa-diagram-project me-1"></i> Open Allocation Matrix
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Guidance Info Card -->
+                    <div class="card border-0 shadow-sm rounded-3" style="background: #F8FAFC; border: 1px dashed #CBD5E1 !important;">
+                        <div class="card-body p-3">
+                            <h6 class="fw-bold text-dark mb-2" style="font-size: 13.5px;"><i class="fa-solid fa-lightbulb text-warning me-1"></i> How Petty Cash Works</h6>
+                            <p class="text-muted mb-2" style="font-size: 12px; line-height: 1.5;">
+                                <strong>1. Cash Withdrawals:</strong> Withdrawing money from the bank feeds the cash box with an open balance.<br>
+                                <strong>2. Cash Utilisations:</strong> Recording petty expenses spends cash from custodian floats.<br>
+                                <strong>3. Allocation:</strong> Automatically matches oldest withdrawals to expenses (FIFO) so every rupee is traced to its bank source.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- TAB 2: CASH INFLOWS & WITHDRAWALS         -->
+        <!-- ========================================== -->
+        <div class="tab-pane fade @(activeTab == "withdrawals" ? "show active" : "")" id="tab-withdrawals" role="tabpanel">
+            <div class="card border-0 shadow-sm rounded-3">
+                <div class="card-header bg-white py-3 d-flex flex-wrap align-items-center justify-content-between gap-2 border-bottom">
+                    <div>
+                        <h6 class="mb-0 fw-bold text-dark"><i class="fa-solid fa-money-bill-transfer me-2 text-primary"></i>Cash Withdrawals &amp; Inflows Register</h6>
+                        <span class="text-muted" style="font-size: 12.5px;">Bank withdrawals, customer cash receipts, refunds, and returned advances</span>
+                    </div>
+                    <button type="button" class="btn btn-primary btn-sm px-3" data-bs-toggle="modal" data-bs-target="#newWithdrawalModal">
+                        <i class="fa-solid fa-plus me-1"></i> New Cash Inflow / Withdrawal
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0" style="font-size: 13px;">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-3">Ref No</th>
+                                    <th>Date</th>
+                                    <th>Source Type</th>
+                                    <th>Bank Account &amp; Cheque</th>
+                                    <th>Withdrawn By</th>
+                                    <th>Purpose / Justification</th>
+                                    <th>Approved By</th>
+                                    <th>Reconciliation</th>
+                                    <th class="text-end">Amount (&#8377;)</th>
+                                    <th class="text-end">Utilised (&#8377;)</th>
+                                    <th class="text-end">Balance (&#8377;)</th>
+                                    <th>Status</th>
+                                    <th class="pe-3 text-center">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (Model.Withdrawals.Any())
+                                {
+                                    @foreach (var w in Model.Withdrawals)
+                                    {
+                                        var balance = w.Amount - w.UtilisedAmount;
+                                        <tr>
+                                            <td class="ps-3 fw-bold text-primary">@w.ReferenceNumber</td>
+                                            <td class="text-nowrap">@w.WithdrawalDate.ToString("dd MMM yyyy")</td>
+                                            <td>
+                                                @switch (w.SourceType)
+                                                {
+                                                    case "BANK_WITHDRAWAL":
+                                                        <span class="badge badge-soft-primary"><i class="fa-solid fa-building-columns me-1"></i>Bank Withdrawal</span>
+                                                        break;
+                                                    case "CUSTOMER_RECEIPT":
+                                                        <span class="badge badge-soft-success"><i class="fa-solid fa-hand-holding-dollar me-1"></i>Customer Cash</span>
+                                                        break;
+                                                    case "REFUND":
+                                                        <span class="badge badge-soft-info"><i class="fa-solid fa-rotate-left me-1"></i>Refund</span>
+                                                        break;
+                                                    case "RETURNED_ADVANCE":
+                                                        <span class="badge badge-soft-warning"><i class="fa-solid fa-arrow-rotate-left me-1"></i>Returned Advance</span>
+                                                        break;
+                                                    default:
+                                                        <span class="badge badge-soft-secondary">@w.SourceType</span>
+                                                        break;
+                                                }
+                                            </td>
+                                            <td>
+                                                @if (w.BankAccount != null)
+                                                {
+                                                    <div class="fw-semibold">@w.BankAccount.BankName</div>
+                                                    <div class="text-muted" style="font-size: 11.5px;">A/C: @w.BankAccount.AccountNumber &bull; Ref: @(w.ChequeOrRefNo ?? "-")</div>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">Direct Cash / @(w.ChequeOrRefNo ?? "-")</span>
+                                                }
+                                            </td>
+                                            <td>@w.WithdrawnBy</td>
+                                            <td class="text-truncate" style="max-width: 180px;" title="@w.Purpose">@w.Purpose</td>
+                                            <td>@w.ApprovedBy</td>
+                                            <td>
+                                                @if (w.SourceType == "BANK_WITHDRAWAL")
+                                                {
+                                                    @if (!string.IsNullOrEmpty(w.BankStatementRef) || w.BankStatementLineId.HasValue)
+                                                    {
+                                                        <span class="badge badge-soft-success" title="Reconciled with Bank Statement: @(w.BankStatementRef ?? "Line #" + w.BankStatementLineId)">
+                                                            <i class="fa-solid fa-check me-1"></i>Bank Reconciled
+                                                        </span>
+                                                        <div class="text-muted" style="font-size: 11px;">Ref: @(w.BankStatementRef ?? ("#" + w.BankStatementLineId))</div>
+                                                    }
+                                                    else
+                                                    {
+                                                        <button type="button" class="btn btn-outline-warning btn-sm py-0 px-2 text-dark" 
+                                                                style="font-size: 11.5px; border-style: dashed;" 
+                                                                title="Click to reconcile with Bank Statement line (BRS)"
+                                                                onclick="openReconcileModal(@w.Id, '@w.ReferenceNumber', @w.Amount, '@(w.BankAccount?.BankName ?? "Bank")')">
+                                                            <i class="fa-solid fa-stamp me-1 text-warning"></i>Reconcile BRS
+                                                        </button>
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge badge-soft-secondary text-muted" title="Direct cash receipt does not require bank reconciliation (BRS)">
+                                                        <i class="fa-solid fa-minus me-1"></i>N/A (Direct Cash)
+                                                    </span>
+                                                }
+                                            </td>
+                                            <td class="text-end fw-bold text-dark">&#8377; @w.Amount.ToString("N2")</td>
+                                            <td class="text-end text-danger fw-semibold">&#8377; @w.UtilisedAmount.ToString("N2")</td>
+                                            <td class="text-end fw-bold text-success">&#8377; @balance.ToString("N2")</td>
+                                            <td>
+                                                @switch (w.Status)
+                                                {
+                                                    case "OPEN":
+                                                        <span class="badge badge-soft-success">OPEN</span>
+                                                        break;
+                                                    case "PARTLY_UTILISED":
+                                                        <span class="badge badge-soft-warning">PARTLY UTILISED</span>
+                                                        break;
+                                                    case "FULLY_UTILISED":
+                                                        <span class="badge badge-soft-secondary">FULLY UTILISED</span>
+                                                        break;
+                                                    case "CLOSED":
+                                                        <span class="badge bg-dark">CLOSED</span>
+                                                        break;
+                                                    default:
+                                                        <span class="badge badge-soft-secondary">@w.Status</span>
+                                                        break;
+                                                }
+                                            </td>
+                                            <td class="pe-3 text-center">
+                                                <div class="btn-group btn-group-sm">
+                                                    <button type="button" class="btn btn-outline-secondary py-1 px-2" title="View expenses funded by this withdrawal" onclick="showWithdrawalAllocations(@w.Id, '@w.ReferenceNumber', @w.Amount, @w.UtilisedAmount)">
+                                                        <i class="fa-solid fa-list-check"></i>
+                                                    </button>
+                                                    <form asp-controller="PettyCash" asp-action="DeleteWithdrawal" method="post" class="d-inline" onsubmit="return confirm('Delete withdrawal @w.ReferenceNumber?');">
+                                                        @Html.AntiForgeryToken()
+                                                        <input type="hidden" name="id" value="@w.Id" />
+                                                        <button type="submit" class="btn btn-outline-danger py-1 px-2" title="Delete withdrawal" @(w.Allocations.Any() ? "disabled" : "")>
+                                                            <i class="fa-solid fa-trash-can"></i>
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                                else
+                                {
+                                    <tr>
+                                        <td colspan="13" class="text-center py-5 text-muted">
+                                            <i class="fa-solid fa-building-columns mb-2" style="font-size: 32px; color: #CBD5E1;"></i>
+                                            <h6 class="fw-bold text-secondary mb-1">No Cash Withdrawals Recorded</h6>
+                                            <p class="mb-0" style="font-size: 12.5px;">Click the button above to record your first bank cash withdrawal or cash receipt.</p>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- TAB 3: CASH UTILISATION & EXPENSES        -->
+        <!-- ========================================== -->
+        <div class="tab-pane fade @(activeTab == "utilisations" ? "show active" : "")" id="tab-utilisations" role="tabpanel">
+            <div class="card border-0 shadow-sm rounded-3">
+                <div class="card-header bg-white py-3 d-flex flex-wrap align-items-center justify-content-between gap-2 border-bottom">
+                    <div>
+                        <h6 class="mb-0 fw-bold text-dark"><i class="fa-solid fa-receipt me-2 text-danger"></i>Cash Disbursement &amp; Expense Register</h6>
+                        <span class="text-muted" style="font-size: 12.5px;">Petty cash vouchers, payee, expense category, project cost center &amp; custodian disbursements</span>
+                    </div>
+                    <button type="button" class="btn btn-primary btn-sm px-3" data-bs-toggle="modal" data-bs-target="#newUtilisationModal">
+                        <i class="fa-solid fa-plus me-1"></i> Record Cash Expense
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0" style="font-size: 13px;">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-3">Voucher #</th>
+                                    <th>Date</th>
+                                    <th>Payee</th>
+                                    <th>Category / Ledger Head</th>
+                                    <th>Cost Centre / Project</th>
+                                    <th>Purpose</th>
+                                    <th>Paid By (Custodian)</th>
+                                    <th>Approved By</th>
+                                    <th>Bill / Slip</th>
+                                    <th class="text-end">Amount (&#8377;)</th>
+                                    <th class="text-end">Allocated (&#8377;)</th>
+                                    <th>Status</th>
+                                    <th class="pe-3 text-center">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (Model.Utilisations.Any())
+                                {
+                                    @foreach (var u in Model.Utilisations)
+                                    {
+                                        var isFullyAllocated = u.AllocatedAmount >= u.Amount;
+                                        <tr>
+                                            <td class="ps-3 fw-bold text-primary">@u.VoucherNumber</td>
+                                            <td class="text-nowrap">@u.ExpenseDate.ToString("dd MMM yyyy")</td>
+                                            <td class="fw-semibold">@u.Payee</td>
+                                            <td>
+                                                <span class="badge badge-soft-secondary">@u.ExpenseCategory</span>
+                                            </td>
+                                            <td>
+                                                @if (u.Project != null)
+                                                {
+                                                    <span class="badge badge-soft-info" title="Project: @u.Project.ProjectName">@u.Project.ProjectCode</span>
+                                                }
+                                                else if (!string.IsNullOrEmpty(u.CostCenter))
+                                                {
+                                                    <span class="text-muted">@u.CostCenter</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">-</span>
+                                                }
+                                            </td>
+                                            <td class="text-truncate" style="max-width: 180px;" title="@u.Purpose">@u.Purpose</td>
+                                            <td>@u.PaidBy</td>
+                                            <td>@u.ApprovedBy</td>
+                                            <td>
+                                                @if (!string.IsNullOrEmpty(u.AttachmentFilePath))
+                                                {
+                                                    <a href="@u.AttachmentFilePath" target="_blank" class="btn btn-outline-info btn-sm py-0 px-2" title="View attached bill">
+                                                        <i class="fa-solid fa-paperclip"></i>
+                                                    </a>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted" style="font-size: 11px;">None</span>
+                                                }
+                                            </td>
+                                            <td class="text-end fw-bold text-dark">&#8377; @u.Amount.ToString("N2")</td>
+                                            <td class="text-end fw-semibold @(isFullyAllocated ? "text-success" : "text-warning")">
+                                                &#8377; @u.AllocatedAmount.ToString("N2")
+                                                @if (isFullyAllocated)
+                                                {
+                                                    <i class="fa-solid fa-check ms-1 text-success" title="Fully matched to withdrawal"></i>
+                                                }
+                                                else
+                                                {
+                                                    <i class="fa-solid fa-triangle-exclamation ms-1 text-warning" title="Partly or unallocated"></i>
+                                                }
+                                            </td>
+                                            <td>
+                                                @switch (u.Status)
+                                                {
+                                                    case "DRAFT":
+                                                        <span class="badge badge-soft-warning">DRAFT</span>
+                                                        break;
+                                                    case "APPROVED":
+                                                        <span class="badge badge-soft-primary">APPROVED</span>
+                                                        break;
+                                                    case "POSTED":
+                                                        <span class="badge badge-soft-success">POSTED</span>
+                                                        break;
+                                                    default:
+                                                        <span class="badge badge-soft-secondary">@u.Status</span>
+                                                        break;
+                                                }
+                                            </td>
+                                            <td class="pe-3 text-center">
+                                                <div class="btn-group btn-group-sm">
+                                                    @if (u.Status == "DRAFT")
+                                                    {
+                                                        <form asp-controller="PettyCash" asp-action="UpdateUtilisationStatus" method="post" class="d-inline">
+                                                            @Html.AntiForgeryToken()
+                                                            <input type="hidden" name="id" value="@u.Id" />
+                                                            <input type="hidden" name="status" value="APPROVED" />
+                                                            <button type="submit" class="btn btn-outline-success py-1 px-2" title="Approve voucher">
+                                                                <i class="fa-solid fa-check"></i> Approve
+                                                            </button>
+                                                        </form>
+                                                    }
+                                                    else if (u.Status == "APPROVED")
+                                                    {
+                                                        <form asp-controller="PettyCash" asp-action="UpdateUtilisationStatus" method="post" class="d-inline">
+                                                            @Html.AntiForgeryToken()
+                                                            <input type="hidden" name="id" value="@u.Id" />
+                                                            <input type="hidden" name="status" value="POSTED" />
+                                                            <button type="submit" class="btn btn-outline-primary py-1 px-2" title="Post to General Ledger">
+                                                                <i class="fa-solid fa-share-from-square"></i> Post
+                                                            </button>
+                                                        </form>
+                                                    }
+
+                                                    <button type="button" class="btn btn-outline-secondary py-1 px-2" title="Manage Allocation (FIFO / Manual Override)" onclick="openManualAllocationModal(@u.Id)">
+                                                        <i class="fa-solid fa-link"></i>
+                                                    </button>
+                                                    <form asp-controller="PettyCash" asp-action="DeleteUtilisation" method="post" class="d-inline" onsubmit="return confirm('Delete voucher @u.VoucherNumber (₹@u.Amount.ToString("N2"))? Any allocated cash will be returned to the float.');">
+                                                        @Html.AntiForgeryToken()
+                                                        <input type="hidden" name="id" value="@u.Id" />
+                                                        <button type="submit" class="btn btn-outline-danger py-1 px-2" title="Delete voucher & restore cash float">
+                                                            <i class="fa-solid fa-trash-can"></i>
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                                else
+                                {
+                                    <tr>
+                                        <td colspan="13" class="text-center py-5 text-muted">
+                                            <i class="fa-solid fa-receipt mb-2" style="font-size: 32px; color: #CBD5E1;"></i>
+                                            <h6 class="fw-bold text-secondary mb-1">No Cash Expense Vouchers Recorded</h6>
+                                            <p class="mb-0" style="font-size: 12.5px;">Click the button above to record your first petty cash expense.</p>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- TAB 4: FUND TRACEABILITY & SETTLEMENT      -->
+        <!-- ========================================== -->
+        <div class="tab-pane fade @(activeTab == "allocations" ? "show active" : "")" id="tab-allocations" role="tabpanel">
+            <div class="card border-0 shadow-sm rounded-3 mb-4">
+                <div class="card-header bg-white py-3 d-flex flex-wrap align-items-center justify-content-between gap-2 border-bottom">
+                    <div>
+                        <h6 class="mb-0 fw-bold text-dark"><i class="fa-solid fa-link me-2 text-success"></i>Fund Traceability &amp; Settlement Register</h6>
+                        <span class="text-muted" style="font-size: 12.5px;">Complete audit trail linking each expense disbursement to its originating bank withdrawal or cash inflow</span>
+                    </div>
+                    <form asp-controller="PettyCash" asp-action="AutoAllocateFifo" method="post" class="d-inline" onsubmit="return confirm('Execute FIFO matching for all pending cash expenses?');">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-success btn-sm px-3">
+                            <i class="fa-solid fa-bolt me-1"></i> Auto-Allocate All Pending (FIFO)
+                        </button>
+                    </form>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0" style="font-size: 13px;">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-3">Alloc ID</th>
+                                    <th>Date</th>
+                                    <th>Funding Inflow Ref</th>
+                                    <th>Source / Bank</th>
+                                    <th>Expense Voucher #</th>
+                                    <th>Payee &amp; Category</th>
+                                    <th class="text-end">Amount Allocated (&#8377;)</th>
+                                    <th>Allocation Mode</th>
+                                    <th>Allocated By</th>
+                                    <th class="pe-3 text-center">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (Model.Allocations.Any())
+                                {
+                                    @foreach (var a in Model.Allocations)
+                                    {
+                                        <tr>
+                                            <td class="ps-3 text-muted">#@a.Id</td>
+                                            <td class="text-nowrap">@a.AllocationDate.ToString("dd MMM yyyy")</td>
+                                            <td>
+                                                <span class="fw-bold text-primary">@a.Withdrawal.ReferenceNumber</span>
+                                                <div class="text-muted" style="font-size: 11.5px;">@a.Withdrawal.WithdrawalDate.ToString("dd/MM/yyyy") &bull; ₹@a.Withdrawal.Amount.ToString("N2")</div>
+                                            </td>
+                                            <td>
+                                                <span class="badge badge-soft-secondary">@a.Withdrawal.SourceType</span>
+                                            </td>
+                                            <td>
+                                                <span class="fw-bold text-danger">@a.Utilisation.VoucherNumber</span>
+                                                <div class="text-muted" style="font-size: 11.5px;">@a.Utilisation.ExpenseDate.ToString("dd/MM/yyyy") &bull; ₹@a.Utilisation.Amount.ToString("N2")</div>
+                                            </td>
+                                            <td>
+                                                <div class="fw-semibold">@a.Utilisation.Payee</div>
+                                                <div class="text-muted" style="font-size: 11.5px;">@a.Utilisation.ExpenseCategory</div>
+                                            </td>
+                                            <td class="text-end fw-bold text-success fs-6">&#8377; @a.Amount.ToString("N2")</td>
+                                            <td>
+                                                @if (a.IsManualOverride)
+                                                {
+                                                    <span class="badge badge-soft-warning"><i class="fa-solid fa-sliders me-1"></i>Manual Override</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge badge-soft-success"><i class="fa-solid fa-wand-magic-sparkles me-1"></i>FIFO Auto</span>
+                                                }
+                                            </td>
+                                            <td>@(a.AllocatedBy ?? "System")</td>
+                                            <td class="pe-3 text-center">
+                                                <form asp-controller="PettyCash" asp-action="DeleteAllocation" method="post" class="d-inline" onsubmit="return confirm('Remove this cash allocation? Funds will return to the withdrawal.');">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="allocationId" value="@a.Id" />
+                                                    <button type="submit" class="btn btn-outline-danger btn-sm py-1 px-2" title="Delete allocation">
+                                                        <i class="fa-solid fa-trash-can"></i>
+                                                    </button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                                else
+                                {
+                                    <tr>
+                                        <td colspan="10" class="text-center py-5 text-muted">
+                                            <i class="fa-solid fa-link-slash mb-2" style="font-size: 32px; color: #CBD5E1;"></i>
+                                            <h6 class="fw-bold text-secondary mb-1">No Allocations Created Yet</h6>
+                                            <p class="mb-0" style="font-size: 12.5px;">Click "Auto-Allocate All Pending (FIFO)" or create an expense voucher to automatically link expenses to withdrawals.</p>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- TAB 5: BANK ACCOUNTS & BRS                -->
+        <!-- ========================================== -->
+        <div class="tab-pane fade @(activeTab == "bankaccounts" ? "show active" : "")" id="tab-bankaccounts" role="tabpanel">
+            <div class="card border-0 shadow-sm rounded-3">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom">
+                    <div>
+                        <h6 class="mb-0 fw-bold text-dark"><i class="fa-solid fa-building-columns me-2 text-primary"></i>Corporate Bank Accounts &amp; Book Balances</h6>
+                        <span class="text-muted" style="font-size: 12.5px;">Master bank registry for withdrawals &amp; Bank Reconciliation Statements</span>
+                    </div>
+                    <span class="badge bg-primary">@Model.BankAccounts.Count Account(s)</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0" style="font-size: 13.5px;">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-4">Bank Name &amp; Branch</th>
+                                    <th>Account No</th>
+                                    <th>IFSC Code</th>
+                                    <th>Account Type</th>
+                                    <th class="text-end">Book Balance (&#8377;)</th>
+                                    <th class="text-center">Status</th>
+                                    <th class="pe-4 text-center">Quick Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (Model.BankAccounts.Any())
+                                {
+                                    @foreach (var b in Model.BankAccounts)
+                                    {
+                                        <tr>
+                                            <td class="ps-4 fw-bold">
+                                                <i class="fa-solid fa-landmark text-primary me-2"></i>@b.BankName
+                                                <div class="text-muted fw-normal" style="font-size: 12px;">@b.BranchName</div>
+                                            </td>
+                                            <td><code>@b.AccountNumber</code></td>
+                                            <td><code>@b.IfscCode</code></td>
+                                            <td><span class="badge bg-light text-dark border">@b.AccountType</span></td>
+                                            <td class="text-end fw-bold text-success fs-6">&#8377; @b.BookBalance.ToString("N2")</td>
+                                            <td class="text-center">
+                                                <span class="badge @(b.IsActive ? "bg-success" : "bg-secondary")">@(b.IsActive ? "ACTIVE" : "INACTIVE")</span>
+                                            </td>
+                                            <td class="pe-4 text-center">
+                                                <button type="button" class="btn btn-outline-primary btn-sm py-1 px-3" onclick="openWithdrawModalForBank(@b.Id)">
+                                                    <i class="fa-solid fa-money-bill-transfer me-1"></i> Withdraw Cash
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                                else
+                                {
+                                    <tr>
+                                        <td colspan="7" class="text-center py-5 text-muted">
+                                            <i class="fa-solid fa-building-columns mb-2" style="font-size: 32px; color: #CBD5E1;"></i>
+                                            <h6 class="fw-bold text-secondary mb-1">No Corporate Bank Accounts Registered</h6>
+                                            <p class="mb-0" style="font-size: 12.5px;">No bank accounts have been added to the database yet.</p>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dedicated Bank Reconciliation (BRS) Panel for Bank Cash Withdrawals -->
+            <div class="card border-0 shadow-sm rounded-3 mt-4">
+                <div class="card-header bg-white py-3 d-flex flex-wrap justify-content-between align-items-center gap-2 border-bottom">
+                    <div>
+                        <h6 class="mb-0 fw-bold text-dark"><i class="fa-solid fa-stamp me-2 text-warning"></i>Bank Reconciliation (BRS) — Cash Withdrawals</h6>
+                        <span class="text-muted" style="font-size: 12.5px;">Match ERP cash withdrawal vouchers with bank passbook/statement debit entries</span>
+                    </div>
+                    <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">
+                        @(Model.Withdrawals.Count(w => w.SourceType == "BANK_WITHDRAWAL" && string.IsNullOrEmpty(w.BankStatementRef) && !w.BankStatementLineId.HasValue)) Awaiting Statement Matching
+                    </span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0" style="font-size: 13px;">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-4">Voucher Ref</th>
+                                    <th>Withdrawal Date</th>
+                                    <th>Bank Account</th>
+                                    <th>Cheque / Ref No</th>
+                                    <th>Custodian (Withdrawn By)</th>
+                                    <th class="text-end">Amount (&#8377;)</th>
+                                    <th>BRS Status</th>
+                                    <th class="pe-4 text-center">Reconcile Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @{
+                                    var bankWdls = Model.Withdrawals.Where(w => w.SourceType == "BANK_WITHDRAWAL").ToList();
+                                }
+                                @if (bankWdls.Any())
+                                {
+                                    @foreach (var bw in bankWdls)
+                                    {
+                                        var isRec = !string.IsNullOrEmpty(bw.BankStatementRef) || bw.BankStatementLineId.HasValue;
+                                        <tr>
+                                            <td class="ps-4 fw-bold text-primary">@bw.ReferenceNumber</td>
+                                            <td>@bw.WithdrawalDate.ToString("dd MMM yyyy")</td>
+                                            <td>@(bw.BankAccount?.BankName ?? "Bank") (@(bw.BankAccount?.AccountNumber ?? "-"))</td>
+                                            <td><code>@(bw.ChequeOrRefNo ?? "-")</code></td>
+                                            <td>@bw.WithdrawnBy</td>
+                                            <td class="text-end fw-bold text-dark">&#8377; @bw.Amount.ToString("N2")</td>
+                                            <td>
+                                                @if (isRec)
+                                                {
+                                                    <span class="badge badge-soft-success"><i class="fa-solid fa-check me-1"></i>Reconciled</span>
+                                                    <div class="text-muted" style="font-size: 11px;">Ref: @bw.BankStatementRef</div>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge badge-soft-warning"><i class="fa-solid fa-clock-rotate-left me-1"></i>Awaiting Statement</span>
+                                                }
+                                            </td>
+                                            <td class="pe-4 text-center">
+                                                @if (isRec)
+                                                {
+                                                    <span class="text-success" style="font-size: 12px;"><i class="fa-solid fa-check-double me-1"></i>Cleared</span>
+                                                }
+                                                else
+                                                {
+                                                    <button type="button" class="btn btn-outline-warning btn-sm py-1 px-3 text-dark fw-semibold"
+                                                            onclick="openReconcileModal(@bw.Id, '@bw.ReferenceNumber', @bw.Amount, '@(bw.BankAccount?.BankName ?? "Bank")')">
+                                                        <i class="fa-solid fa-stamp me-1 text-warning"></i> Reconcile BRS
+                                                    </button>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                                else
+                                {
+                                    <tr>
+                                        <td colspan="8" class="text-center py-4 text-muted">No bank cash withdrawals recorded yet.</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- ======================================================== -->
+<!-- MODAL 1: NEW CASH WITHDRAWAL / INFLOW                   -->
+<!-- ======================================================== -->
+<div class="modal fade" id="newWithdrawalModal" tabindex="-1" aria-labelledby="newWithdrawalModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow">
+            <form asp-controller="PettyCash" asp-action="CreateWithdrawal" method="post" id="newWithdrawalForm" onsubmit="return validateWithdrawalSubmit();">
+                @Html.AntiForgeryToken()
+                <div class="modal-header bg-light py-3">
+                    <h5 class="modal-title fw-bold" id="newWithdrawalModalLabel">
+                        <i class="fa-solid fa-money-bill-transfer text-primary me-2"></i>Record Cash Inflow / Float Top-up
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-semibold" style="font-size: 13px;">Source Type <span class="text-danger">*</span></label>
+                            <select class="form-select form-select-sm" name="SourceType" id="withdrawalSourceType" required onchange="toggleBankFields()">
+                                <option value="BANK_WITHDRAWAL" selected>Bank Cash Withdrawal (ATM / Cheque)</option>
+                                <option value="CUSTOMER_RECEIPT">Customer Cash Receipt</option>
+                                <option value="REFUND">Vendor Refund / Rebate</option>
+                                <option value="RETURNED_ADVANCE">Returned Staff Advance</option>
+                                <option value="OPENING_BALANCE">Opening Imprest Cash Float</option>
+                                <option value="OTHER">Other Cash Inflow</option>
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-semibold" style="font-size: 13px;">Withdrawal / Receipt Date <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control form-control-sm" name="WithdrawalDate" value="@DateTime.Today.ToString("yyyy-MM-dd")" required />
+                        </div>
+
+                        <div class="col-12 col-md-6" id="bankAccountGroup">
+                            <label class="form-label fw-semibold" style="font-size: 13px;">From Bank Account <span class="text-danger">*</span></label>
+                            <select class="form-select form-select-sm" name="BankAccountId" id="bankAccountIdSelect" onchange="updateBankBalanceInfo()">
+                                <option value="" data-balance="0">-- Select Bank Account --</option>
+                                @foreach (var b in Model.BankAccounts)
+                                {
+                                    <option value="@b.Id" data-balance="@b.BookBalance">@b.BankName (@b.AccountNumber) - Bal: ₹@b.BookBalance.ToString("N2")</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-semibold" style="font-size: 13px;">Cheque No / Slip Reference</label>
+                            <input type="text" class="form-control form-control-sm" name="ChequeOrRefNo" placeholder="e.g. CHQ-849201 or ATM-TXN-102" />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="form-label fw-semibold mb-0" style="font-size: 13px;">Inflow Amount (&#8377;) <span class="text-danger">*</span></label>
+                                <span class="badge bg-secondary-subtle text-secondary" id="bankBalanceBadge" style="font-size: 11px; display: none;"></span>
+                            </div>
+                            <input type="number" step="0.01" min="1" class="form-control form-control-sm fw-bold text-success fs-6" 
+                                   name="Amount" id="withdrawalAmountInput" placeholder="0.00" required oninput="validateWithdrawalAmount()" />
+                            <div id="bankBalanceAlert" class="text-danger mt-1 fw-semibold d-none" style="font-size: 11.5px;">
+                                <i class="fa-solid fa-triangle-exclamation me-1"></i>Amount exceeds selected bank account book balance.
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-semibold" style="font-size: 13px;">Withdrawn / Received By <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control form-control-sm" name="WithdrawnBy" list="userList" placeholder="e.g. Ramesh Kumar (Custodian)" required />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-semibold" style="font-size: 13px;">Approved By <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control form-control-sm" name="ApprovedBy" list="userList" placeholder="e.g. Finance Manager" required />
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-semibold" style="font-size: 13px;">Bank Statement Line / BRS Reference</label>
+                            <input type="text" class="form-control form-control-sm" name="BankStatementRef" placeholder="e.g. HDFC-STM-202610-1842" />
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label fw-semibold" style="font-size: 13px;">Purpose / Business Justification <span class="text-danger">*</span></label>
+                            <textarea class="form-control form-control-sm" name="Purpose" rows="2" placeholder="e.g. Cash withdrawal for weekly site operations, freight and courier expenses" required></textarea>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label fw-semibold" style="font-size: 13px;">Internal Notes</label>
+                            <input type="text" class="form-control form-control-sm" name="Notes" placeholder="Optional internal notes" />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light py-2">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm px-4">Save Cash Inflow</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ======================================================== -->
+<!-- MODAL 2: NEW CASH UTILISATION (THE EXPENSE)             -->
+<!-- ======================================================== -->
+<div class="modal fade" id="newUtilisationModal" tabindex="-1" aria-labelledby="newUtilisationModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow">
+            <form asp-controller="PettyCash" asp-action="CreateUtilisation" method="post" enctype="multipart/form-data" id="newUtilisationForm" onsubmit="return validateExpenseSubmit();">
+                @Html.AntiForgeryToken()
+                <div class="modal-header bg-light py-3">
+                    <h5 class="modal-title fw-bold" id="newUtilisationModalLabel">
+                        <i class="fa-solid fa-receipt text-danger me-2"></i>Record Cash Utilisation (The Expense)
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-semibold" style="font-size: 13px;">Payment Date <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control form-control-sm" name="ExpenseDate" value="@DateTime.Today.ToString("yyyy-MM-dd")" required />
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="form-label fw-semibold mb-0" style="font-size: 13px;">Expense Amount (&#8377;) <span class="text-danger">*</span></label>
+                                <span class="badge @(Model.CashInHand <= 0 ? "bg-danger" : "bg-success-subtle text-success border border-success-subtle")" id="availCashBadge" style="font-size: 11px;">
+                                    In Hand: &#8377; @Model.CashInHand.ToString("N2")
+                                </span>
+                            </div>
+                            <input type="number" step="0.01" min="0.5" class="form-control form-control-sm fw-bold text-danger fs-6" 
+                                   name="Amount" id="expenseAmountInput" placeholder="0.00" required oninput="validateExpenseAmount()" />
+                            <div id="cashExceededAlert" class="text-danger mt-1 fw-semibold d-none" style="font-size: 11.5px;">
+                                <i class="fa-solid fa-triangle-exclamation me-1"></i>Amount exceeds available cash-in-hand (&#8377; @Model.CashInHand.ToString("N2")). You must select 'Draft' or replenish the float first.
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-semibold" style="font-size: 13px;">Payee / Vendor Paid To <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control form-control-sm" name="Payee" placeholder="e.g. National Stationery Mart or Taxi Driver" required />
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-semibold" style="font-size: 13px;">Expense Category / Ledger Head <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control form-control-sm" name="ExpenseCategory" list="expenseCategoryList" placeholder="e.g. Office Supplies, Travel & Conveyance" required />
+                            <datalist id="expenseCategoryList">
+                                <option value="Office Supplies & Printing" />
+                                <option value="Travel & Local Conveyance" />
+                                <option value="Food & Refreshments" />
+                                <option value="Site Minor Repairs & Maintenance" />
+                                <option value="Courier & Postage" />
+                                <option value="Cartage & Freight" />
+                                <option value="Staff Welfare & Medical" />
+                                <option value="Miscellaneous Site Expense" />
+                            </datalist>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-semibold" style="font-size: 13px;">Cost Centre or Project</label>
+                            <select class="form-select form-select-sm" name="ProjectId">
+                                <option value="">-- General / No Project --</option>
+                                @foreach (var p in Model.Projects)
+                                {
+                                    <option value="@p.Id">@p.ProjectCode - @p.ProjectName</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-semibold" style="font-size: 13px;">Cost Centre Name</label>
+                            <input type="text" class="form-control form-control-sm" name="CostCenter" placeholder="e.g. HQ Administration or Site Office" />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-semibold" style="font-size: 13px;">Paid By (Custodian) <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control form-control-sm" name="PaidBy" list="userList" placeholder="e.g. Ramesh Kumar (Custodian)" required />
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-semibold" style="font-size: 13px;">Approved By <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control form-control-sm" name="ApprovedBy" list="userList" placeholder="e.g. Project Manager / Finance Head" required />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-semibold" style="font-size: 13px;">Initial Voucher Status</label>
+                            <select class="form-select form-select-sm" name="Status" id="expenseStatusSelect" onchange="validateExpenseAmount()">
+                                <option value="POSTED" selected>Posted (Immediately Finalized)</option>
+                                <option value="APPROVED">Approved (Awaiting Posting)</option>
+                                <option value="DRAFT">Draft</option>
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-semibold" style="font-size: 13px;">Bill / Receipt Attachment (PDF/Image)</label>
+                            <input type="file" class="form-control form-control-sm" name="receiptFile" accept=".pdf,.png,.jpg,.jpeg,.webp" />
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label fw-semibold" style="font-size: 13px;">Purpose / Expense Description <span class="text-danger">*</span></label>
+                            <textarea class="form-control form-control-sm" name="Purpose" rows="2" placeholder="Describe the item or service purchased with cash" required></textarea>
+                        </div>
+
+                        <div class="col-12">
+                            <div class="form-check p-2 rounded bg-light border">
+                                <input class="form-check-input ms-0 me-2" type="checkbox" name="AutoAllocateFifo" value="true" id="autoAllocateCheck" checked />
+                                <label class="form-check-label fw-semibold text-primary" for="autoAllocateCheck" style="font-size: 13px;">
+                                    <i class="fa-solid fa-wand-magic-sparkles me-1"></i> Auto-allocate immediately oldest-first (FIFO) against open cash withdrawals
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light py-2">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm px-4" id="expenseSubmitBtn">Save Expense Voucher</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ======================================================== -->
+<!-- MODAL 3: MANUAL ALLOCATION & SOURCE SETTLEMENT MODAL    -->
+<!-- ======================================================== -->
+<div class="modal fade" id="manualAllocationModal" tabindex="-1" aria-labelledby="manualAllocationModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow">
+            <form asp-controller="PettyCash" asp-action="SaveManualAllocation" method="post" id="manualAllocForm" onsubmit="return validateManualAlloc();">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="utilisationId" id="manualAllocUtilisationId" />
+                <input type="hidden" name="allocationsJson" id="manualAllocJson" />
+
+                <div class="modal-header bg-light py-3">
+                    <h5 class="modal-title fw-bold" id="manualAllocationModalLabel">
+                        <i class="fa-solid fa-link text-success me-2"></i>Expense Source Allocation &amp; Settlement
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <!-- Utilisation Summary Banner -->
+                    <div class="p-3 mb-3 rounded-3" style="background: #F1F5F9;">
+                        <div class="row g-2 align-items-center">
+                            <div class="col-12 col-md-4">
+                                <div class="text-muted" style="font-size: 11.5px;">VOUCHER</div>
+                                <div class="fw-bold fs-6 text-primary" id="mAllocVoucherNo">-</div>
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <div class="text-muted" style="font-size: 11.5px;">TOTAL EXPENSE</div>
+                                <div class="fw-bold fs-6 text-danger" id="mAllocTotalAmount">-</div>
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <div class="text-muted" style="font-size: 11.5px;">UNALLOCATED REMAINING</div>
+                                <div class="fw-bold fs-6 text-warning" id="mAllocRemainingAmount">-</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-muted mb-2" style="font-size: 12.5px;">
+                        Select which cash withdrawal(s) fund this expense and specify the exact amount to draw from each:
+                    </p>
+
+                    <div class="table-responsive border rounded-3 mb-3">
+                        <table class="table table-sm table-hover align-middle mb-0" style="font-size: 12.5px;" id="manualAllocTable">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-3">Withdrawal / Inflow</th>
+                                    <th>Date</th>
+                                    <th>Source</th>
+                                    <th class="text-end">Total (&#8377;)</th>
+                                    <th class="text-end">Available Float (&#8377;)</th>
+                                    <th class="text-end pe-3" style="width: 170px;">Allocate Amount (&#8377;)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="manualAllocTableBody">
+                                <!-- Populated dynamically by JS -->
+                            </tbody>
+                            <tfoot class="table-light fw-bold">
+                                <tr>
+                                    <td colspan="5" class="ps-3 text-end">Total Assigned to this Expense:</td>
+                                    <td class="text-end pe-3 text-success fs-6" id="mAllocCalculatedTotal">&#8377; 0.00</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold" style="font-size: 12.5px;">Override Reason / Audit Notes</label>
+                        <input type="text" class="form-control form-control-sm" name="notes" placeholder="e.g. Manually drawn from project site withdrawal CW-2026-0001" />
+                    </div>
+                </div>
+                <div class="modal-footer bg-light py-2">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success btn-sm px-4">Save Allocations</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ======================================================== -->
+<!-- MODAL 4: VIEW WITHDRAWAL ALLOCATIONS                     -->
+<!-- ======================================================== -->
+<div class="modal fade" id="viewWithdrawalAllocModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light py-3">
+                <h5 class="modal-title fw-bold" id="viewWAllocTitle">
+                    <i class="fa-solid fa-list-check text-primary me-2"></i>Expenses Funded by Withdrawal
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4" id="viewWAllocBody">
+                <p class="text-muted">Loading allocations...</p>
+            </div>
+            <div class="modal-footer bg-light py-2">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ======================================================== -->
+<!-- MODAL 5: RECONCILE BANK WITHDRAWAL (BRS)                -->
+<!-- ======================================================== -->
+<div class="modal fade" id="reconcileWithdrawalModal" tabindex="-1" aria-labelledby="reconcileWithdrawalModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <form asp-controller="PettyCash" asp-action="ReconcileWithdrawal" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" id="reconcileWithdrawalId" />
+                <div class="modal-header bg-light py-3">
+                    <h5 class="modal-title fw-bold" id="reconcileWithdrawalModalLabel">
+                        <i class="fa-solid fa-stamp text-warning me-2"></i>Bank Reconciliation (BRS)
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="p-3 mb-3 rounded-3 bg-light border">
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <div class="text-muted" style="font-size: 11px;">WITHDRAWAL REF</div>
+                                <div class="fw-bold text-primary" id="recWithdrawalRef">-</div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-muted" style="font-size: 11px;">AMOUNT</div>
+                                <div class="fw-bold text-success fs-6" id="recWithdrawalAmount">-</div>
+                            </div>
+                            <div class="col-12 mt-2">
+                                <div class="text-muted" style="font-size: 11px;">BANK ACCOUNT</div>
+                                <div class="fw-semibold text-dark" id="recWithdrawalBank">-</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold" style="font-size: 13px;">Bank Statement Reference / Transaction ID <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control form-control-sm" name="bankStatementRef" id="recStatementRefInput" placeholder="e.g. HDFC-STM-202610-0948 or UTR/Cheque Debit Ref" required />
+                        <div class="form-text" style="font-size: 11.5px;">Enter the transaction reference or line ID shown on your official bank passbook / netbanking statement.</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold" style="font-size: 13px;">Reconciliation Notes (Optional)</label>
+                        <input type="text" class="form-control form-control-sm" name="notes" placeholder="e.g. Cleared in October bank statement on 25-Oct" />
+                    </div>
+                </div>
+                <div class="modal-footer bg-light py-2">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success btn-sm px-4">
+                        <i class="fa-solid fa-check-double me-1"></i>Confirm BRS Reconciliation
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Datalist for User Autocomplete -->
+<datalist id="userList">
+    @foreach (var u in Model.Users)
+    {
+        <option value="@u.FullName" />
+    }
+    <option value="Ramesh Kumar (Accountant)" />
+    <option value="Sunil Verma (Site Supervisor)" />
+    <option value="Admin / Finance Manager" />
+</datalist>
+
+@section Scripts {
+<script>
+    const availableCashInHand = @Model.CashInHand;
+
+    function toggleBankFields() {
+        var src = document.getElementById('withdrawalSourceType').value;
+        var bankGroup = document.getElementById('bankAccountGroup');
+        if (src === 'BANK_WITHDRAWAL') {
+            bankGroup.style.display = 'block';
+            updateBankBalanceInfo();
+        } else {
+            bankGroup.style.display = 'none';
+            document.getElementById('bankBalanceBadge').style.display = 'none';
+            document.getElementById('bankBalanceAlert').classList.add('d-none');
+        }
+    }
+
+    function updateBankBalanceInfo() {
+        var select = document.getElementById('bankAccountIdSelect');
+        var badge = document.getElementById('bankBalanceBadge');
+        if (!select || select.selectedIndex < 0) return;
+        var opt = select.options[select.selectedIndex];
+        var bal = parseFloat(opt.getAttribute('data-balance')) || 0;
+        if (opt.value) {
+            badge.innerText = 'Book Bal: ₹ ' + bal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+            badge.style.display = 'inline-block';
+        } else {
+            badge.style.display = 'none';
+        }
+        validateWithdrawalAmount();
+    }
+
+    function validateWithdrawalAmount() {
+        var src = document.getElementById('withdrawalSourceType').value;
+        if (src !== 'BANK_WITHDRAWAL') {
+            document.getElementById('bankBalanceAlert').classList.add('d-none');
+            return true;
+        }
+
+        var select = document.getElementById('bankAccountIdSelect');
+        if (!select || select.selectedIndex < 0) return true;
+        var opt = select.options[select.selectedIndex];
+        var bal = parseFloat(opt.getAttribute('data-balance')) || 0;
+        var amt = parseFloat(document.getElementById('withdrawalAmountInput').value) || 0;
+
+        if (opt.value && amt > bal) {
+            document.getElementById('bankBalanceAlert').classList.remove('d-none');
+            return false;
+        } else {
+            document.getElementById('bankBalanceAlert').classList.add('d-none');
+            return true;
+        }
+    }
+
+    function validateWithdrawalSubmit() {
+        var isValid = validateWithdrawalAmount();
+        if (!isValid) {
+            alert('Withdrawal amount exceeds the selected bank account book balance.');
+            return false;
+        }
+        return true;
+    }
+
+    function validateExpenseAmount() {
+        var amt = parseFloat(document.getElementById('expenseAmountInput').value) || 0;
+        var status = document.getElementById('expenseStatusSelect').value;
+        var alertDiv = document.getElementById('cashExceededAlert');
+        var submitBtn = document.getElementById('expenseSubmitBtn');
+
+        if (amt > availableCashInHand && (status === 'POSTED' || status === 'APPROVED')) {
+            alertDiv.classList.remove('d-none');
+            submitBtn.disabled = true;
+            submitBtn.title = 'Cannot save: amount exceeds cash in hand';
+        } else {
+            alertDiv.classList.add('d-none');
+            submitBtn.disabled = false;
+            submitBtn.title = '';
+        }
+    }
+
+    function validateExpenseSubmit() {
+        var amt = parseFloat(document.getElementById('expenseAmountInput').value) || 0;
+        var status = document.getElementById('expenseStatusSelect').value;
+
+        if (amt > availableCashInHand && (status === 'POSTED' || status === 'APPROVED')) {
+            alert('Cannot create ' + status + ' voucher of ₹' + amt.toFixed(2) + '.\n\nAvailable cash in hand is only ₹' + Math.max(0, availableCashInHand).toFixed(2) + '.\nPlease select "Draft" status or record a bank cash withdrawal first to replenish the float.');
+            return false;
+        }
+        return true;
+    }
+
+    function openWithdrawModalForBank(bankId) {
+        document.getElementById('withdrawalSourceType').value = 'BANK_WITHDRAWAL';
+        toggleBankFields();
+        document.getElementById('bankAccountIdSelect').value = bankId;
+        updateBankBalanceInfo();
+        var modal = new bootstrap.Modal(document.getElementById('newWithdrawalModal'));
+        modal.show();
+    }
+
+    var currentUtilisation = null;
+
+    async function openManualAllocationModal(utilId) {
+        var modalEl = document.getElementById('manualAllocationModal');
+        var modal = new bootstrap.Modal(modalEl);
+        modal.show();
+
+        document.getElementById('mAllocVoucherNo').innerText = 'Loading...';
+        document.getElementById('mAllocTotalAmount').innerText = '-';
+        document.getElementById('mAllocRemainingAmount').innerText = '-';
+        document.getElementById('manualAllocTableBody').innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted"><i class="fa-solid fa-spinner fa-spin me-2"></i>Loading available withdrawals...</td></tr>';
+
+        try {
+            var res = await fetch('/PettyCash/GetUtilisationAllocationsJson?id=' + utilId);
+            var data = await res.json();
+            currentUtilisation = data.utilisation;
+
+            document.getElementById('manualAllocUtilisationId').value = data.utilisation.id;
+            document.getElementById('mAllocVoucherNo').innerText = data.utilisation.voucherNumber;
+            document.getElementById('mAllocTotalAmount').innerText = '₹ ' + Number(data.utilisation.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+            document.getElementById('mAllocRemainingAmount').innerText = '₹ ' + Number(data.utilisation.remainingUnallocated).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+
+            var tbody = document.getElementById('manualAllocTableBody');
+            tbody.innerHTML = '';
+
+            var existingMap = {};
+            if (data.existingAllocations) {
+                data.existingAllocations.forEach(function(a) {
+                    existingMap[a.withdrawalId] = a.amount;
+                });
+            }
+
+            if (!data.availableWithdrawals || data.availableWithdrawals.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-danger"><i class="fa-solid fa-triangle-exclamation me-2"></i>No open or partly utilised cash withdrawals found in database. Please record a cash withdrawal first.</td></tr>';
+                return;
+            }
+
+            data.availableWithdrawals.forEach(function(w) {
+                var currentVal = existingMap[w.id] || 0;
+                var effectiveMax = w.availableAmount + currentVal;
+
+                var tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="ps-3 fw-bold text-primary">${w.referenceNumber}</td>
+                    <td>${w.withdrawalDate.substring(0, 10)}</td>
+                    <td><span class="badge badge-soft-secondary">${w.sourceType}</span></td>
+                    <td class="text-end">₹ ${Number(w.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                    <td class="text-end fw-semibold text-success">₹ ${Number(w.availableAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                    <td class="text-end pe-3">
+                        <input type="number" step="0.01" min="0" max="${effectiveMax}" 
+                               data-withdrawal-id="${w.id}" 
+                               data-max="${effectiveMax}"
+                               class="form-control form-control-sm text-end fw-bold alloc-input" 
+                               value="${currentVal > 0 ? currentVal : ''}" 
+                               placeholder="0.00" 
+                               oninput="recalcManualAlloc()" />
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            recalcManualAlloc();
+        } catch (e) {
+            document.getElementById('manualAllocTableBody').innerHTML = '<tr><td colspan="6" class="text-center py-4 text-danger">Error loading data: ' + e.message + '</td></tr>';
+        }
+    }
+
+    function recalcManualAlloc() {
+        var inputs = document.querySelectorAll('.alloc-input');
+        var sum = 0;
+        inputs.forEach(function(inp) {
+            var val = parseFloat(inp.value) || 0;
+            sum += val;
+        });
+
+        document.getElementById('mAllocCalculatedTotal').innerText = '₹ ' + sum.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+
+        if (currentUtilisation) {
+            var remaining = Math.max(0, currentUtilisation.amount - sum);
+            document.getElementById('mAllocRemainingAmount').innerText = '₹ ' + remaining.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+
+            if (sum > currentUtilisation.amount) {
+                document.getElementById('mAllocCalculatedTotal').classList.add('text-danger');
+                document.getElementById('mAllocCalculatedTotal').classList.remove('text-success');
+            } else {
+                document.getElementById('mAllocCalculatedTotal').classList.add('text-success');
+                document.getElementById('mAllocCalculatedTotal').classList.remove('text-danger');
+            }
+        }
+    }
+
+    function validateManualAlloc() {
+        var inputs = document.querySelectorAll('.alloc-input');
+        var items = [];
+        var total = 0;
+
+        for (var i = 0; i < inputs.length; i++) {
+            var inp = inputs[i];
+            var val = parseFloat(inp.value) || 0;
+            var max = parseFloat(inp.dataset.max) || 0;
+            var wId = parseInt(inp.dataset.withdrawalId);
+
+            if (val > max) {
+                alert('Allocated amount ₹' + val + ' exceeds available balance ₹' + max + ' for this withdrawal.');
+                return false;
+            }
+
+            if (val > 0) {
+                items.push({ withdrawalId: wId, amount: val });
+                total += val;
+            }
+        }
+
+        if (currentUtilisation && total > currentUtilisation.amount) {
+            alert('Total allocated ₹' + total + ' cannot exceed total expense voucher amount ₹' + currentUtilisation.amount);
+            return false;
+        }
+
+        document.getElementById('manualAllocJson').value = JSON.stringify(items);
+        return true;
+    }
+
+    function showWithdrawalAllocations(wId, refNo, amount, utilised) {
+        document.getElementById('viewWAllocTitle').innerText = 'Expenses Funded by ' + refNo;
+        var modal = new bootstrap.Modal(document.getElementById('viewWithdrawalAllocModal'));
+        modal.show();
+
+        var body = document.getElementById('viewWAllocBody');
+        body.innerHTML = `
+            <div class="p-3 mb-3 bg-light rounded d-flex justify-content-between">
+                <div><strong>Total Inflow:</strong> ₹ ${amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                <div class="text-danger"><strong>Utilised:</strong> ₹ ${utilised.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                <div class="text-success"><strong>Remaining:</strong> ₹ ${(amount - utilised).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+            </div>
+            <p class="text-muted" style="font-size: 13px;">This withdrawal has funded the following expense voucher(s):</p>
+            <div class="text-center py-3">
+                <a href="/PettyCash?tab=allocations" class="btn btn-outline-primary btn-sm">
+                    <i class="fa-solid fa-arrow-up-right-from-square me-1"></i> Open Full Allocation Join Matrix
+                </a>
+            </div>
+        `;
+    }
+
+    function openReconcileModal(wId, refNo, amount, bankName) {
+        document.getElementById('reconcileWithdrawalId').value = wId;
+        document.getElementById('recWithdrawalRef').innerText = refNo;
+        document.getElementById('recWithdrawalAmount').innerText = '₹ ' + Number(amount).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+        document.getElementById('recWithdrawalBank').innerText = bankName;
+        document.getElementById('recStatementRefInput').value = '';
+
+        var modal = new bootstrap.Modal(document.getElementById('reconcileWithdrawalModal'));
+        modal.show();
+    }
+</script>
+}

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using SDK.ERP.Domain.Entities.Admin;
 using SDK.ERP.Domain.Entities.MasterData;
 using SDK.ERP.Domain.Entities.Accounting;
+using SDK.ERP.Domain.Entities.Banking;
 
 namespace SDK.ERP.Infrastructure.Data;
 
@@ -465,6 +466,235 @@ public static class SeedData
         {
             // Logging or fallback if table not yet created
             System.Diagnostics.Debug.WriteLine($"DirectExpenses seed notice: {ex.Message}");
+        }
+
+        // 8. Seed BankAccounts & Petty Cash System (CashWithdrawals, CashUtilisations, CashAllocations)
+        try
+        {
+            var targetCompany = await context.Companies.FirstOrDefaultAsync();
+            var companyId = targetCompany?.Id ?? 1;
+
+            if (!await context.BankAccounts.AnyAsync())
+            {
+                var hdfc = new BankAccount
+                {
+                    CompanyId = companyId,
+                    GlAccountId = 1,
+                    BankName = "HDFC Bank Ltd",
+                    BranchName = "Connaught Place Branch, New Delhi",
+                    AccountNumber = "50200084920194",
+                    IfscCode = "HDFC0000123",
+                    AccountType = "CURRENT",
+                    BookBalance = 4850000.00m,
+                    IsActive = true
+                };
+                var sbi = new BankAccount
+                {
+                    CompanyId = companyId,
+                    GlAccountId = 1,
+                    BankName = "State Bank of India (SBI)",
+                    BranchName = "Commercial Branch, New Delhi",
+                    AccountNumber = "39201948201",
+                    IfscCode = "SBIN0001244",
+                    AccountType = "CURRENT",
+                    BookBalance = 1250000.00m,
+                    IsActive = true
+                };
+                context.BankAccounts.AddRange(hdfc, sbi);
+                await context.SaveChangesAsync();
+            }
+
+            if (!await context.CashWithdrawals.AnyAsync())
+            {
+                var bank = await context.BankAccounts.FirstOrDefaultAsync();
+
+                var w1 = new CashWithdrawal
+                {
+                    CompanyId = companyId,
+                    ReferenceNumber = "CW-2026-0001",
+                    WithdrawalDate = DateTime.Today.AddDays(-15),
+                    SourceType = "BANK_WITHDRAWAL",
+                    BankAccountId = bank?.Id,
+                    ChequeOrRefNo = "CHQ-849201",
+                    Amount = 50000.00m,
+                    UtilisedAmount = 32500.00m,
+                    WithdrawnBy = "Ramesh Kumar (Accountant)",
+                    Purpose = "Monthly cash withdrawal for office imprest float & routine site expenses",
+                    ApprovedBy = "Admin / Finance Manager",
+                    BankStatementRef = "HDFC-STM-202610-0948",
+                    Status = "PARTLY_UTILISED"
+                };
+
+                var w2 = new CashWithdrawal
+                {
+                    CompanyId = companyId,
+                    ReferenceNumber = "CW-2026-0002",
+                    WithdrawalDate = DateTime.Today.AddDays(-5),
+                    SourceType = "BANK_WITHDRAWAL",
+                    BankAccountId = bank?.Id,
+                    ChequeOrRefNo = "ATM-WDL-93021",
+                    Amount = 25000.00m,
+                    UtilisedAmount = 0m,
+                    WithdrawnBy = "Ramesh Kumar (Accountant)",
+                    Purpose = "Mid-month petty cash replenishment for site conveyance & courier charges",
+                    ApprovedBy = "Admin / Finance Manager",
+                    BankStatementRef = "HDFC-ATM-202610-1842",
+                    Status = "OPEN"
+                };
+
+                var w3 = new CashWithdrawal
+                {
+                    CompanyId = companyId,
+                    ReferenceNumber = "CR-2026-0001",
+                    WithdrawalDate = DateTime.Today.AddDays(-8),
+                    SourceType = "RETURNED_ADVANCE",
+                    ChequeOrRefNo = "CASH-REC-104",
+                    Amount = 7500.00m,
+                    UtilisedAmount = 7500.00m,
+                    WithdrawnBy = "Sunil Verma (Site Supervisor)",
+                    Purpose = "Returned unspent cash balance from field site survey advance",
+                    ApprovedBy = "Admin / Finance Manager",
+                    Status = "FULLY_UTILISED"
+                };
+
+                context.CashWithdrawals.AddRange(w1, w2, w3);
+                await context.SaveChangesAsync();
+
+                var u1 = new CashUtilisation
+                {
+                    CompanyId = companyId,
+                    VoucherNumber = "PCV-2026-0001",
+                    ExpenseDate = DateTime.Today.AddDays(-14),
+                    Amount = 4500.00m,
+                    AllocatedAmount = 4500.00m,
+                    Payee = "National Stationery Mart",
+                    ExpenseCategory = "Office Supplies & Printing",
+                    CostCenter = "HQ Administration",
+                    Purpose = "Purchased printer paper, register books, envelopes and stationery",
+                    PaidBy = "Ramesh Kumar",
+                    ApprovedBy = "Admin / Finance Manager",
+                    Status = "POSTED"
+                };
+
+                var u2 = new CashUtilisation
+                {
+                    CompanyId = companyId,
+                    VoucherNumber = "PCV-2026-0002",
+                    ExpenseDate = DateTime.Today.AddDays(-12),
+                    Amount = 12000.00m,
+                    AllocatedAmount = 12000.00m,
+                    Payee = "Metro Taxi & Local Travels",
+                    ExpenseCategory = "Travel & Conveyance",
+                    CostCenter = "Site Operations",
+                    Purpose = "Emergency site transportation & local cab fare for technical team",
+                    PaidBy = "Ramesh Kumar",
+                    ApprovedBy = "Admin / Finance Manager",
+                    Status = "POSTED"
+                };
+
+                var u3 = new CashUtilisation
+                {
+                    CompanyId = companyId,
+                    VoucherNumber = "PCV-2026-0003",
+                    ExpenseDate = DateTime.Today.AddDays(-7),
+                    Amount = 16000.00m,
+                    AllocatedAmount = 16000.00m,
+                    Payee = "Om Sai Hardware & Electricals",
+                    ExpenseCategory = "Site Minor Repairs & Maintenance",
+                    CostCenter = "Project Site",
+                    Purpose = "Urgent drill bits, cables, clamps and electrical tape for installation work",
+                    PaidBy = "Ramesh Kumar",
+                    ApprovedBy = "Admin / Finance Manager",
+                    Status = "POSTED"
+                };
+
+                var u4 = new CashUtilisation
+                {
+                    CompanyId = companyId,
+                    VoucherNumber = "PCV-2026-0004",
+                    ExpenseDate = DateTime.Today.AddDays(-2),
+                    Amount = 7500.00m,
+                    AllocatedAmount = 7500.00m,
+                    Payee = "Blue Dart Express & Speed Courier",
+                    ExpenseCategory = "Courier & Postage",
+                    CostCenter = "Tender Department",
+                    Purpose = "Express dispatch of tender bid documents and security bond packages",
+                    PaidBy = "Ramesh Kumar",
+                    ApprovedBy = "Admin / Finance Manager",
+                    Status = "POSTED"
+                };
+
+                var u5 = new CashUtilisation
+                {
+                    CompanyId = companyId,
+                    VoucherNumber = "PCV-2026-0005",
+                    ExpenseDate = DateTime.Today,
+                    Amount = 2800.00m,
+                    AllocatedAmount = 0m,
+                    Payee = "Chai Point & Pantry Supplies",
+                    ExpenseCategory = "Pantry & Refreshments",
+                    CostCenter = "HQ Office",
+                    Purpose = "Weekly tea, coffee, biscuits and refreshments for client technical meetings",
+                    PaidBy = "Ramesh Kumar",
+                    ApprovedBy = "Admin / Finance Manager",
+                    Status = "DRAFT"
+                };
+
+                context.CashUtilisations.AddRange(u1, u2, u3, u4, u5);
+                await context.SaveChangesAsync();
+
+                // Join allocations
+                var a1 = new CashAllocation
+                {
+                    CompanyId = companyId,
+                    WithdrawalId = w1.Id,
+                    UtilisationId = u1.Id,
+                    Amount = 4500.00m,
+                    AllocationDate = u1.ExpenseDate,
+                    AllocatedBy = "System (FIFO Auto-Allocation)",
+                    IsManualOverride = false
+                };
+
+                var a2 = new CashAllocation
+                {
+                    CompanyId = companyId,
+                    WithdrawalId = w1.Id,
+                    UtilisationId = u2.Id,
+                    Amount = 12000.00m,
+                    AllocationDate = u2.ExpenseDate,
+                    AllocatedBy = "System (FIFO Auto-Allocation)",
+                    IsManualOverride = false
+                };
+
+                var a3 = new CashAllocation
+                {
+                    CompanyId = companyId,
+                    WithdrawalId = w1.Id,
+                    UtilisationId = u3.Id,
+                    Amount = 16000.00m,
+                    AllocationDate = u3.ExpenseDate,
+                    AllocatedBy = "System (FIFO Auto-Allocation)",
+                    IsManualOverride = false
+                };
+
+                var a4 = new CashAllocation
+                {
+                    CompanyId = companyId,
+                    WithdrawalId = w3.Id,
+                    UtilisationId = u4.Id,
+                    Amount = 7500.00m,
+                    AllocationDate = u4.ExpenseDate,
+                    AllocatedBy = "System (FIFO Auto-Allocation)",
+                    IsManualOverride = false
+                };
+
+                context.CashAllocations.AddRange(a1, a2, a3, a4);
+                await context.SaveChangesAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"PettyCash seed notice: {ex.Message}");
         }
     }
 }

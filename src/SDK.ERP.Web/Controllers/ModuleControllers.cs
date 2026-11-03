@@ -9,6 +9,7 @@ using SDK.ERP.Domain.Entities.Procurement;
 using SDK.ERP.Domain.Entities.Accounting;
 using SDK.ERP.Domain.Entities.Banking;
 using SDK.ERP.Domain.Entities.Tax;
+using SDK.ERP.Application.ViewModels;
 using SDK.ERP.Infrastructure.Data;
 
 namespace SDK.ERP.Web.Controllers;
@@ -3879,14 +3880,12 @@ public class BankingController : Controller
     private readonly ApplicationDbContext _db;
     public BankingController(ApplicationDbContext db) => _db = db;
 
-    public async Task<IActionResult> Index()
+    public IActionResult Index(string tab = "overview")
     {
-        ViewData["ActiveMenu"] = "Banking";
-        var accounts = await _db.BankAccounts.AsNoTracking().ToListAsync();
-        return View(accounts);
+        return RedirectToAction("Index", "PettyCash", new { tab = tab });
     }
 
-    public IActionResult Reconciliation() => RedirectToAction(nameof(Index));
+    public IActionResult Reconciliation() => RedirectToAction("Index", "PettyCash", new { tab = "bankaccounts" });
 }
 
 public class PayrollController : Controller
@@ -3922,20 +3921,4 @@ public class ReportsController : Controller
         ViewData["ActiveMenu"] = "Reports";
         return View();
     }
-}
-
-public class AdminController : Controller
-{
-    private readonly ApplicationDbContext _db;
-    public AdminController(ApplicationDbContext db) => _db = db;
-
-    public async Task<IActionResult> Index()
-    {
-        ViewData["ActiveMenu"] = "Admin";
-        ViewBag.Roles = await _db.Roles.Include(r => r.Users).AsNoTracking().ToListAsync();
-        var auditLogs = await _db.AuditLogs.OrderByDescending(a => a.CreatedAt).Take(50).AsNoTracking().ToListAsync();
-        return View(auditLogs);
-    }
-
-    public IActionResult AuditTrail() => RedirectToAction(nameof(Index));
 }

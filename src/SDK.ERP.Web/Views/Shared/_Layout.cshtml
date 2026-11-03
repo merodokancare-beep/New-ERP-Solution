@@ -103,9 +103,9 @@
                     <span class="nav-icon-badge blue"><i class="fa-solid fa-file-shield"></i></span>
                     <span class="flex-grow-1">GST &amp; Tax Compliance</span>
                 </a>
-                <a class="nav-item-link @(activeMenu == "Banking" ? "active" : "")" asp-controller="Banking" asp-action="Index" title="Cash & Banking / BRS" data-bs-toggle="tooltip" data-bs-placement="right">
-                    <span class="nav-icon-badge gray"><i class="fa-solid fa-building-columns"></i></span>
-                    <span class="flex-grow-1">Cash &amp; Banking / BRS</span>
+                <a class="nav-item-link @(activeMenu == "PettyCash" || activeMenu == "Banking" ? "active" : "")" asp-controller="PettyCash" asp-action="Index" title="Petty Cash Management" data-bs-toggle="tooltip" data-bs-placement="right">
+                    <span class="nav-icon-badge amber"><i class="fa-solid fa-wallet"></i></span>
+                    <span class="flex-grow-1">Petty Cash Management</span>
                 </a>
 
                 <!-- HR & ASSETS -->
@@ -225,14 +225,14 @@
                                         </a>
                                     </div>
 
-                                    <!-- Column 4: Financials & Banking -->
+                                    <!-- Column 4: Financials & Petty Cash -->
                                     <div class="col-6 col-md-3">
-                                        <div class="quick-section-label">BANKING &amp; ACCOUNTS</div>
-                                        <a href="/Banking" class="quick-action-card" data-shortcut="banking">
-                                            <div class="quick-icon-box gray"><i class="fa-solid fa-building-columns"></i></div>
+                                        <div class="quick-section-label">TREASURY &amp; CASH</div>
+                                        <a href="/PettyCash" class="quick-action-card" data-shortcut="pettycash">
+                                            <div class="quick-icon-box amber"><i class="fa-solid fa-wallet"></i></div>
                                             <div class="quick-action-text">
-                                                <span class="quick-action-title">Bank / Cheque</span>
-                                                <span class="quick-action-desc">BRS &amp; Clearance</span>
+                                                <span class="quick-action-title">Petty Cash</span>
+                                                <span class="quick-action-desc">Imprest &amp; Vouchers</span>
                                             </div>
                                         </a>
                                         <a href="/Expenses/Create" class="quick-action-card" data-shortcut="expense">
@@ -419,6 +419,12 @@
                                 <a class="dropdown-item py-2 rounded d-flex align-items-center gap-2 text-secondary" asp-controller="Admin" asp-action="Index">
                                     <i class="fa-solid fa-shield-halved text-secondary"></i>
                                     <span class="fw-semibold" style="font-size: 13px;">Security &amp; Audit Logs</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item py-2 rounded d-flex align-items-center gap-2 text-danger" href="/Admin?tab=reset">
+                                    <i class="fa-solid fa-triangle-exclamation text-danger"></i>
+                                    <span class="fw-semibold" style="font-size: 13px;">Testing &amp; Data Reset</span>
                                 </a>
                             </li>
                             <li><hr class="dropdown-divider my-2"></li>

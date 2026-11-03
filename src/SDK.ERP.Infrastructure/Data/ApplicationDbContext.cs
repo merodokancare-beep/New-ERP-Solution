@@ -100,6 +100,9 @@ public class ApplicationDbContext : DbContext
     public DbSet<BankTransaction> BankTransactions => Set<BankTransaction>();
     public DbSet<BankReconciliation> BankReconciliations => Set<BankReconciliation>();
     public DbSet<PettyCashTransaction> PettyCashTransactions => Set<PettyCashTransaction>();
+    public DbSet<CashWithdrawal> CashWithdrawals => Set<CashWithdrawal>();
+    public DbSet<CashUtilisation> CashUtilisations => Set<CashUtilisation>();
+    public DbSet<CashAllocation> CashAllocations => Set<CashAllocation>();
 
     // Domain 10: Payroll
     public DbSet<Employee> Employees => Set<Employee>();
@@ -145,6 +148,21 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<Employee>().HasQueryFilter(e => _tenantProvider == null || _tenantProvider.CurrentCompanyId == 0 || e.CompanyId == _tenantProvider.CurrentCompanyId);
         modelBuilder.Entity<FixedAsset>().HasQueryFilter(e => _tenantProvider == null || _tenantProvider.CurrentCompanyId == 0 || e.CompanyId == _tenantProvider.CurrentCompanyId);
         modelBuilder.Entity<DirectExpense>().HasQueryFilter(e => _tenantProvider == null || _tenantProvider.CurrentCompanyId == 0 || e.CompanyId == _tenantProvider.CurrentCompanyId);
+        modelBuilder.Entity<CashWithdrawal>().HasQueryFilter(e => _tenantProvider == null || _tenantProvider.CurrentCompanyId == 0 || e.CompanyId == _tenantProvider.CurrentCompanyId);
+        modelBuilder.Entity<CashUtilisation>().HasQueryFilter(e => _tenantProvider == null || _tenantProvider.CurrentCompanyId == 0 || e.CompanyId == _tenantProvider.CurrentCompanyId);
+        modelBuilder.Entity<CashAllocation>().HasQueryFilter(e => _tenantProvider == null || _tenantProvider.CurrentCompanyId == 0 || e.CompanyId == _tenantProvider.CurrentCompanyId);
+
+        modelBuilder.Entity<CashAllocation>()
+            .HasOne(a => a.Withdrawal)
+            .WithMany(w => w.Allocations)
+            .HasForeignKey(a => a.WithdrawalId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<CashAllocation>()
+            .HasOne(a => a.Utilisation)
+            .WithMany(u => u.Allocations)
+            .HasForeignKey(a => a.UtilisationId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

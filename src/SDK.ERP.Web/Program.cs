@@ -452,6 +452,98 @@ using (var scope = app.Services.CreateScope())
             app.Logger.LogError(ex, "DirectExpenses schema migration SQL error: {Message}", ex.Message);
         }
 
+        // Dedicated Petty Cash Management (CashWithdrawals, CashUtilisations, CashAllocations) Schema Migration
+        try
+        {
+            await db.Database.ExecuteSqlRawAsync(@"
+                -- Ensure BankAccounts Table
+                IF OBJECT_ID('[BankAccounts]') IS NULL AND OBJECT_ID('[dbo].[BankAccounts]') IS NULL
+                BEGIN
+                    CREATE TABLE [dbo].[BankAccounts] (
+                        [Id] BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                        [CompanyId] BIGINT NOT NULL DEFAULT 1,
+                        [GlAccountId] BIGINT NOT NULL DEFAULT 1,
+                        [BankName] NVARCHAR(150) NOT NULL,
+                        [BranchName] NVARCHAR(150) NULL,
+                        [AccountNumber] NVARCHAR(50) NOT NULL,
+                        [IfscCode] NVARCHAR(30) NOT NULL,
+                        [AccountType] NVARCHAR(50) NOT NULL DEFAULT 'CURRENT',
+                        [BookBalance] DECIMAL(18,2) NOT NULL DEFAULT 0,
+                        [IsActive] BIT NOT NULL DEFAULT 1
+                    );
+                END
+
+                -- CashWithdrawals
+                IF OBJECT_ID('[CashWithdrawals]') IS NULL AND OBJECT_ID('[dbo].[CashWithdrawals]') IS NULL
+                BEGIN
+                    CREATE TABLE [dbo].[CashWithdrawals] (
+                        [Id] BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                        [CompanyId] BIGINT NOT NULL DEFAULT 1,
+                        [ReferenceNumber] NVARCHAR(100) NOT NULL,
+                        [WithdrawalDate] DATETIME2 NOT NULL,
+                        [SourceType] NVARCHAR(50) NOT NULL DEFAULT 'BANK_WITHDRAWAL',
+                        [BankAccountId] BIGINT NULL,
+                        [ChequeOrRefNo] NVARCHAR(100) NULL,
+                        [Amount] DECIMAL(18,2) NOT NULL DEFAULT 0,
+                        [UtilisedAmount] DECIMAL(18,2) NOT NULL DEFAULT 0,
+                        [WithdrawnBy] NVARCHAR(150) NOT NULL,
+                        [Purpose] NVARCHAR(500) NOT NULL,
+                        [ApprovedBy] NVARCHAR(150) NOT NULL,
+                        [BankStatementLineId] BIGINT NULL,
+                        [BankStatementRef] NVARCHAR(200) NULL,
+                        [Status] NVARCHAR(50) NOT NULL DEFAULT 'OPEN',
+                        [Notes] NVARCHAR(1000) NULL,
+                        [CreatedAt] DATETIME2 NOT NULL DEFAULT GETUTCDATE()
+                    );
+                END
+
+                -- CashUtilisations
+                IF OBJECT_ID('[CashUtilisations]') IS NULL AND OBJECT_ID('[dbo].[CashUtilisations]') IS NULL
+                BEGIN
+                    CREATE TABLE [dbo].[CashUtilisations] (
+                        [Id] BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                        [CompanyId] BIGINT NOT NULL DEFAULT 1,
+                        [VoucherNumber] NVARCHAR(100) NOT NULL,
+                        [ExpenseDate] DATETIME2 NOT NULL,
+                        [Amount] DECIMAL(18,2) NOT NULL DEFAULT 0,
+                        [AllocatedAmount] DECIMAL(18,2) NOT NULL DEFAULT 0,
+                        [Payee] NVARCHAR(200) NOT NULL,
+                        [ExpenseCategory] NVARCHAR(150) NOT NULL,
+                        [ExpenseAccountId] BIGINT NULL,
+                        [ProjectId] BIGINT NULL,
+                        [CostCenter] NVARCHAR(100) NULL,
+                        [Purpose] NVARCHAR(500) NOT NULL,
+                        [AttachmentFileName] NVARCHAR(255) NULL,
+                        [AttachmentFilePath] NVARCHAR(500) NULL,
+                        [PaidBy] NVARCHAR(150) NOT NULL,
+                        [ApprovedBy] NVARCHAR(150) NOT NULL,
+                        [Status] NVARCHAR(50) NOT NULL DEFAULT 'DRAFT',
+                        [CreatedAt] DATETIME2 NOT NULL DEFAULT GETUTCDATE()
+                    );
+                END
+
+                -- CashAllocations
+                IF OBJECT_ID('[CashAllocations]') IS NULL AND OBJECT_ID('[dbo].[CashAllocations]') IS NULL
+                BEGIN
+                    CREATE TABLE [dbo].[CashAllocations] (
+                        [Id] BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                        [CompanyId] BIGINT NOT NULL DEFAULT 1,
+                        [WithdrawalId] BIGINT NOT NULL,
+                        [UtilisationId] BIGINT NOT NULL,
+                        [Amount] DECIMAL(18,2) NOT NULL DEFAULT 0,
+                        [AllocationDate] DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+                        [AllocatedBy] NVARCHAR(150) NULL,
+                        [IsManualOverride] BIT NOT NULL DEFAULT 0,
+                        [Notes] NVARCHAR(500) NULL
+                    );
+                END
+            ");
+        }
+        catch (Exception ex)
+        {
+            app.Logger.LogError(ex, "Petty Cash schema migration SQL error: {Message}", ex.Message);
+        }
+
         await SeedData.InitializeAsync(db);
     }
     catch (Exception ex)
