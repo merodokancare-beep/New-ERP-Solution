@@ -306,7 +306,7 @@
                     Amount = po.TotalPoValue,
                     PerformedByName = !string.IsNullOrWhiteSpace(po.CreatedByName) ? po.CreatedByName : "System Creator",
                     PerformedByRole = !string.IsNullOrWhiteSpace(po.CreatedByRole) ? po.CreatedByRole : "ACCOUNTANT",
-                    CreatedAt = DateTime.SpecifyKind(po.PoDate.Date.AddHours(10).AddHours(-5.5), DateTimeKind.Utc)
+                    CreatedAt = DateTime.SpecifyKind(po.PoDate.Date.AddHours(4).AddMinutes(30), DateTimeKind.Utc)
                 });
 
                 // 2. PO Approved
@@ -321,7 +321,7 @@
                         Amount = po.TotalPoValue,
                         PerformedByName = "Management / Approver",
                         PerformedByRole = "MANAGEMENT",
-                        CreatedAt = po.ApprovedAt ?? DateTime.SpecifyKind(po.PoDate.Date.AddHours(12).AddHours(-5.5), DateTimeKind.Utc)
+                        CreatedAt = po.ApprovedAt ?? DateTime.SpecifyKind(po.PoDate.Date.AddHours(6).AddMinutes(30), DateTimeKind.Utc)
                     });
                 }
 
@@ -338,7 +338,7 @@
                         PerformedByName = "Management",
                         PerformedByRole = "MANAGEMENT",
                         Remarks = po.RejectionReason,
-                        CreatedAt = po.ApprovedAt ?? DateTime.SpecifyKind(po.PoDate.Date.AddHours(12).AddHours(-5.5), DateTimeKind.Utc)
+                        CreatedAt = po.ApprovedAt ?? DateTime.SpecifyKind(po.PoDate.Date.AddHours(6).AddMinutes(30), DateTimeKind.Utc)
                     });
                 }
 
@@ -355,7 +355,7 @@
                         Amount = markAmt,
                         PerformedByName = !string.IsNullOrWhiteSpace(po.CreatedByName) ? po.CreatedByName : "User",
                         PerformedByRole = "USER",
-                        CreatedAt = po.MarkedForPaymentAt ?? DateTime.SpecifyKind(po.PoDate.Date.AddHours(16).AddHours(-5.5), DateTimeKind.Utc)
+                        CreatedAt = po.MarkedForPaymentAt ?? DateTime.SpecifyKind(po.PoDate.Date.AddHours(10).AddMinutes(30), DateTimeKind.Utc)
                     });
                 }
 
@@ -373,7 +373,7 @@
                         PerformedByName = !string.IsNullOrWhiteSpace(po.PaymentApprovedByName) ? po.PaymentApprovedByName : "Admin User (CEO)",
                         PerformedByRole = "SUPER_ADMIN",
                         Remarks = po.PaymentApprovalRemarks,
-                        CreatedAt = po.PaymentApprovedAt ?? DateTime.SpecifyKind(po.PoDate.Date.AddHours(16).AddMinutes(30).AddHours(-5.5), DateTimeKind.Utc)
+                        CreatedAt = po.PaymentApprovedAt ?? DateTime.SpecifyKind(po.PoDate.Date.AddHours(11), DateTimeKind.Utc)
                     });
                 }
 
@@ -392,7 +392,7 @@
                         PerformedByName = "Accounts Dept",
                         PerformedByRole = "ACCOUNTS",
                         Remarks = pay.Remarks,
-                        CreatedAt = pay.PaymentDate.Kind == DateTimeKind.Utc ? pay.PaymentDate : DateTime.SpecifyKind(pay.PaymentDate.Date.AddHours(17).AddHours(-5.5), DateTimeKind.Utc)
+                        CreatedAt = pay.PaymentDate.Kind == DateTimeKind.Utc ? pay.PaymentDate : DateTime.SpecifyKind(pay.PaymentDate.Date.AddHours(11).AddMinutes(30), DateTimeKind.Utc)
                     });
                 }
 

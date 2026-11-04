@@ -2629,6 +2629,152 @@ PRINT '  - Demo Masters: Clients, Vendors, Projects, POs, Delivery Challans, Inv
 PRINT '=============================================================================';
 
 
+-- Migration for Masters & Procurement PO Lifecycle, Multi-stage Approvals & Audit Trails
+-- 0. Ensure master.states table & 37 Indian States and UTs
+IF OBJECT_ID(N'[master].[states]', N'U') IS NULL
+BEGIN
+    CREATE TABLE [master].[states] (
+        [Id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [StateCode] NVARCHAR(10) NOT NULL,
+        [StateName] NVARCHAR(100) NOT NULL,
+        [StateType] NVARCHAR(50) NULL,
+        [IsActive] BIT NOT NULL DEFAULT 1
+    );
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM [master].[states])
+BEGIN
+    INSERT INTO [master].[states] ([StateCode], [StateName], [StateType], [IsActive]) VALUES
+    ('01', 'Jammu and Kashmir', 'Union Territory', 1),
+    ('02', 'Himachal Pradesh', 'State', 1),
+    ('03', 'Punjab', 'State', 1),
+    ('04', 'Chandigarh', 'Union Territory', 1),
+    ('05', 'Uttarakhand', 'State', 1),
+    ('06', 'Haryana', 'State', 1),
+    ('07', 'Delhi', 'Union Territory', 1),
+    ('08', 'Rajasthan', 'State', 1),
+    ('09', 'Uttar Pradesh', 'State', 1),
+    ('10', 'Bihar', 'State', 1),
+    ('11', 'Sikkim', 'State', 1),
+    ('12', 'Arunachal Pradesh', 'State', 1),
+    ('13', 'Nagaland', 'State', 1),
+    ('14', 'Manipur', 'State', 1),
+    ('15', 'Mizoram', 'State', 1),
+    ('16', 'Tripura', 'State', 1),
+    ('17', 'Meghalaya', 'State', 1),
+    ('18', 'Assam', 'State', 1),
+    ('19', 'West Bengal', 'State', 1),
+    ('20', 'Jharkhand', 'State', 1),
+    ('21', 'Odisha', 'State', 1),
+    ('22', 'Chhattisgarh', 'State', 1),
+    ('23', 'Madhya Pradesh', 'State', 1),
+    ('24', 'Gujarat', 'State', 1),
+    ('26', 'Dadra and Nagar Haveli and Daman and Diu', 'Union Territory', 1),
+    ('27', 'Maharashtra', 'State', 1),
+    ('28', 'Andhra Pradesh', 'State', 1),
+    ('29', 'Karnataka', 'State', 1),
+    ('30', 'Goa', 'State', 1),
+    ('31', 'Lakshadweep', 'Union Territory', 1),
+    ('32', 'Kerala', 'State', 1),
+    ('33', 'Tamil Nadu', 'State', 1),
+    ('34', 'Puducherry', 'Union Territory', 1),
+    ('35', 'Andaman and Nicobar Islands', 'Union Territory', 1),
+    ('36', 'Telangana', 'State', 1),
+    ('37', 'Andhra Pradesh (New)', 'State', 1),
+    ('38', 'Ladakh', 'Union Territory', 1);
+END
+GO
+
+-- 0.1 Ensure master.clients & master.vendors columns
+IF OBJECT_ID(N'[master].[clients]', N'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[master].[clients]') AND name = 'ClientCategory')
+        ALTER TABLE [master].[clients] ADD [ClientCategory] NVARCHAR(30) NULL DEFAULT 'B2B';
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[master].[clients]') AND name = 'StateName')
+        ALTER TABLE [master].[clients] ADD [StateName] NVARCHAR(100) NULL;
+    EXEC('UPDATE [master].[clients] SET [ClientCategory] = ''B2B'' WHERE [ClientCategory] IS NULL');
+    IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[master].[clients]') AND name = 'Pan')
+        ALTER TABLE [master].[clients] ALTER COLUMN [Pan] NVARCHAR(50) NULL;
+    IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[master].[clients]') AND name = 'Gstin')
+        ALTER TABLE [master].[clients] ALTER COLUMN [Gstin] NVARCHAR(50) NULL;
+END
+GO
+
+IF OBJECT_ID(N'[master].[vendors]', N'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[master].[vendors]') AND name = 'StateCode')
+        ALTER TABLE [master].[vendors] ADD [StateCode] NVARCHAR(10) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[master].[vendors]') AND name = 'StateName')
+        ALTER TABLE [master].[vendors] ADD [StateName] NVARCHAR(100) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[master].[vendors]') AND name = 'VendorCategory')
+        ALTER TABLE [master].[vendors] ADD [VendorCategory] NVARCHAR(50) NULL DEFAULT 'GENERAL';
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[master].[vendors]') AND name = 'MsmeType')
+        ALTER TABLE [master].[vendors] ADD [MsmeType] NVARCHAR(50) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[master].[vendors]') AND name = 'BankName')
+        ALTER TABLE [master].[vendors] ADD [BankName] NVARCHAR(150) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[master].[vendors]') AND name = 'BankAccountNo')
+        ALTER TABLE [master].[vendors] ADD [BankAccountNo] NVARCHAR(50) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[master].[vendors]') AND name = 'IfscCode')
+        ALTER TABLE [master].[vendors] ADD [IfscCode] NVARCHAR(20) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[master].[vendors]') AND name = 'PaymentTermsDays')
+        ALTER TABLE [master].[vendors] ADD [PaymentTermsDays] INT NOT NULL DEFAULT 30;
+    IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[master].[vendors]') AND name = 'Pan')
+        ALTER TABLE [master].[vendors] ALTER COLUMN [Pan] NVARCHAR(50) NULL;
+    IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[master].[vendors]') AND name = 'Gstin')
+        ALTER TABLE [master].[vendors] ALTER COLUMN [Gstin] NVARCHAR(50) NULL;
+    EXEC('UPDATE [master].[vendors] SET [VendorCategory] = ''GENERAL'' WHERE [VendorCategory] IS NULL');
+END
+GO
+
+-- 0.2 Ensure ProjectTypes & ExpenseTypes
+IF OBJECT_ID(N'[dbo].[ProjectTypes]', N'U') IS NULL
+BEGIN
+    CREATE TABLE [dbo].[ProjectTypes] (
+        [Id] BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [Code] NVARCHAR(50) NOT NULL,
+        [Name] NVARCHAR(150) NOT NULL,
+        [Description] NVARCHAR(500) NULL,
+        [IsActive] BIT NOT NULL DEFAULT 1
+    );
+    INSERT INTO [dbo].[ProjectTypes] ([Code], [Name], [Description], [IsActive]) VALUES
+    ('STANDARD', 'Standard Turnkey Contract', 'Fixed-price supply, installation, testing and commissioning contracts', 1),
+    ('AMC', 'Annual Maintenance Contract (AMC)', 'Ongoing operations, service level maintenance and support agreements', 1),
+    ('CONSULTING', 'Consulting & Advisory', 'Professional technical advisory, system design and project management', 1),
+    ('SUPPLY_INSTALL', 'Supply & Installation', 'Material delivery with onsite installation and sign-off', 1),
+    ('MANPOWER', 'Manpower & Managed Services', 'Time and material / rate card based deployment', 1),
+    ('INTERNAL', 'Internal R&D / Capital Project', 'Internal organizational infrastructure or R&D initiatives', 1);
+END
+GO
+
+IF OBJECT_ID(N'[dbo].[ExpenseTypes]', N'U') IS NULL
+BEGIN
+    CREATE TABLE [dbo].[ExpenseTypes] (
+        [Id] BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [Name] NVARCHAR(250) NOT NULL,
+        [Description] NVARCHAR(1000) NULL,
+        [IsProjectRelated] BIT NOT NULL DEFAULT 0,
+        [ReceiveDirectPayments] BIT NOT NULL DEFAULT 0,
+        [OpeningAmount] DECIMAL(18,2) NULL,
+        [IsActive] BIT NOT NULL DEFAULT 1,
+        [CreatedAt] DATETIME2 NOT NULL DEFAULT GETUTCDATE()
+    );
+    INSERT INTO [dbo].[ExpenseTypes] ([Name], [Description], [IsProjectRelated], [ReceiveDirectPayments], [OpeningAmount], [IsActive]) VALUES
+    (N'BUSINESS DEVELOPMENT (DEPARTMENTAL & PROJECT)', N'BUSINESS DEVELOPMENT (DEPARTMENTAL & PROJECT)', 0, 0, NULL, 1),
+    (N'OFFICE EXPENSES', N'All the expenses incurred for the office.', 0, 0, NULL, 1),
+    (N'PROJECT EXPESNES', N'EXPENSES RELATED TO PROJECT', 1, 0, NULL, 1),
+    (N'Proprietor Drawings A/c.', N'Proprietor Drawings A/c.', 0, 0, NULL, 1),
+    (N'Salary & Allowance', N'Salary & Allowance', 0, 0, NULL, 1),
+    (N'SDK Solution Gangtok Loan A/c.', N'SDK Solution Gangtok Loan A/c.', 0, 0, NULL, 1),
+    (N'TAXES AND GST PAYMENT', N'ALL THE TAXES AND GST PAYMENT FOR THE COMPANY', 0, 0, NULL, 1),
+    (N'Transportation Charges.', N'Transportation Charges.', 0, 0, NULL, 1),
+    (N'Milestone / Mobilization Advance', N'Advance received for project or milestone mobilisation', 1, 1, NULL, 1),
+    (N'Direct Engineering & Service Revenue', N'Direct consulting and service revenue receipts', 0, 1, NULL, 1),
+    (N'Site Expense Reimbursement / Refund', N'Refunds and reimbursement of site advances', 1, 1, NULL, 1),
+    (N'Sundry Direct Receipts', N'Miscellaneous direct payments and nominal receipts', 0, 1, NULL, 1);
+END
+GO
+
 -- Migration for Procurement PO Lifecycle, Multi-stage Approvals & Audit Trails
 -- 1. Ensure columns on [PurchaseOrders]
 IF OBJECT_ID(N'[PurchaseOrders]', N'U') IS NOT NULL

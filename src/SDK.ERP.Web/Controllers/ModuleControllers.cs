@@ -420,26 +420,36 @@ public class MastersController : Controller
 
         }
 
+        List<Client> clients;
+        try { clients = await _db.Clients.AsNoTracking().ToListAsync(); }
+        catch { clients = new List<Client>(); }
+
+        List<Vendor> vendors;
+        try { vendors = await _db.Vendors.AsNoTracking().ToListAsync(); }
+        catch { vendors = new List<Vendor>(); }
+
+        List<Item> items;
+        try { items = await _db.Items.Include(i => i.Category).Include(i => i.Unit).AsNoTracking().ToListAsync(); }
+        catch { items = new List<Item>(); }
+
+        List<TaxRate> taxRates;
+        try { taxRates = await _db.TaxRates.AsNoTracking().ToListAsync(); }
+        catch { taxRates = new List<TaxRate>(); }
+
+        List<AccountGroup> accountGroups;
+        try { accountGroups = await _db.AccountGroups.Include(g => g.Accounts).AsNoTracking().ToListAsync(); }
+        catch { accountGroups = new List<AccountGroup>(); }
+
         var vm = new SDK.ERP.Application.ViewModels.MastersViewModel
-
         {
-
-            Clients = await _db.Clients.AsNoTracking().ToListAsync(),
-
-            Vendors = await _db.Vendors.AsNoTracking().ToListAsync(),
-
-            Items = await _db.Items.Include(i => i.Category).Include(i => i.Unit).AsNoTracking().ToListAsync(),
-
-            TaxRates = await _db.TaxRates.AsNoTracking().ToListAsync(),
-
-            AccountGroups = await _db.AccountGroups.Include(g => g.Accounts).AsNoTracking().ToListAsync(),
-
+            Clients = clients,
+            Vendors = vendors,
+            Items = items,
+            TaxRates = taxRates,
+            AccountGroups = accountGroups,
             ProjectTypes = projectTypes,
-
             ExpenseTypes = expenseTypes,
-
             States = states
-
         };
 
         return View(vm);
@@ -4442,7 +4452,7 @@ public class ProcurementController : Controller
                         PerformedById = po.CreatedBy,
                         PerformedByName = po.CreatedByName ?? "Creator",
                         PerformedByRole = po.CreatedByRole ?? "ACCOUNTANT",
-                        CreatedAt = DateTime.SpecifyKind(po.PoDate.Date.AddHours(10).AddHours(-5.5), DateTimeKind.Utc)
+                        CreatedAt = DateTime.SpecifyKind(po.PoDate.Date.AddHours(4).AddMinutes(30), DateTimeKind.Utc)
                     };
                     _db.PurchaseOrderLogs.Add(createLog);
                     hasNewSeedLogs = true;
@@ -4460,7 +4470,7 @@ public class ProcurementController : Controller
                             Amount = po.TotalPoValue,
                             PerformedByName = "Management / Approver",
                             PerformedByRole = "MANAGEMENT",
-                            CreatedAt = po.ApprovedAt ?? DateTime.SpecifyKind(po.PoDate.Date.AddHours(12).AddHours(-5.5), DateTimeKind.Utc)
+                            CreatedAt = po.ApprovedAt ?? DateTime.SpecifyKind(po.PoDate.Date.AddHours(6).AddMinutes(30), DateTimeKind.Utc)
                         };
                         _db.PurchaseOrderLogs.Add(appLog);
                     }
@@ -4479,7 +4489,7 @@ public class ProcurementController : Controller
                             Amount = markAmount,
                             PerformedByName = po.CreatedByName ?? "User",
                             PerformedByRole = "USER",
-                            CreatedAt = po.MarkedForPaymentAt ?? DateTime.SpecifyKind(po.PoDate.Date.AddHours(16).AddHours(-5.5), DateTimeKind.Utc)
+                            CreatedAt = po.MarkedForPaymentAt ?? DateTime.SpecifyKind(po.PoDate.Date.AddHours(10).AddMinutes(30), DateTimeKind.Utc)
                         };
                         _db.PurchaseOrderLogs.Add(markLog);
                     }
@@ -4498,7 +4508,7 @@ public class ProcurementController : Controller
                             PerformedByName = po.PaymentApprovedByName ?? "Admin User (CEO)",
                             PerformedByRole = "SUPER_ADMIN",
                             Remarks = po.PaymentApprovalRemarks,
-                            CreatedAt = po.PaymentApprovedAt ?? DateTime.SpecifyKind(po.PoDate.Date.AddHours(16).AddMinutes(30).AddHours(-5.5), DateTimeKind.Utc)
+                            CreatedAt = po.PaymentApprovedAt ?? DateTime.SpecifyKind(po.PoDate.Date.AddHours(11), DateTimeKind.Utc)
                         };
                         _db.PurchaseOrderLogs.Add(appPayLog);
                     }
@@ -4520,7 +4530,7 @@ public class ProcurementController : Controller
                             PerformedByName = "Accounts Dept",
                             PerformedByRole = "ACCOUNTS",
                             Remarks = pay.Remarks,
-                            CreatedAt = pay.PaymentDate.Kind == DateTimeKind.Utc ? pay.PaymentDate : DateTime.SpecifyKind(pay.PaymentDate.Date.AddHours(17).AddHours(-5.5), DateTimeKind.Utc)
+                            CreatedAt = pay.PaymentDate.Kind == DateTimeKind.Utc ? pay.PaymentDate : DateTime.SpecifyKind(pay.PaymentDate.Date.AddHours(11).AddMinutes(30), DateTimeKind.Utc)
                         };
                         _db.PurchaseOrderLogs.Add(payLog);
                     }
@@ -5580,7 +5590,7 @@ public class ProcurementController : Controller
                     FROM [PurchaseOrderLogs] pol
                     INNER JOIN [PurchaseOrders] po ON (pol.PoId = po.Id OR pol.PurchaseOrderId = po.Id)
                     WHERE pol.ActionType = 'PO_CREATED'
-                      AND pol.CreatedAt < CAST(po.PoDate AS DATE);
+                      AND CAST(DATEADD(minute, 330, pol.CreatedAt) AS DATE) < CAST(po.PoDate AS DATE);
                 END
             ");
         }
