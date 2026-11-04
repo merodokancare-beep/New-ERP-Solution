@@ -26,6 +26,10 @@ public class PurchaseOrder : ITenantEntity
     public decimal SgstAmount { get; set; }
     public decimal IgstAmount { get; set; }
     public decimal TotalPoValue { get; set; }
+    public decimal PaidAmount { get; set; }
+    public decimal MarkedAmount { get; set; }
+    public string? MarkedPaymentType { get; set; } // "FULL", "ADVANCE"
+    public string? ExpenseHead { get; set; }
     public string ApprovalStatus { get; set; } = "APPROVED";
     public long? ApprovedBy { get; set; }
     public DateTime? ApprovedAt { get; set; }
@@ -34,6 +38,10 @@ public class PurchaseOrder : ITenantEntity
     public string? CreatedByRole { get; set; }
     public string? RejectionReason { get; set; }
     public DateTime? MarkedForPaymentAt { get; set; }
+    public long? PaymentApprovedBy { get; set; }
+    public string? PaymentApprovedByName { get; set; }
+    public DateTime? PaymentApprovedAt { get; set; }
+    public string? PaymentApprovalRemarks { get; set; }
 
     public Company Company { get; set; } = null!;
     public Branch Branch { get; set; } = null!;
@@ -44,4 +52,5 @@ public class PurchaseOrder : ITenantEntity
 
     public ICollection<PurchaseOrderItem> Items { get; set; } = new List<PurchaseOrderItem>();
     public ICollection<GoodsReceiptNote> GoodsReceiptNotes { get; set; } = new List<GoodsReceiptNote>();
+    public ICollection<PurchaseOrderLog> Logs { get; set; } = new List<PurchaseOrderLog>();
 }

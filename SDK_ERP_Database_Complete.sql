@@ -469,12 +469,14 @@ CREATE TABLE [VendorPayments] (
     [Id] bigint NOT NULL IDENTITY,
     [CompanyId] bigint NOT NULL,
     [VendorId] bigint NOT NULL,
+    [PoId] bigint NULL,
     [BankAccountId] bigint NOT NULL,
     [PaymentVoucherNo] nvarchar(max) NOT NULL,
     [PaymentDate] datetime2 NOT NULL,
     [TotalAmountPaid] decimal(18,2) NOT NULL,
     [PaymentMode] nvarchar(max) NOT NULL,
     [ChequeUtrNo] nvarchar(max) NULL,
+    [Remarks] nvarchar(max) NULL,
     [Status] nvarchar(max) NOT NULL,
     [JournalEntryId] bigint NULL,
     CONSTRAINT [PK_VendorPayments] PRIMARY KEY ([Id]),
@@ -1106,17 +1108,17 @@ IF OBJECT_ID(N'[PurchaseOrderItems]', N'U') IS NULL
 BEGIN
 CREATE TABLE [PurchaseOrderItems] (
     [Id] bigint NOT NULL IDENTITY,
-    [PoId] bigint NOT NULL,
+    [PoId] bigint NULL,
     [ItemId] bigint NULL,
     [ItemDescription] nvarchar(max) NOT NULL,
     [HsnSacCode] nvarchar(max) NULL,
     [OrderedQty] decimal(18,2) NOT NULL,
     [ReceivedQty] decimal(18,2) NOT NULL,
-    [UnitId] int NOT NULL,
+    [UnitId] int NULL,
     [UnitRate] decimal(18,2) NOT NULL,
-    [TaxRateId] int NOT NULL,
+    [TaxRateId] int NULL,
     [LineTotal] decimal(18,2) NOT NULL,
-    [PurchaseOrderId] bigint NOT NULL,
+    [PurchaseOrderId] bigint NULL,
     CONSTRAINT [PK_PurchaseOrderItems] PRIMARY KEY ([Id]),
     CONSTRAINT [FK_PurchaseOrderItems_ItemUnits_UnitId] FOREIGN KEY ([UnitId]) REFERENCES [ItemUnits] ([Id]) ON DELETE NO ACTION,
     CONSTRAINT [FK_PurchaseOrderItems_PurchaseOrders_PurchaseOrderId] FOREIGN KEY ([PurchaseOrderId]) REFERENCES [PurchaseOrders] ([Id]) ON DELETE NO ACTION,
@@ -2604,3 +2606,79 @@ PRINT '  - Admin Login 2: admin  | Password: Admin@123 (or admin123)            
 PRINT '  - User 3: kamal         | Password: admin123 (or Admin@123)                ';
 PRINT '  - Demo Masters: Clients, Vendors, Projects, POs, Delivery Challans, Invoices';
 PRINT '=============================================================================';
+
+
+-- Migration for Procurement PO and VendorPayments
+IF OBJECT_ID(N'[VendorPayments]', N'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[VendorPayments]') AND name = 'PoId')
+        ALTER TABLE [VendorPayments] ADD [PoId] bigint NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[VendorPayments]') AND name = 'Remarks')
+        ALTER TABLE [VendorPayments] ADD [Remarks] nvarchar(max) NULL;
+END
+GO
+
+IF OBJECT_ID(N'[PurchaseOrders]', N'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrders]') AND name = 'PaidAmount')
+        ALTER TABLE [PurchaseOrders] ADD [PaidAmount] decimal(18,2) NOT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrders]') AND name = 'MarkedAmount')
+        ALTER TABLE [PurchaseOrders] ADD [MarkedAmount] decimal(18,2) NOT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrders]') AND name = 'MarkedPaymentType')
+        ALTER TABLE [PurchaseOrders] ADD [MarkedPaymentType] nvarchar(50) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrders]') AND name = 'ExpenseHead')
+        ALTER TABLE [PurchaseOrders] ADD [ExpenseHead] nvarchar(250) NULL;
+END
+GO
+
+
+IF OBJECT_ID(N'[PurchaseOrderItems]', N'U') IS NOT NULL
+BEGIN
+    IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrderItems]') AND name = 'PoId' AND is_nullable = 0)
+        ALTER TABLE [PurchaseOrderItems] ALTER COLUMN [PoId] bigint NULL;
+    IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrderItems]') AND name = 'PurchaseOrderId' AND is_nullable = 0)
+        ALTER TABLE [PurchaseOrderItems] ALTER COLUMN [PurchaseOrderId] bigint NULL;
+    IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrderItems]') AND name = 'UnitId' AND is_nullable = 0)
+        ALTER TABLE [PurchaseOrderItems] ALTER COLUMN [UnitId] int NULL;
+    IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrderItems]') AND name = 'TaxRateId' AND is_nullable = 0)
+        ALTER TABLE [PurchaseOrderItems] ALTER COLUMN [TaxRateId] int NULL;
+END
+GO
+
+
+IF OBJECT_ID(N'[PurchaseOrders]', N'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrders]') AND name = 'PaymentApprovedBy')
+        ALTER TABLE [PurchaseOrders] ADD [PaymentApprovedBy] bigint NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrders]') AND name = 'PaymentApprovedByName')
+        ALTER TABLE [PurchaseOrders] ADD [PaymentApprovedByName] nvarchar(150) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrders]') AND name = 'PaymentApprovedAt')
+        ALTER TABLE [PurchaseOrders] ADD [PaymentApprovedAt] datetime2 NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrders]') AND name = 'PaymentApprovalRemarks')
+        ALTER TABLE [PurchaseOrders] ADD [PaymentApprovalRemarks] nvarchar(max) NULL;
+END
+GO
+
+
+IF OBJECT_ID(N'[PurchaseOrderLogs]', N'U') IS NULL
+BEGIN
+    CREATE TABLE [PurchaseOrderLogs] (
+        [Id] bigint NOT NULL IDENTITY,
+        [PoId] bigint NOT NULL,
+        [ActionType] nvarchar(50) NOT NULL,
+        [Title] nvarchar(200) NOT NULL,
+        [Description] nvarchar(max) NULL,
+        [Amount] decimal(18,2) NULL,
+        [PaymentMode] nvarchar(50) NULL,
+        [VoucherOrRefNo] nvarchar(100) NULL,
+        [PerformedById] bigint NULL,
+        [PerformedByName] nvarchar(150) NOT NULL,
+        [PerformedByRole] nvarchar(50) NULL,
+        [Remarks] nvarchar(max) NULL,
+        [CreatedAt] datetime2 NOT NULL DEFAULT GETUTCDATE(),
+        CONSTRAINT [PK_PurchaseOrderLogs] PRIMARY KEY ([Id]),
+        CONSTRAINT [FK_PurchaseOrderLogs_PurchaseOrders_PoId] FOREIGN KEY ([PoId]) REFERENCES [PurchaseOrders] ([Id]) ON DELETE CASCADE
+    );
+    CREATE INDEX [IX_PurchaseOrderLogs_PoId_CreatedAt] ON [PurchaseOrderLogs] ([PoId], [CreatedAt]);
+END
+GO

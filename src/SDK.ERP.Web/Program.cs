@@ -90,10 +90,19 @@ using (var scope = app.Services.CreateScope())
                     ALTER TABLE [master].[clients] ALTER COLUMN [Pan] NVARCHAR(50) NULL;
                 IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[master].[clients]') AND name = 'Gstin')
                     ALTER TABLE [master].[clients] ALTER COLUMN [Gstin] NVARCHAR(50) NULL;
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[master].[clients]') AND name = 'StateName')
+                    ALTER TABLE [master].[clients] ADD [StateName] NVARCHAR(100) NULL;
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[master].[clients]') AND name = 'ClientCategory')
+                    ALTER TABLE [master].[clients] ADD [ClientCategory] NVARCHAR(30) NULL DEFAULT 'B2B';
+                UPDATE [master].[clients] SET [ClientCategory] = 'B2B' WHERE [ClientCategory] IS NULL;
                 IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[master].[vendors]') AND name = 'Pan')
                     ALTER TABLE [master].[vendors] ALTER COLUMN [Pan] NVARCHAR(50) NULL;
                 IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[master].[vendors]') AND name = 'Gstin')
                     ALTER TABLE [master].[vendors] ALTER COLUMN [Gstin] NVARCHAR(50) NULL;
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[master].[vendors]') AND name = 'StateCode')
+                    ALTER TABLE [master].[vendors] ADD [StateCode] NVARCHAR(10) NULL;
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[master].[vendors]') AND name = 'StateName')
+                    ALTER TABLE [master].[vendors] ADD [StateName] NVARCHAR(100) NULL;
                 IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[projects].[projects]') AND name = 'ManagerId')
                     ALTER TABLE [projects].[projects] ALTER COLUMN [ManagerId] BIGINT NULL;
                 IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[GstTransactions]') AND name = 'VoucherId')

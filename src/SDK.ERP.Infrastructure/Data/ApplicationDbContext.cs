@@ -50,6 +50,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<Item> Items => Set<Item>();
     public DbSet<ProjectType> ProjectTypes => Set<ProjectType>();
     public DbSet<ExpenseType> ExpenseTypes => Set<ExpenseType>();
+    public DbSet<StateMaster> States => Set<StateMaster>();
 
     // Domain 3: Projects
     public DbSet<Project> Projects => Set<Project>();
@@ -72,6 +73,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<PurchaseRequisitionItem> PurchaseRequisitionItems => Set<PurchaseRequisitionItem>();
     public DbSet<PurchaseOrder> PurchaseOrders => Set<PurchaseOrder>();
     public DbSet<PurchaseOrderItem> PurchaseOrderItems => Set<PurchaseOrderItem>();
+    public DbSet<PurchaseOrderLog> PurchaseOrderLogs => Set<PurchaseOrderLog>();
     public DbSet<GoodsReceiptNote> GoodsReceiptNotes => Set<GoodsReceiptNote>();
     public DbSet<GrnItem> GrnItems => Set<GrnItem>();
     public DbSet<PurchaseBill> PurchaseBills => Set<PurchaseBill>();

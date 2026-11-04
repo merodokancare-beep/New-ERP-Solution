@@ -1,1382 +1,3448 @@
 @model SDK.ERP.Application.ViewModels.MastersViewModel
+
 @{
+
     ViewData["Title"] = "Masters & System Configuration";
+
     ViewData["ActiveMenu"] = "Masters";
+
     var clients = Model?.Clients ?? new();
+
     var vendors = Model?.Vendors ?? new();
+
     var items = Model?.Items ?? new();
+
     var taxRates = Model?.TaxRates ?? new();
+
     var accountGroups = Model?.AccountGroups ?? new();
+
     var projectTypes = Model?.ProjectTypes ?? new();
+
     var expenseTypes = Model?.ExpenseTypes ?? new();
+
+    var states = Model?.States ?? new();
+
 }
 
 <div class="d-flex align-items-center justify-content-between mb-4">
+
     <div>
+
         <h3 style="font-weight: 700; color: var(--erp-primary); margin-bottom: 4px;">Masters &amp; Configuration</h3>
+
         <p style="color: var(--erp-text-muted); margin: 0; font-size: 13.5px;">Centralized Master Repository &bull; Zero Data Duplication Architecture</p>
+
     </div>
+
     <div class="d-flex gap-2">
+
         <button id="btnGlobalAddRecord" class="btn btn-primary btn-sm px-3 shadow-sm d-inline-flex align-items-center" style="background: var(--erp-primary); border-color: var(--erp-primary);" data-bs-toggle="modal" data-bs-target="#createClientModal">
+
             <i class="fa-solid fa-plus me-1"></i> <span id="btnGlobalAddRecordText">Add Client</span>
+
         </button>
+
     </div>
+
 </div>
 
 @if (TempData["SuccessMessage"] != null)
+
 {
+
     <div class="alert alert-success alert-dismissible fade show d-flex align-items-center mb-4 shadow-sm" role="alert">
+
         <i class="fa-solid fa-circle-check fs-5 me-2"></i>
+
         <div>@Html.Raw(TempData["SuccessMessage"])</div>
+
         <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close"></button>
+
     </div>
+
 }
 
 <!-- Nav Tabs for Masters (Dynamic Counts) -->
+
 <ul class="nav nav-pills mb-4 gap-2" id="masterTabs" role="tablist">
+
     <li class="nav-item" role="presentation">
+
         <button class="nav-link active fw-semibold" id="clients-tab" data-bs-toggle="pill" data-bs-target="#clients" type="button" role="tab">
+
             <i class="fa-solid fa-user-tie me-2"></i>Clients (@clients.Count)
+
         </button>
+
     </li>
+
     <li class="nav-item" role="presentation">
+
         <button class="nav-link fw-semibold" id="vendors-tab" data-bs-toggle="pill" data-bs-target="#vendors" type="button" role="tab">
+
             <i class="fa-solid fa-truck-field me-2"></i>Vendors (@vendors.Count)
+
         </button>
+
     </li>
+
     <li class="nav-item" role="presentation">
+
         <button class="nav-link fw-semibold" id="items-tab" data-bs-toggle="pill" data-bs-target="#items" type="button" role="tab">
+
             <i class="fa-solid fa-box-archive me-2"></i>Consumable Items (@items.Count)
+
         </button>
+
     </li>
+
     <li class="nav-item" role="presentation">
+
         <button class="nav-link fw-semibold" id="tax-tab" data-bs-toggle="pill" data-bs-target="#tax" type="button" role="tab">
+
             <i class="fa-solid fa-percent me-2"></i>GST Tax Slabs (@taxRates.Count)
+
         </button>
+
     </li>
+
     <li class="nav-item" role="presentation">
+
         <button class="nav-link fw-semibold" id="coa-tab" data-bs-toggle="pill" data-bs-target="#coa" type="button" role="tab">
+
             <i class="fa-solid fa-sitemap me-2"></i>Chart of Accounts (@accountGroups.Count Groups)
+
         </button>
+
     </li>
+
     <li class="nav-item" role="presentation">
+
         <button class="nav-link fw-semibold" id="projecttypes-tab" data-bs-toggle="pill" data-bs-target="#projecttypes" type="button" role="tab">
+
             <i class="fa-solid fa-diagram-project me-2"></i>Project Types (@projectTypes.Count)
+
         </button>
+
     </li>
+
     <li class="nav-item" role="presentation">
+
         <button class="nav-link fw-semibold" id="expensetypes-tab" data-bs-toggle="pill" data-bs-target="#expensetypes" type="button" role="tab">
+
             <i class="fa-solid fa-receipt me-2"></i>Expense Types (@expenseTypes.Count)
+
         </button>
+
     </li>
+
+    <li class="nav-item" role="presentation">
+
+        <button class="nav-link fw-semibold" id="states-tab" data-bs-toggle="pill" data-bs-target="#states" type="button" role="tab">
+
+            <i class="fa-solid fa-map-location-dot me-2"></i>State Master (@states.Count)
+
+        </button>
+
+    </li>
+
 </ul>
 
 <div class="tab-content" id="masterTabsContent">
+
     <!-- 1. Clients Tab -->
+
     <div class="tab-pane fade show active" id="clients" role="tabpanel">
+
         <div class="erp-card">
+
             <div class="erp-card-header d-flex justify-content-between align-items-center">
+
                 <h5 class="erp-card-title"><i class="fa-solid fa-users me-2"></i>Client Master Directory</h5>
+
                 <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#createClientModal">
+
                     <i class="fa-solid fa-plus me-1"></i> Add Client
+
                 </button>
+
             </div>
+
             <div class="erp-card-body p-0">
+
                 <div class="table-responsive">
+
                     <table class="table table-hover align-middle mb-0">
+
                         <thead class="table-light">
+
                             <tr style="font-size: 12px; text-transform: uppercase;">
+
                                 <th class="ps-4">Client Code</th>
+
                                 <th>Client Name</th>
+
+                                <th>Category</th>
+
                                 <th>GSTIN</th>
+
                                 <th>State</th>
+
                                 <th>Credit Terms</th>
+
                                 <th>Credit Limit</th>
+
                                 <th>Status</th>
+
                                 <th class="text-end pe-4">Actions</th>
+
                             </tr>
+
                         </thead>
+
                         <tbody style="font-size: 13.5px;">
+
                             @if (clients.Any())
+
                             {
+
                                 @foreach (var c in clients)
+
                                 {
+
                                     <tr>
+
                                         <td class="ps-4 fw-bold text-primary">@c.ClientCode</td>
+
                                         <td><strong>@c.ClientName</strong><br><small class="text-muted">@(c.Email ?? c.ContactPerson ?? "N/A")</small></td>
-                                        <td><code>@(c.Gstin ?? "Unregistered")</code></td>
-                                        <td><span class="badge bg-light text-dark border">@c.StateCode</span></td>
-                                        <td>@c.CreditDays Days</td>
-                                        <td>&#8377; @c.CreditLimit.ToString("N2")</td>
-                                        <td><span class="badge bg-success">Active</span></td>
-                                        <td class="text-end pe-4">
-                                            <button class="btn btn-sm btn-outline-primary" title="Edit Client Details" data-bs-toggle="modal" data-bs-target="#editClientModal_@c.Id">
-                                                <i class="fa-solid fa-pen-to-square"></i>
-                                            </button>
+
+                                        <td>
+
+                                            @if (c.ClientCategory == "B2C")
+
+                                            {
+
+                                                <span class="badge bg-info-subtle text-info border fw-semibold">B2C (Retail)</span>
+
+                                            }
+
+                                            else if (c.ClientCategory == "EXPORT")
+
+                                            {
+
+                                                <span class="badge bg-warning-subtle text-warning border fw-semibold">Export / SEZ</span>
+
+                                            }
+
+                                            else if (c.ClientCategory == "GOVERNMENT")
+
+                                            {
+
+                                                <span class="badge bg-secondary-subtle text-secondary border fw-semibold">Gov / PSU</span>
+
+                                            }
+
+                                            else
+
+                                            {
+
+                                                <span class="badge bg-primary-subtle text-primary border fw-semibold">B2B (Corp)</span>
+
+                                            }
+
                                         </td>
+
+                                        <td><code>@(c.Gstin ?? "Unregistered")</code></td>
+
+                                        <td>
+
+                                            @if (!string.IsNullOrEmpty(c.StateName))
+
+                                            {
+
+                                                <div><strong style="font-size: 12.5px;">@c.StateName</strong></div>
+
+                                                <small class="badge bg-light text-secondary border">Code: @c.StateCode</small>
+
+                                            }
+
+                                            else
+
+                                            {
+
+                                                <span class="badge bg-light text-dark border">@c.StateCode</span>
+
+                                            }
+
+                                        </td>
+
+                                        <td>@c.CreditDays Days</td>
+
+                                        <td>&#8377; @c.CreditLimit.ToString("N2")</td>
+
+                                        <td><span class="badge bg-success">Active</span></td>
+
+                                        <td class="text-end pe-4">
+
+                                            <button class="btn btn-sm btn-outline-primary" title="Edit Client Details" data-bs-toggle="modal" data-bs-target="#editClientModal_@c.Id">
+
+                                                <i class="fa-solid fa-pen-to-square"></i>
+
+                                            </button>
+
+                                        </td>
+
                                     </tr>
 
-                                    <!-- Edit Client Modal -->
-                                    <div class="modal fade" id="editClientModal_@c.Id" tabindex="-1" aria-hidden="true">
-                                        <div class="modal-dialog modal-dialog-centered modal-lg">
-                                            <div class="modal-content border-0 shadow">
-                                                <form method="post" asp-controller="Masters" asp-action="EditClient">
-                                                    @Html.AntiForgeryToken()
-                                                    <input type="hidden" name="id" value="@c.Id" />
-                                                    <div class="modal-header bg-light">
-                                                        <h5 class="modal-title fw-bold" style="color: var(--erp-primary); font-size: 16px;">
-                                                            <i class="fa-solid fa-pen-to-square me-2"></i>Edit Client Details: @c.ClientCode
-                                                        </h5>
-                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                    </div>
-                                                    <div class="modal-body p-4">
-                                                        <div class="row g-3">
-                                                            <div class="col-md-6">
-                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Client Code</label>
-                                                                <input type="text" class="form-control bg-light" value="@c.ClientCode" readonly />
-                                                            </div>
-                                                            <div class="col-md-6">
-                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Client / Company Name <span class="text-danger">*</span></label>
-                                                                <input type="text" name="clientName" class="form-control" value="@c.ClientName" required />
-                                                            </div>
-                                                            <div class="col-md-6">
-                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">GSTIN</label>
-                                                                <input type="text" name="gstin" class="form-control" value="@c.Gstin" />
-                                                            </div>
-                                                            <div class="col-md-6">
-                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">PAN</label>
-                                                                <input type="text" name="pan" class="form-control" value="@c.Pan" />
-                                                            </div>
-                                                            <div class="col-md-6">
-                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Contact Person</label>
-                                                                <input type="text" name="contactPerson" class="form-control" value="@c.ContactPerson" />
-                                                            </div>
-                                                            <div class="col-md-6">
-                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Phone / Mobile</label>
-                                                                <input type="text" name="phone" class="form-control" value="@c.Phone" />
-                                                            </div>
-                                                            <div class="col-md-6">
-                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Email</label>
-                                                                <input type="email" name="email" class="form-control" value="@c.Email" />
-                                                            </div>
-                                                            <div class="col-md-6">
-                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Credit Limit (&#8377;)</label>
-                                                                <input type="number" step="0.01" name="creditLimit" class="form-control" value="@c.CreditLimit" />
-                                                            </div>
-                                                            <div class="col-12">
-                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Billing Address <span class="text-danger">*</span></label>
-                                                                <textarea name="billingAddress" class="form-control" rows="2" required>@c.BillingAddress</textarea>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div class="modal-footer bg-light">
-                                                        <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
-                                                        <button type="submit" class="btn btn-primary btn-sm px-4" style="background: var(--erp-primary);">
-                                                            <i class="fa-solid fa-save me-1"></i> Update Client Details
-                                                        </button>
-                                                    </div>
-                                                </form>
-                                            </div>
-                                        </div>
-                                    </div>
+                                    
+
                                 }
+
                             }
+
                             else
+
                             {
+
                                 <tr>
+
                                     <td colspan="8" class="text-center py-5">
+
                                         <i class="fa-solid fa-user-tie mb-3" style="font-size: 40px; color: #CBD5E1;"></i>
+
                                         <h6 class="fw-bold text-secondary mb-1">No Clients in Database</h6>
+
                                         <p class="text-muted mb-3" style="font-size: 12.5px;">Register your enterprise clients to issue project quotations and tax invoices.</p>
+
                                         <button class="btn btn-primary btn-sm px-3" style="background: var(--erp-primary);" data-bs-toggle="modal" data-bs-target="#createClientModal">
+
                                             <i class="fa-solid fa-plus me-1"></i> Register First Client
+
                                         </button>
+
                                     </td>
+
                                 </tr>
+
                             }
+
                         </tbody>
+
                     </table>
+
+@if (clients.Any())
+
+{
+
+    @foreach (var c in clients)
+
+    {
+
+<!-- Edit Client Modal -->
+
+                                    <div class="modal fade" id="editClientModal_@c.Id" tabindex="-1" aria-hidden="true">
+
+                                        <div class="modal-dialog modal-dialog-centered modal-lg">
+
+                                            <div class="modal-content border-0 shadow">
+
+                                                <form method="post" asp-controller="Masters" asp-action="EditClient">
+
+                                                    @Html.AntiForgeryToken()
+
+                                                    <input type="hidden" name="id" value="@c.Id" />
+
+                                                    <div class="modal-header bg-light">
+
+                                                        <h5 class="modal-title fw-bold" style="color: var(--erp-primary); font-size: 16px;">
+
+                                                            <i class="fa-solid fa-pen-to-square me-2"></i>Edit Client Details: @c.ClientCode
+
+                                                        </h5>
+
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+
+                                                    </div>
+
+                                                    <div class="modal-body p-4">
+
+                                                        <div class="row g-3">
+
+                                                            <div class="col-md-6">
+
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Client Code <span class="text-danger">*</span></label>
+                                                                <input type="text" name="clientCode" class="form-control fw-semibold" value="@c.ClientCode" required />
+
+                                                            </div>
+
+                                                            <div class="col-md-6">
+
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Client / Company Name <span class="text-danger">*</span></label>
+
+                                                                <input type="text" name="clientName" class="form-control" value="@c.ClientName" required />
+
+                                                            </div>
+
+                                                            <div class="col-md-6">
+
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Client Category <span class="text-danger">*</span></label>
+
+                                                                <select name="clientCategory" class="form-select">
+
+                                                                    <option value="B2B" selected="@(c.ClientCategory == "B2B")">B2B (Business to Business)</option>
+
+                                                                    <option value="B2C" selected="@(c.ClientCategory == "B2C")">B2C (Retail / Consumer)</option>
+
+                                                                    <option value="EXPORT" selected="@(c.ClientCategory == "EXPORT")">EXPORT (Overseas / SEZ)</option>
+
+                                                                    <option value="GOVERNMENT" selected="@(c.ClientCategory == "GOVERNMENT")">GOVERNMENT (Gov / PSU)</option>
+
+                                                                </select>
+
+                                                            </div>
+
+                                                            <div class="col-md-6">
+
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">GSTIN</label>
+
+                                                                <input type="text" name="gstin" class="form-control" value="@c.Gstin" />
+
+                                                            </div>
+
+                                                            <div class="col-md-6">
+
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">PAN</label>
+
+                                                                <input type="text" name="pan" class="form-control" value="@c.Pan" />
+
+                                                            </div>
+
+                                                            <div class="col-md-6">
+
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Contact Person</label>
+
+                                                                <input type="text" name="contactPerson" class="form-control" value="@c.ContactPerson" />
+
+                                                            </div>
+
+                                                            <div class="col-md-6">
+
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Phone / Mobile</label>
+
+                                                                <input type="text" name="phone" class="form-control" value="@c.Phone" />
+
+                                                            </div>
+
+                                                            <div class="col-md-6">
+
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Email</label>
+
+                                                                <input type="email" name="email" class="form-control" value="@c.Email" />
+
+                                                            </div>
+
+                                                            <div class="col-md-6">
+
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Credit Limit (&#8377;)</label>
+
+                                                                <input type="number" step="0.01" name="creditLimit" class="form-control" value="@c.CreditLimit" />
+
+                                                            </div>
+
+                                                            <div class="col-md-6">
+
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">State Name</label>
+
+                                                                <input type="text" name="stateName" id="editClientStateName_@c.Id" class="form-control" list="indianStatesList" value="@c.StateName" placeholder="e.g. Delhi" onchange="window.syncStateToCode(this, 'editClientStateCode_@c.Id')" />
+
+                                                            </div>
+
+                                                            <div class="col-md-6">
+
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">State Code (GST)</label>
+
+                                                                <input type="text" name="stateCode" id="editClientStateCode_@c.Id" class="form-control" value="@c.StateCode" placeholder="e.g. 07" maxlength="2" onchange="window.syncCodeToState(this, 'editClientStateName_@c.Id')" />
+
+                                                            </div>
+
+                                                            <div class="col-12">
+
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Billing Address <span class="text-danger">*</span></label>
+
+                                                                <textarea name="billingAddress" class="form-control" rows="2" required>@c.BillingAddress</textarea>
+
+                                                            </div>
+
+                                                        </div>
+
+                                                    </div>
+
+                                                    <div class="modal-footer bg-light">
+
+                                                        <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+
+                                                        <button type="submit" class="btn btn-primary btn-sm px-4" style="background: var(--erp-primary);">
+
+                                                            <i class="fa-solid fa-save me-1"></i> Update Client Details
+
+                                                        </button>
+
+                                                    </div>
+
+                                                </form>
+
+                                            </div>
+
+                                        </div>
+
+                                    </div>
+
+    }
+
+}
+
                 </div>
+
             </div>
+
         </div>
+
     </div>
 
     <!-- 2. Vendors Tab -->
+
     <div class="tab-pane fade" id="vendors" role="tabpanel">
+
         <div class="erp-card">
+
             <div class="erp-card-header d-flex justify-content-between align-items-center">
+
                 <h5 class="erp-card-title"><i class="fa-solid fa-truck-field me-2"></i>Vendor Directory</h5>
+
                 <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#createVendorModal">
+
                     <i class="fa-solid fa-plus me-1"></i> Add Vendor
+
                 </button>
+
             </div>
+
             <div class="erp-card-body p-0">
+
                 <div class="table-responsive">
+
                     <table class="table table-hover align-middle mb-0">
+
                         <thead class="table-light">
+
                             <tr style="font-size: 12px; text-transform: uppercase;">
+
                                 <th class="ps-4">Vendor Code</th>
+
                                 <th>Vendor Name</th>
+
                                 <th>Category</th>
+
                                 <th>GSTIN</th>
+
+                                <th>State</th>
+
                                 <th>PAN</th>
+
                                 <th>MSME Type</th>
+
                                 <th class="text-end pe-4">Actions</th>
+
                             </tr>
+
                         </thead>
+
                         <tbody style="font-size: 13.5px;">
+
                             @if (vendors.Any())
+
                             {
+
                                 @foreach (var v in vendors)
+
                                 {
+
                                     <tr>
+
                                         <td class="ps-4 fw-bold text-primary">@v.VendorCode</td>
+
                                         <td><strong>@v.VendorName</strong></td>
+
                                         <td><span class="badge bg-light text-dark border">@v.VendorCategory</span></td>
+
                                         <td><code>@(v.Gstin ?? "N/A")</code></td>
-                                        <td>@v.Pan</td>
-                                        <td><span class="badge @(v.MsmeType != null ? "bg-info" : "bg-light text-muted border")">@(v.MsmeType ?? "Non-MSME")</span></td>
-                                        <td class="text-end pe-4">
-                                            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editVendorModal_@v.Id">
-                                                <i class="fa-solid fa-pen-to-square"></i>
-                                            </button>
+
+                                        <td>
+
+                                            @if (!string.IsNullOrEmpty(v.StateName))
+
+                                            {
+
+                                                <div><strong style="font-size: 12.5px;">@v.StateName</strong></div>
+
+                                                <small class="badge bg-light text-secondary border">Code: @(v.StateCode ?? "--")</small>
+
+                                            }
+
+                                            else if (!string.IsNullOrEmpty(v.StateCode))
+
+                                            {
+
+                                                <span class="badge bg-light text-dark border">@v.StateCode</span>
+
+                                            }
+
+                                            else
+
+                                            {
+
+                                                <span class="text-muted">--</span>
+
+                                            }
+
                                         </td>
+
+                                        <td>@v.Pan</td>
+
+                                        <td><span class="badge @(v.MsmeType != null ? "bg-info" : "bg-light text-muted border")">@(v.MsmeType ?? "Non-MSME")</span></td>
+
+                                        <td class="text-end pe-4">
+
+                                            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editVendorModal_@v.Id">
+
+                                                <i class="fa-solid fa-pen-to-square"></i>
+
+                                            </button>
+
+                                        </td>
+
                                     </tr>
 
-                                    <!-- Edit Vendor Modal -->
-                                    <div class="modal fade" id="editVendorModal_@v.Id" tabindex="-1" aria-hidden="true">
-                                        <div class="modal-dialog modal-dialog-centered modal-lg">
-                                            <div class="modal-content border-0 shadow">
-                                                <form method="post" asp-controller="Masters" asp-action="EditVendor">
-                                                    @Html.AntiForgeryToken()
-                                                    <input type="hidden" name="id" value="@v.Id" />
-                                                    <div class="modal-header bg-light">
-                                                        <h5 class="modal-title fw-bold" style="color: var(--erp-primary); font-size: 16px;">
-                                                            <i class="fa-solid fa-pen-to-square me-2"></i>Edit Vendor: @v.VendorCode
-                                                        </h5>
-                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                    </div>
-                                                    <div class="modal-body p-4">
-                                                        <div class="row g-3">
-                                                            <div class="col-md-6">
-                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Vendor Code</label>
-                                                                <input type="text" class="form-control bg-light" value="@v.VendorCode" readonly />
-                                                            </div>
-                                                            <div class="col-md-6">
-                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Vendor Name <span class="text-danger">*</span></label>
-                                                                <input type="text" name="vendorName" class="form-control" value="@v.VendorName" required />
-                                                            </div>
-                                                            <div class="col-md-6">
-                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">GSTIN</label>
-                                                                <input type="text" name="gstin" class="form-control" value="@v.Gstin" />
-                                                            </div>
-                                                            <div class="col-md-6">
-                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">PAN</label>
-                                                                <input type="text" name="pan" class="form-control" value="@v.Pan" />
-                                                            </div>
-                                                            <div class="col-md-6">
-                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Category</label>
-                                                                <select name="vendorCategory" class="form-select">
-                                                                    <option value="HARDWARE" selected="@(v.VendorCategory == "HARDWARE")">Hardware &amp; Equipment</option>
-                                                                    <option value="SERVICES" selected="@(v.VendorCategory == "SERVICES")">Services &amp; Subcontractors</option>
-                                                                    <option value="GENERAL" selected="@(v.VendorCategory == "GENERAL")">General Consumables</option>
-                                                                </select>
-                                                            </div>
-                                                            <div class="col-md-6">
-                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">MSME Classification</label>
-                                                                <select name="msmeType" class="form-select">
-                                                                    <option value="" selected="@(string.IsNullOrEmpty(v.MsmeType))">Non-MSME (Standard 30 Days)</option>
-                                                                    <option value="MICRO" selected="@(v.MsmeType == "MICRO")">Micro Enterprise (45-Day Rule)</option>
-                                                                    <option value="SMALL" selected="@(v.MsmeType == "SMALL")">Small Enterprise (45-Day Rule)</option>
-                                                                    <option value="MEDIUM" selected="@(v.MsmeType == "MEDIUM")">Medium Enterprise</option>
-                                                                </select>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div class="modal-footer bg-light">
-                                                        <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
-                                                        <button type="submit" class="btn btn-primary btn-sm px-4" style="background: var(--erp-primary);">
-                                                            <i class="fa-solid fa-save me-1"></i> Update Vendor
-                                                        </button>
-                                                    </div>
-                                                </form>
-                                            </div>
-                                        </div>
-                                    </div>
+                                    
+
                                 }
+
                             }
+
                             else
+
                             {
+
                                 <tr>
+
                                     <td colspan="7" class="text-center py-5">
+
                                         <i class="fa-solid fa-truck-field mb-3" style="font-size: 40px; color: #CBD5E1;"></i>
+
                                         <h6 class="fw-bold text-secondary mb-1">No Vendors in Database</h6>
+
                                         <p class="text-muted mb-3" style="font-size: 12.5px;">Register suppliers and contractors to issue purchase orders and bills.</p>
+
                                         <button class="btn btn-primary btn-sm px-3" style="background: var(--erp-primary);" data-bs-toggle="modal" data-bs-target="#createVendorModal">
+
                                             <i class="fa-solid fa-plus me-1"></i> Register First Vendor
+
                                         </button>
+
                                     </td>
+
                                 </tr>
+
                             }
+
                         </tbody>
+
                     </table>
+
+@if (vendors.Any())
+
+{
+
+    @foreach (var v in vendors)
+
+    {
+
+<!-- Edit Vendor Modal -->
+
+                                    <div class="modal fade" id="editVendorModal_@v.Id" tabindex="-1" aria-hidden="true">
+
+                                        <div class="modal-dialog modal-dialog-centered modal-lg">
+
+                                            <div class="modal-content border-0 shadow">
+
+                                                <form method="post" asp-controller="Masters" asp-action="EditVendor">
+
+                                                    @Html.AntiForgeryToken()
+
+                                                    <input type="hidden" name="id" value="@v.Id" />
+
+                                                    <div class="modal-header bg-light">
+
+                                                        <h5 class="modal-title fw-bold" style="color: var(--erp-primary); font-size: 16px;">
+
+                                                            <i class="fa-solid fa-pen-to-square me-2"></i>Edit Vendor: @v.VendorCode
+
+                                                        </h5>
+
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+
+                                                    </div>
+
+                                                    <div class="modal-body p-4">
+
+                                                        <div class="row g-3">
+
+                                                            <div class="col-md-6">
+
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Vendor Code <span class="text-danger">*</span></label>
+                                                                <input type="text" name="vendorCode" class="form-control fw-semibold" value="@v.VendorCode" required />
+
+                                                            </div>
+
+                                                            <div class="col-md-6">
+
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Vendor Name <span class="text-danger">*</span></label>
+
+                                                                <input type="text" name="vendorName" class="form-control" value="@v.VendorName" required />
+
+                                                            </div>
+
+                                                            <div class="col-md-6">
+
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">GSTIN</label>
+
+                                                                <input type="text" name="gstin" class="form-control" value="@v.Gstin" />
+
+                                                            </div>
+
+                                                            <div class="col-md-6">
+
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">PAN</label>
+
+                                                                <input type="text" name="pan" class="form-control" value="@v.Pan" />
+
+                                                            </div>
+
+                                                            <div class="col-md-6">
+
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Category</label>
+
+                                                                <select name="vendorCategory" class="form-select">
+
+                                                                    <option value="HARDWARE" selected="@(v.VendorCategory == "HARDWARE")">Hardware &amp; Equipment</option>
+
+                                                                    <option value="SERVICES" selected="@(v.VendorCategory == "SERVICES")">Services &amp; Subcontractors</option>
+
+                                                                    <option value="GENERAL" selected="@(v.VendorCategory == "GENERAL")">General Consumables</option>
+
+                                                                </select>
+
+                                                            </div>
+
+                                                            <div class="col-md-6">
+
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">MSME Classification</label>
+
+                                                                <select name="msmeType" class="form-select">
+
+                                                                    <option value="" selected="@(string.IsNullOrEmpty(v.MsmeType))">Non-MSME (Standard 30 Days)</option>
+
+                                                                    <option value="MICRO" selected="@(v.MsmeType == "MICRO")">Micro Enterprise (45-Day Rule)</option>
+
+                                                                    <option value="SMALL" selected="@(v.MsmeType == "SMALL")">Small Enterprise (45-Day Rule)</option>
+
+                                                                    <option value="MEDIUM" selected="@(v.MsmeType == "MEDIUM")">Medium Enterprise</option>
+
+                                                                </select>
+
+                                                            </div>
+
+                                                            <div class="col-md-6">
+
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">State Name</label>
+
+                                                                <input type="text" name="stateName" id="editVendorStateName_@v.Id" class="form-control" list="indianStatesList" value="@v.StateName" placeholder="e.g. Maharashtra" onchange="window.syncStateToCode(this, 'editVendorStateCode_@v.Id')" />
+
+                                                            </div>
+
+                                                            <div class="col-md-6">
+
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">State Code (GST)</label>
+
+                                                                <input type="text" name="stateCode" id="editVendorStateCode_@v.Id" class="form-control" value="@v.StateCode" placeholder="e.g. 27" maxlength="2" onchange="window.syncCodeToState(this, 'editVendorStateName_@v.Id')" />
+
+                                                            </div>
+
+                                                        </div>
+
+                                                    </div>
+
+                                                    <div class="modal-footer bg-light">
+
+                                                        <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+
+                                                        <button type="submit" class="btn btn-primary btn-sm px-4" style="background: var(--erp-primary);">
+
+                                                            <i class="fa-solid fa-save me-1"></i> Update Vendor
+
+                                                        </button>
+
+                                                    </div>
+
+                                                </form>
+
+                                            </div>
+
+                                        </div>
+
+                                    </div>
+
+    }
+
+}
+
                 </div>
+
             </div>
+
         </div>
+
     </div>
 
     <!-- 3. Consumable Items Tab -->
+
     <div class="tab-pane fade" id="items" role="tabpanel">
+
         <div class="erp-card">
+
             <div class="erp-card-header d-flex justify-content-between align-items-center">
+
                 <h5 class="erp-card-title"><i class="fa-solid fa-box-archive me-2"></i>Item Master &amp; Office Consumables</h5>
+
                 <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#createItemModal">
+
                     <i class="fa-solid fa-plus me-1"></i> Add Item
+
                 </button>
+
             </div>
+
             <div class="erp-card-body p-0">
+
                 <div class="table-responsive">
+
                     <table class="table table-hover align-middle mb-0">
+
                         <thead class="table-light">
+
                             <tr style="font-size: 12px; text-transform: uppercase;">
+
                                 <th class="ps-4">Item Code</th>
+
                                 <th>Item Name</th>
+
                                 <th>Category</th>
+
                                 <th>Unit Cost</th>
+
                                 <th>Current Stock</th>
+
                                 <th>Reorder Level</th>
+
                                 <th class="text-end pe-4">Actions</th>
+
                             </tr>
+
                         </thead>
+
                         <tbody style="font-size: 13.5px;">
+
                             @if (items.Any())
+
                             {
+
                                 @foreach (var item in items)
+
                                 {
+
                                     <tr>
+
                                         <td class="ps-4 fw-bold text-primary">@item.ItemCode</td>
+
                                         <td><strong>@item.ItemName</strong></td>
+
                                         <td>@(item.Category?.CategoryName ?? "General")</td>
+
                                         <td>&#8377; @item.UnitCost.ToString("N2")</td>
+
                                         <td class="fw-bold @(item.CurrentStockQty <= item.ReorderLevelQty ? "text-danger" : "text-success")">
+
                                             @item.CurrentStockQty @(item.Unit?.UnitCode ?? "NOS")
+
                                         </td>
+
                                         <td>@item.ReorderLevelQty @(item.Unit?.UnitCode ?? "NOS")</td>
+
                                         <td class="text-end pe-4">
+
                                             <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editItemModal_@item.Id">
+
                                                 <i class="fa-solid fa-pen-to-square"></i>
+
                                             </button>
+
                                         </td>
+
                                     </tr>
 
-                                    <!-- Edit Item Modal -->
-                                    <div class="modal fade" id="editItemModal_@item.Id" tabindex="-1" aria-hidden="true">
-                                        <div class="modal-dialog modal-dialog-centered modal-lg">
-                                            <div class="modal-content border-0 shadow">
-                                                <form method="post" asp-controller="Masters" asp-action="EditItem">
-                                                    @Html.AntiForgeryToken()
-                                                    <input type="hidden" name="id" value="@item.Id" />
-                                                    <div class="modal-header bg-light">
-                                                        <h5 class="modal-title fw-bold" style="color: var(--erp-primary); font-size: 16px;">
-                                                            <i class="fa-solid fa-pen-to-square me-2"></i>Edit Item: @item.ItemCode
-                                                        </h5>
-                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                    </div>
-                                                    <div class="modal-body p-4">
-                                                        <div class="row g-3">
-                                                            <div class="col-md-6">
-                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Item Code</label>
-                                                                <input type="text" class="form-control bg-light" value="@item.ItemCode" readonly />
-                                                            </div>
-                                                            <div class="col-md-6">
-                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Item Name <span class="text-danger">*</span></label>
-                                                                <input type="text" name="itemName" class="form-control" value="@item.ItemName" required />
-                                                            </div>
-                                                            <div class="col-md-6">
-                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Unit Cost (&#8377;) <span class="text-danger">*</span></label>
-                                                                <input type="number" step="0.01" name="unitCost" class="form-control" value="@item.UnitCost" required />
-                                                            </div>
-                                                            <div class="col-md-6">
-                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Minimum Reorder Level Qty</label>
-                                                                <input type="number" step="1" name="reorderLevelQty" class="form-control" value="@item.ReorderLevelQty" />
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div class="modal-footer bg-light">
-                                                        <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
-                                                        <button type="submit" class="btn btn-primary btn-sm px-4" style="background: var(--erp-primary);">
-                                                            <i class="fa-solid fa-save me-1"></i> Update Item
-                                                        </button>
-                                                    </div>
-                                                </form>
-                                            </div>
-                                        </div>
-                                    </div>
+                                    
+
                                 }
+
                             }
+
                             else
+
                             {
+
                                 <tr>
+
                                     <td colspan="7" class="text-center py-5">
+
                                         <i class="fa-solid fa-box-archive mb-3" style="font-size: 40px; color: #CBD5E1;"></i>
+
                                         <h6 class="fw-bold text-secondary mb-1">No Items in Catalog</h6>
+
                                         <p class="text-muted mb-3" style="font-size: 12.5px;">Add office consumable items and materials to track inventory levels.</p>
+
                                         <button class="btn btn-primary btn-sm px-3" style="background: var(--erp-primary);" data-bs-toggle="modal" data-bs-target="#createItemModal">
+
                                             <i class="fa-solid fa-plus me-1"></i> Add First Item
+
                                         </button>
+
                                     </td>
+
                                 </tr>
+
                             }
+
                         </tbody>
+
                     </table>
+
+@if (items.Any())
+
+{
+
+    @foreach (var item in items)
+
+    {
+
+<!-- Edit Item Modal -->
+
+                                    <div class="modal fade" id="editItemModal_@item.Id" tabindex="-1" aria-hidden="true">
+
+                                        <div class="modal-dialog modal-dialog-centered modal-lg">
+
+                                            <div class="modal-content border-0 shadow">
+
+                                                <form method="post" asp-controller="Masters" asp-action="EditItem">
+
+                                                    @Html.AntiForgeryToken()
+
+                                                    <input type="hidden" name="id" value="@item.Id" />
+
+                                                    <div class="modal-header bg-light">
+
+                                                        <h5 class="modal-title fw-bold" style="color: var(--erp-primary); font-size: 16px;">
+
+                                                            <i class="fa-solid fa-pen-to-square me-2"></i>Edit Item: @item.ItemCode
+
+                                                        </h5>
+
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+
+                                                    </div>
+
+                                                    <div class="modal-body p-4">
+
+                                                        <div class="row g-3">
+
+                                                            <div class="col-md-6">
+
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Item Code</label>
+
+                                                                <input type="text" class="form-control bg-light" value="@item.ItemCode" readonly />
+
+                                                            </div>
+
+                                                            <div class="col-md-6">
+
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Item Name <span class="text-danger">*</span></label>
+
+                                                                <input type="text" name="itemName" class="form-control" value="@item.ItemName" required />
+
+                                                            </div>
+
+                                                            <div class="col-md-6">
+
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Unit Cost (&#8377;) <span class="text-danger">*</span></label>
+
+                                                                <input type="number" step="0.01" name="unitCost" class="form-control" value="@item.UnitCost" required />
+
+                                                            </div>
+
+                                                            <div class="col-md-6">
+
+                                                                <label class="form-label fw-semibold" style="font-size: 12.5px;">Minimum Reorder Level Qty</label>
+
+                                                                <input type="number" step="1" name="reorderLevelQty" class="form-control" value="@item.ReorderLevelQty" />
+
+                                                            </div>
+
+                                                        </div>
+
+                                                    </div>
+
+                                                    <div class="modal-footer bg-light">
+
+                                                        <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+
+                                                        <button type="submit" class="btn btn-primary btn-sm px-4" style="background: var(--erp-primary);">
+
+                                                            <i class="fa-solid fa-save me-1"></i> Update Item
+
+                                                        </button>
+
+                                                    </div>
+
+                                                </form>
+
+                                            </div>
+
+                                        </div>
+
+                                    </div>
+
+    }
+
+}
+
                 </div>
+
             </div>
+
         </div>
+
     </div>
 
     <!-- 4. GST Tax Slabs Tab (Seeded Data) -->
+
     <div class="tab-pane fade" id="tax" role="tabpanel">
+
         <div class="erp-card">
+
             <div class="erp-card-header">
+
                 <h5 class="erp-card-title"><i class="fa-solid fa-percent me-2"></i>Statutory Indian GST Tax Slabs</h5>
+
             </div>
+
             <div class="erp-card-body p-0">
+
                 <div class="table-responsive">
+
                     <table class="table table-hover align-middle mb-0">
+
                         <thead class="table-light">
+
                             <tr style="font-size: 12px; text-transform: uppercase;">
+
                                 <th class="ps-4">Tax Name</th>
+
                                 <th>Total GST %</th>
+
                                 <th>CGST Rate</th>
+
                                 <th>SGST Rate</th>
+
                                 <th>IGST Rate</th>
+
                                 <th>Status</th>
+
                             </tr>
+
                         </thead>
+
                         <tbody style="font-size: 13.5px;">
+
                             @foreach (var rate in taxRates)
+
                             {
+
                                 <tr>
+
                                     <td class="ps-4 fw-bold text-primary">@rate.TaxName</td>
+
                                     <td class="fw-bold">@rate.RatePercentage.ToString("0.##")%</td>
+
                                     <td>@rate.CgstPercentage.ToString("0.##")%</td>
+
                                     <td>@rate.SgstPercentage.ToString("0.##")%</td>
+
                                     <td>@rate.IgstPercentage.ToString("0.##")%</td>
+
                                     <td><span class="badge bg-success">Active Slab</span></td>
+
                                 </tr>
+
                             }
+
                         </tbody>
+
                     </table>
+
                 </div>
+
             </div>
+
         </div>
+
     </div>
 
     <!-- 5. Chart of Accounts Tab (Seeded Data) -->
+
     <div class="tab-pane fade" id="coa" role="tabpanel">
+
         <div class="erp-card">
+
             <div class="erp-card-header">
+
                 <h5 class="erp-card-title"><i class="fa-solid fa-sitemap me-2"></i>Double-Entry Chart of Accounts Architecture</h5>
+
             </div>
+
             <div class="erp-card-body p-0">
+
                 <div class="table-responsive">
+
                     <table class="table table-hover align-middle mb-0">
+
                         <thead class="table-light">
+
                             <tr style="font-size: 12px; text-transform: uppercase;">
+
                                 <th class="ps-4">Group Code</th>
+
                                 <th>Account Group Name</th>
+
                                 <th>Accounting Category</th>
+
                                 <th>Sub-Accounts</th>
+
                                 <th>Status</th>
+
                             </tr>
+
                         </thead>
+
                         <tbody style="font-size: 13.5px;">
+
                             @foreach (var g in accountGroups)
+
                             {
+
                                 <tr>
+
                                     <td class="ps-4 fw-bold text-primary">@g.GroupCode</td>
+
                                     <td><strong>@g.GroupName</strong></td>
+
                                     <td><span class="badge bg-light text-dark border">@g.AccountCategory</span></td>
+
                                     <td>@g.Accounts.Count Active Ledgers</td>
+
                                     <td><span class="badge bg-success">System Group</span></td>
+
                                 </tr>
+
                             }
+
                         </tbody>
+
                     </table>
+
                 </div>
+
             </div>
+
         </div>
+
     </div>
 
     <!-- 6. Project Types Tab -->
+
     <div class="tab-pane fade" id="projecttypes" role="tabpanel">
+
         <div class="erp-card">
+
             <div class="erp-card-header d-flex justify-content-between align-items-center">
+
                 <h5 class="erp-card-title"><i class="fa-solid fa-diagram-project me-2"></i>Project Types Master Directory</h5>
+
                 <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#createProjectTypeModal">
+
                     <i class="fa-solid fa-plus me-1"></i> Add Project Type
+
                 </button>
+
             </div>
+
             <div class="erp-card-body p-0">
+
                 <div class="table-responsive">
+
                     <table class="table table-hover align-middle mb-0">
+
                         <thead class="table-light">
+
                             <tr style="font-size: 12px; text-transform: uppercase;">
+
                                 <th class="ps-4">Code</th>
+
                                 <th>Project Type Name</th>
+
                                 <th>Description / Scope</th>
+
                                 <th>Status</th>
+
                                 <th class="text-end pe-4">Action</th>
+
                             </tr>
+
                         </thead>
+
                         <tbody style="font-size: 13.5px;">
+
                             @if (projectTypes.Any())
+
                             {
+
                                 @foreach (var pt in projectTypes)
+
                                 {
+
                                     <tr>
+
                                         <td class="ps-4 fw-bold text-primary">@pt.Code</td>
+
                                         <td><strong>@pt.Name</strong></td>
+
                                         <td class="text-muted">@(string.IsNullOrWhiteSpace(pt.Description) ? "Standard contract classification" : pt.Description)</td>
+
                                         <td>
+
                                             @if (pt.IsActive)
+
                                             {
+
                                                 <span class="badge bg-success-subtle text-success">ACTIVE</span>
+
                                             }
+
                                             else
+
                                             {
+
                                                 <span class="badge bg-danger-subtle text-danger">INACTIVE</span>
+
                                             }
+
                                         </td>
+
                                         <td class="text-end pe-4">
+
                                             <form method="post" asp-controller="Masters" asp-action="ToggleProjectType" style="display:inline;">
+
                                                 @Html.AntiForgeryToken()
+
                                                 <input type="hidden" name="id" value="@pt.Id" />
+
                                                 <button type="submit" class="btn btn-sm @(pt.IsActive ? "btn-outline-danger" : "btn-outline-success") px-2 py-1" style="font-size: 11.5px;">
+
                                                     <i class="fa-solid @(pt.IsActive ? "fa-ban" : "fa-check") me-1"></i> @(pt.IsActive ? "Deactivate" : "Activate")
+
                                                 </button>
+
                                             </form>
+
                                         </td>
+
                                     </tr>
+
                                 }
+
                             }
+
                             else
+
                             {
+
                                 <tr>
+
                                     <td colspan="5" class="text-center py-5">
+
                                         <i class="fa-solid fa-diagram-project mb-3" style="font-size: 40px; color: #CBD5E1;"></i>
+
                                         <h6 class="fw-bold text-secondary mb-1">No Project Types Configured</h6>
+
                                         <p class="text-muted mb-3" style="font-size: 12.5px;">Add custom project contract classifications for your enterprise.</p>
+
                                         <button class="btn btn-primary btn-sm px-3" data-bs-toggle="modal" data-bs-target="#createProjectTypeModal">
+
                                             <i class="fa-solid fa-plus me-1"></i> Add First Project Type
+
                                         </button>
+
                                     </td>
+
                                 </tr>
+
                             }
+
                         </tbody>
+
                     </table>
+
                 </div>
+
             </div>
+
         </div>
+
     </div>
 
     <!-- 7. Expense Types Tab -->
+
     <div class="tab-pane fade" id="expensetypes" role="tabpanel">
+
         <div class="erp-card">
+
             <div class="erp-card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+
                 <div>
+
                     <h5 class="erp-card-title mb-0"><i class="fa-solid fa-receipt me-2"></i>Expense Types Master Directory</h5>
+
                     <small class="text-muted" style="font-size: 11.5px;">Manage accounting expense heads, direct payment categories, and project associations</small>
+
                 </div>
+
                 <div class="d-flex align-items-center gap-2">
+
                     <div class="input-group input-group-sm" style="width: 240px;">
+
                         <span class="input-group-text bg-light border-end-0"><i class="fa-solid fa-magnifying-glass text-muted" style="font-size: 11px;"></i></span>
+
                         <input type="text" id="expenseTypeSearchInput" class="form-control border-start-0" placeholder="Filter expense types..." style="font-size: 12.5px;" />
+
                     </div>
+
                     <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#createExpenseTypeModal">
+
                         <i class="fa-solid fa-plus me-1"></i> Add Expense Type
+
                     </button>
+
                 </div>
+
             </div>
+
             <div class="erp-card-body p-0">
+
                 <div class="table-responsive">
+
                     <table class="table table-hover align-middle mb-0" id="expenseTypesTable">
+
                         <thead class="table-light">
+
                             <tr style="font-size: 12px; text-transform: uppercase;">
+
                                 <th class="ps-4" style="width: 26%;">Expense Type Name</th>
+
                                 <th style="width: 24%;">Classification / Scope</th>
+
                                 <th style="width: 25%;">Description</th>
+
                                 <th class="text-center" style="width: 13%;">Opening Amount</th>
+
                                 <th class="text-center" style="width: 12%;">Status</th>
+
                                 <th class="text-end pe-4" style="width: 140px;">Actions</th>
+
                             </tr>
+
                         </thead>
+
                         <tbody style="font-size: 13.5px;">
+
                             @if (expenseTypes.Any())
+
                             {
+
                                 @foreach (var exp in expenseTypes)
+
                                 {
+
                                     <tr class="expense-type-row" data-name="@exp.Name.ToLower()" data-desc="@(exp.Description?.ToLower() ?? "")">
+
                                         <td class="ps-4">
+
                                             <div class="fw-bold text-dark">@exp.Name</div>
+
                                         </td>
+
                                         <td>
+
                                             <div class="d-flex flex-column gap-1" style="font-size: 12px;">
+
                                                 <div>
+
                                                     <span class="text-muted me-1">Project Related:</span>
+
                                                     @if (exp.IsProjectRelated)
+
                                                     {
+
                                                         <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-0">Yes</span>
+
                                                     }
+
                                                     else
+
                                                     {
+
                                                         <span class="badge bg-light text-muted border px-2 py-0">No</span>
+
                                                     }
+
                                                 </div>
+
                                                 <div>
+
                                                     <span class="text-muted me-1">Direct Receipts:</span>
+
                                                     @if (exp.ReceiveDirectPayments)
+
                                                     {
+
                                                         <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-0">Yes</span>
+
                                                     }
+
                                                     else
+
                                                     {
+
                                                         <span class="badge bg-light text-muted border px-2 py-0">No</span>
+
                                                     }
+
                                                 </div>
+
                                             </div>
+
                                         </td>
+
                                         <td class="text-muted" style="font-size: 12.5px;">
+
                                             @(string.IsNullOrWhiteSpace(exp.Description) ? "—" : exp.Description)
+
                                         </td>
+
                                         <td class="text-center">
+
                                             @if (exp.OpeningAmount.HasValue && exp.OpeningAmount.Value > 0)
+
                                             {
+
                                                 <span class="fw-bold text-dark">&#8377; @exp.OpeningAmount.Value.ToString("N2")</span>
+
                                             }
+
                                             else
+
                                             {
+
                                                 <span class="badge bg-light text-muted border">N/A</span>
+
                                             }
+
                                         </td>
+
                                         <td class="text-center">
+
                                             @if (exp.IsActive)
+
                                             {
+
                                                 <span class="badge bg-success-subtle text-success">ACTIVE</span>
+
                                             }
+
                                             else
+
                                             {
+
                                                 <span class="badge bg-danger-subtle text-danger">INACTIVE</span>
+
                                             }
+
                                         </td>
+
                                         <td class="text-end pe-4">
+
                                             <div class="d-inline-flex gap-1">
+
                                                 <button type="button" class="btn btn-sm btn-outline-primary px-2 py-1 edit-exp-btn" title="Edit Expense Type"
+
                                                         data-id="@exp.Id"
+
                                                         data-name="@exp.Name"
+
                                                         data-desc="@(exp.Description ?? "")"
+
                                                         data-isproject="@exp.IsProjectRelated.ToString().ToLower()"
+
                                                         data-isdirect="@exp.ReceiveDirectPayments.ToString().ToLower()"
+
                                                         data-opening="@(exp.OpeningAmount?.ToString() ?? "")">
+
                                                     <i class="fa-solid fa-pen-to-square"></i>
+
                                                 </button>
+
                                                 <form method="post" asp-controller="Masters" asp-action="ToggleExpenseType" style="display:inline;">
+
                                                     @Html.AntiForgeryToken()
+
                                                     <input type="hidden" name="id" value="@exp.Id" />
+
                                                     <button type="submit" class="btn btn-sm @(exp.IsActive ? "btn-outline-warning" : "btn-outline-success") px-2 py-1" title="@(exp.IsActive ? "Deactivate" : "Activate")">
+
                                                         <i class="fa-solid @(exp.IsActive ? "fa-ban" : "fa-check")"></i>
+
                                                     </button>
+
                                                 </form>
+
                                                 <button type="button" class="btn btn-sm btn-outline-danger px-2 py-1 delete-exp-btn" title="Delete Expense Type"
+
                                                         data-id="@exp.Id"
+
                                                         data-name="@exp.Name">
+
                                                     <i class="fa-solid fa-trash-can"></i>
+
                                                 </button>
+
                                             </div>
+
                                         </td>
+
                                     </tr>
+
                                 }
+
                             }
+
                             else
+
                             {
+
                                 <tr>
+
                                     <td colspan="6" class="text-center py-5">
+
                                         <i class="fa-solid fa-receipt mb-3" style="font-size: 40px; color: #CBD5E1;"></i>
+
                                         <h6 class="fw-bold text-secondary mb-1">No Expense Types Configured</h6>
+
                                         <p class="text-muted mb-3" style="font-size: 12.5px;">Configure expense and direct payment heads for your company.</p>
+
                                         <button class="btn btn-primary btn-sm px-3" data-bs-toggle="modal" data-bs-target="#createExpenseTypeModal">
+
                                             <i class="fa-solid fa-plus me-1"></i> Add First Expense Type
+
                                         </button>
+
                                     </td>
+
                                 </tr>
+
                             }
+
                         </tbody>
+
                     </table>
+
                 </div>
+
             </div>
+
         </div>
+
     </div>
+
+<!-- 8. State Master Tab -->
+
+    <div class="tab-pane fade" id="states" role="tabpanel">
+
+        <div class="erp-card shadow-sm border-0">
+
+            <div class="erp-card-header d-flex justify-content-between align-items-center py-3 px-4 bg-white border-bottom">
+
+                <div>
+
+                    <h5 class="erp-card-title mb-1" style="font-size: 15px; font-weight: 700; color: #1E293B;">
+
+                        <i class="fa-solid fa-map-location-dot me-2 text-primary"></i>Statutory Indian States &amp; Jurisdictions Master
+
+                    </h5>
+
+                    <small class="text-muted">Master database for GST Place of Supply, inter-state IGST calculation &amp; client/vendor registrations</small>
+
+                </div>
+
+                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#createStateModal">
+
+                    <i class="fa-solid fa-plus me-1"></i> Add State
+
+                </button>
+
+            </div>
+
+            <div class="erp-card-body p-0">
+
+                <div class="table-responsive">
+
+                    <table class="table table-hover align-middle mb-0">
+
+                        <thead class="table-light">
+
+                            <tr style="font-size: 12px; text-transform: uppercase;">
+
+                                <th class="ps-4" style="width: 120px;">State Code</th>
+
+                                <th>State / Territory Name</th>
+
+                                <th>Jurisdiction Type</th>
+
+                                <th>Status</th>
+
+                                <th class="text-end pe-4">Actions</th>
+
+                            </tr>
+
+                        </thead>
+
+                        <tbody style="font-size: 13.5px;">
+
+                            @if (states.Any())
+
+                            {
+
+                                @foreach (var s in states.OrderBy(x => x.StateCode))
+
+                                {
+
+                                    <tr>
+
+                                        <td class="ps-4">
+
+                                            <span class="badge bg-primary-subtle text-primary border fw-bold px-2 py-1" style="font-size: 13px;">@s.StateCode</span>
+
+                                        </td>
+
+                                        <td>
+
+                                            <strong class="text-dark">@s.StateName</strong>
+
+                                        </td>
+
+                                        <td>
+
+                                            <span class="badge @(s.StateType == "Union Territory" ? "bg-info-subtle text-info" : "bg-light text-secondary") border">
+
+                                                @(s.StateType ?? "State")
+
+                                            </span>
+
+                                        </td>
+
+                                        <td>
+
+                                            @if (s.IsActive)
+
+                                            {
+
+                                                <span class="badge bg-success-subtle text-success border">Active</span>
+
+                                            }
+
+                                            else
+
+                                            {
+
+                                                <span class="badge bg-secondary">Inactive</span>
+
+                                            }
+
+                                        </td>
+
+                                        <td class="text-end pe-4">
+
+                                            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editStateModal_@s.Id" title="Edit State Details">
+
+                                                <i class="fa-solid fa-pen-to-square"></i>
+
+                                            </button>
+
+                                        </td>
+
+                                    </tr>
+
+                                }
+
+                            }
+
+                            else
+
+                            {
+
+                                <tr>
+
+                                    <td colspan="5" class="text-center py-4 text-muted">No state records found.</td>
+
+                                </tr>
+
+                            }
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
 </div>
 
 <!-- ========================================================================= -->
+
 <!-- CREATE PROJECT TYPE MODAL -->
+
 <!-- ========================================================================= -->
+
 <div class="modal fade" id="createProjectTypeModal" tabindex="-1" aria-hidden="true">
+
     <div class="modal-dialog modal-dialog-centered">
+
         <div class="modal-content border-0 shadow">
+
             <form method="post" asp-controller="Masters" asp-action="CreateProjectType">
+
                 @Html.AntiForgeryToken()
+
                 <div class="modal-header bg-light">
+
                     <h5 class="modal-title fw-bold text-primary" style="font-size: 16px;">
+
                         <i class="fa-solid fa-diagram-project me-2"></i>Add Project Type Master
+
                     </h5>
+
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+
                 </div>
+
                 <div class="modal-body p-4">
+
                     <div class="row g-3">
+
                         <div class="col-12">
+
                             <label class="form-label fw-semibold" style="font-size: 12.5px;">Type Code <span class="text-danger">*</span></label>
+
                             <input type="text" name="code" class="form-control text-uppercase" placeholder="e.g. TURNKEY, AMC, EPC, T&amp;M" required />
+
                             <small class="text-muted" style="font-size: 11.5px;">Short identifier used across contracts and billing.</small>
+
                         </div>
+
                         <div class="col-12">
+
                             <label class="form-label fw-semibold" style="font-size: 12.5px;">Project Type Name <span class="text-danger">*</span></label>
+
                             <input type="text" name="name" class="form-control" placeholder="e.g. Engineering Procurement &amp; Construction" required />
+
                         </div>
+
                         <div class="col-12">
+
                             <label class="form-label fw-semibold" style="font-size: 12.5px;">Description / Contract Scope</label>
+
                             <textarea name="description" class="form-control" rows="2" placeholder="Describe the billing milestone structure or contract characteristics..."></textarea>
+
                         </div>
+
                     </div>
+
                 </div>
+
                 <div class="modal-footer bg-light">
+
                     <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+
                     <button type="submit" class="btn btn-primary btn-sm px-4 fw-bold">
+
                         <i class="fa-solid fa-check me-1"></i> Save Project Type
+
                     </button>
+
                 </div>
+
             </form>
+
         </div>
+
     </div>
+
 </div>
 
 <!-- ========================================================================= -->
+
 <!-- CREATE EXPENSE TYPE MODAL -->
+
 <!-- ========================================================================= -->
+
 <div class="modal fade" id="createExpenseTypeModal" tabindex="-1" aria-hidden="true">
+
     <div class="modal-dialog modal-dialog-centered">
+
         <div class="modal-content border-0 shadow">
+
             <form method="post" asp-controller="Masters" asp-action="CreateExpenseType">
+
                 @Html.AntiForgeryToken()
+
                 <div class="modal-header bg-light">
+
                     <h5 class="modal-title fw-bold text-primary" style="font-size: 16px;">
+
                         <i class="fa-solid fa-receipt me-2"></i>Add Expense Type Master
+
                     </h5>
+
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+
                 </div>
+
                 <div class="modal-body p-4">
+
                     <div class="row g-3">
+
                         <div class="col-12">
+
                             <label class="form-label fw-semibold" style="font-size: 12.5px;">Expense Type Name <span class="text-danger">*</span></label>
+
                             <input type="text" name="name" class="form-control" placeholder="e.g. OFFICE EXPENSES, SITE MOBILIZATION" required />
+
                         </div>
+
                         <div class="col-md-6">
+
                             <label class="form-label fw-semibold" style="font-size: 12.5px;">Project Related?</label>
+
                             <div class="form-check form-switch mt-1">
+
                                 <input class="form-check-input" type="checkbox" name="isProjectRelated" value="true" id="createIsProjectRelated" style="cursor: pointer; width: 40px; height: 20px;">
+
                                 <label class="form-check-label ms-2" for="createIsProjectRelated" style="font-size: 13px;">Yes</label>
+
                             </div>
+
                         </div>
+
                         <div class="col-md-6">
+
                             <label class="form-label fw-semibold" style="font-size: 12.5px;">Receive Direct Payments?</label>
+
                             <div class="form-check form-switch mt-1">
+
                                 <input class="form-check-input" type="checkbox" name="receiveDirectPayments" value="true" id="createReceiveDirectPayments" style="cursor: pointer; width: 40px; height: 20px;">
+
                                 <label class="form-check-label ms-2" for="createReceiveDirectPayments" style="font-size: 13px;">Yes</label>
+
                             </div>
+
                         </div>
+
                         <div class="col-12">
+
                             <label class="form-label fw-semibold" style="font-size: 12.5px;">Opening Amount (Optional)</label>
+
                             <div class="input-group">
+
                                 <span class="input-group-text">&#8377;</span>
+
                                 <input type="number" step="0.01" name="openingAmount" class="form-control" placeholder="0.00" />
+
                             </div>
+
                         </div>
+
                         <div class="col-12">
+
                             <label class="form-label fw-semibold" style="font-size: 12.5px;">Description / Purpose</label>
+
                             <textarea name="description" class="form-control" rows="2" placeholder="Brief scope or accounting purpose of this expense type..."></textarea>
+
                         </div>
+
                     </div>
+
                 </div>
+
                 <div class="modal-footer bg-light">
+
                     <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+
                     <button type="submit" class="btn btn-primary btn-sm px-4 fw-bold">
+
                         <i class="fa-solid fa-check me-1"></i> Save Expense Type
+
                     </button>
+
                 </div>
+
             </form>
+
         </div>
+
     </div>
+
 </div>
 
 <!-- ========================================================================= -->
+
 <!-- EDIT EXPENSE TYPE MODAL -->
+
 <!-- ========================================================================= -->
+
 <div class="modal fade" id="editExpenseTypeModal" tabindex="-1" aria-hidden="true">
+
     <div class="modal-dialog modal-dialog-centered">
+
         <div class="modal-content border-0 shadow">
+
             <form method="post" asp-controller="Masters" asp-action="UpdateExpenseType">
+
                 @Html.AntiForgeryToken()
+
                 <input type="hidden" name="id" id="editExpenseTypeId" />
+
                 <div class="modal-header bg-light">
+
                     <h5 class="modal-title fw-bold text-primary" style="font-size: 16px;">
+
                         <i class="fa-solid fa-pen-to-square me-2"></i>Edit Expense Type
+
                     </h5>
+
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+
                 </div>
+
                 <div class="modal-body p-4">
+
                     <div class="row g-3">
+
                         <div class="col-12">
+
                             <label class="form-label fw-semibold" style="font-size: 12.5px;">Expense Type Name <span class="text-danger">*</span></label>
+
                             <input type="text" name="name" id="editExpenseTypeName" class="form-control" required />
+
                         </div>
+
                         <div class="col-md-6">
+
                             <label class="form-label fw-semibold" style="font-size: 12.5px;">Project Related?</label>
+
                             <div class="form-check form-switch mt-1">
+
                                 <input class="form-check-input" type="checkbox" name="isProjectRelated" value="true" id="editIsProjectRelated" style="cursor: pointer; width: 40px; height: 20px;">
+
                                 <label class="form-check-label ms-2" for="editIsProjectRelated" style="font-size: 13px;">Yes</label>
+
                             </div>
+
                         </div>
+
                         <div class="col-md-6">
+
                             <label class="form-label fw-semibold" style="font-size: 12.5px;">Receive Direct Payments?</label>
+
                             <div class="form-check form-switch mt-1">
+
                                 <input class="form-check-input" type="checkbox" name="receiveDirectPayments" value="true" id="editReceiveDirectPayments" style="cursor: pointer; width: 40px; height: 20px;">
+
                                 <label class="form-check-label ms-2" for="editReceiveDirectPayments" style="font-size: 13px;">Yes</label>
+
                             </div>
+
                         </div>
+
                         <div class="col-12">
+
                             <label class="form-label fw-semibold" style="font-size: 12.5px;">Opening Amount (Optional)</label>
+
                             <div class="input-group">
+
                                 <span class="input-group-text">&#8377;</span>
+
                                 <input type="number" step="0.01" name="openingAmount" id="editOpeningAmount" class="form-control" placeholder="0.00" />
+
                             </div>
+
                         </div>
+
                         <div class="col-12">
+
                             <label class="form-label fw-semibold" style="font-size: 12.5px;">Description / Purpose</label>
+
                             <textarea name="description" id="editDescription" class="form-control" rows="2"></textarea>
+
                         </div>
+
                     </div>
+
                 </div>
+
                 <div class="modal-footer bg-light">
+
                     <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+
                     <button type="submit" class="btn btn-primary btn-sm px-4 fw-bold">
+
                         <i class="fa-solid fa-check me-1"></i> Update Expense Type
+
                     </button>
+
                 </div>
+
             </form>
+
         </div>
+
     </div>
+
 </div>
 
 <!-- ========================================================================= -->
+
 <!-- DELETE EXPENSE TYPE MODAL -->
+
 <!-- ========================================================================= -->
+
 <div class="modal fade" id="deleteExpenseTypeModal" tabindex="-1" aria-hidden="true">
+
     <div class="modal-dialog modal-dialog-centered modal-sm">
+
         <div class="modal-content border-0 shadow">
+
             <div class="modal-body text-center p-4">
+
                 <i class="fa-solid fa-triangle-exclamation text-danger mb-3" style="font-size: 40px;"></i>
+
                 <h6 class="fw-bold mb-2">Delete Expense Type?</h6>
+
                 <p class="text-muted small mb-4" id="deleteExpenseTypeMessage"></p>
+
                 <form method="post" asp-controller="Masters" asp-action="DeleteExpenseType">
+
                     @Html.AntiForgeryToken()
+
                     <input type="hidden" name="id" id="deleteExpenseTypeId" />
+
                     <div class="d-flex justify-content-center gap-2">
+
                         <button type="button" class="btn btn-outline-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+
                         <button type="submit" class="btn btn-danger btn-sm px-3 fw-bold">Confirm Delete</button>
+
                     </div>
+
                 </form>
+
             </div>
+
         </div>
+
     </div>
+
 </div>
 
-<!-- ========================================================================= -->
-<!-- CREATE CLIENT MODAL -->
-<!-- ========================================================================= -->
-<div class="modal fade" id="createClientModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content border-0 shadow">
-            <form method="post" asp-controller="Masters" asp-action="CreateClient">
-                @Html.AntiForgeryToken()
-                <div class="modal-header bg-light">
-                    <h5 class="modal-title fw-bold" style="color: var(--erp-primary); font-size: 16px;">
-                        <i class="fa-solid fa-user-tie me-2"></i>Register Enterprise Client
-                    </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body p-4">
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Client Code <span class="text-danger">*</span></label>
-                            <input type="text" name="clientCode" class="form-control" value="CL-@DateTime.Now.ToString("MMddHHmm")" required />
+@if (states.Any())
+
+{
+
+    @foreach (var s in states)
+
+    {
+
+        <!-- Edit State Modal -->
+
+        <div class="modal fade" id="editStateModal_@s.Id" tabindex="-1" aria-hidden="true">
+
+            <div class="modal-dialog modal-dialog-centered">
+
+                <div class="modal-content border-0 shadow">
+
+                    <form method="post" asp-controller="Masters" asp-action="EditState">
+
+                        @Html.AntiForgeryToken()
+
+                        <input type="hidden" name="id" value="@s.Id" />
+
+                        <div class="modal-header bg-light">
+
+                            <h5 class="modal-title fw-bold" style="color: var(--erp-primary); font-size: 16px;">
+
+                                <i class="fa-solid fa-pen-to-square me-2"></i>Edit State: @s.StateName
+
+                            </h5>
+
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Client / Company Name <span class="text-danger">*</span></label>
-                            <input type="text" name="clientName" id="createClientName" class="form-control" placeholder="e.g. Reliance Infra Ltd" required />
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold d-flex justify-content-between align-items-center" style="font-size: 12.5px;">
-                                <span>GSTIN</span>
-                                <span class="text-muted" style="font-size: 11px;"><i class="fa-solid fa-bolt text-warning me-1"></i>Auto-fills PAN &amp; Details</span>
-                            </label>
-                            <div class="input-group">
-                                <input type="text" name="gstin" id="createClientGstin" class="form-control text-uppercase gstin-lookup-input" placeholder="e.g. 07AAAAA0000A1Z5" maxlength="15" autocomplete="off" />
-                                <button class="btn btn-outline-primary" type="button" id="btnFetchClientGstin" title="Auto-Fetch Client details from GSTIN">
-                                    <i class="fa-solid fa-wand-magic-sparkles me-1"></i> Auto-Fetch
-                                </button>
+
+                        <div class="modal-body p-4">
+
+                            <div class="row g-3">
+
+                                <div class="col-md-5">
+
+                                    <label class="form-label fw-semibold" style="font-size: 12.5px;">State Code (GST) <span class="text-danger">*</span></label>
+
+                                    <input type="text" name="stateCode" class="form-control text-uppercase" value="@s.StateCode" maxlength="2" required />
+
+                                </div>
+
+                                <div class="col-md-7">
+
+                                    <label class="form-label fw-semibold" style="font-size: 12.5px;">State / Territory Name <span class="text-danger">*</span></label>
+
+                                    <input type="text" name="stateName" class="form-control" value="@s.StateName" required />
+
+                                </div>
+
+                                <div class="col-md-7">
+
+                                    <label class="form-label fw-semibold" style="font-size: 12.5px;">Jurisdiction Type</label>
+
+                                    <select name="stateType" class="form-select">
+
+                                        <option value="State" selected="@(s.StateType == "State")">State</option>
+
+                                        <option value="Union Territory" selected="@(s.StateType == "Union Territory")">Union Territory</option>
+
+                                        <option value="Special Territory" selected="@(s.StateType == "Special Territory")">Special Territory</option>
+
+                                    </select>
+
+                                </div>
+
+                                <div class="col-md-5">
+
+                                    <label class="form-label fw-semibold" style="font-size: 12.5px;">Status</label>
+
+                                    <select name="isActive" class="form-select">
+
+                                        <option value="true" selected="@(s.IsActive)">Active</option>
+
+                                        <option value="false" selected="@(!s.IsActive)">Inactive</option>
+
+                                    </select>
+
+                                </div>
+
                             </div>
-                            <div id="clientGstinFeedback" class="mt-1" style="font-size: 11.5px; display: none;"></div>
+
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold" style="font-size: 12.5px;">PAN</label>
-                            <input type="text" name="pan" id="createClientPan" class="form-control text-uppercase" placeholder="e.g. AAAAA0000A" maxlength="10" />
+
+                        <div class="modal-footer bg-light">
+
+                            <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+
+                            <button type="submit" class="btn btn-primary btn-sm px-4" style="background: var(--erp-primary);">
+
+                                <i class="fa-solid fa-save me-1"></i> Update State
+
+                            </button>
+
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Contact Person</label>
-                            <input type="text" name="contactPerson" id="createClientContactPerson" class="form-control" placeholder="e.g. Procurement Lead" />
+
+                    </form>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    }
+
+}
+
+<!-- ========================================================================= -->
+
+<!-- CREATE STATE MODAL -->
+
+<!-- ========================================================================= -->
+
+<div class="modal fade" id="createStateModal" tabindex="-1" aria-hidden="true">
+
+    <div class="modal-dialog modal-dialog-centered">
+
+        <div class="modal-content border-0 shadow">
+
+            <form method="post" asp-controller="Masters" asp-action="CreateState">
+
+                @Html.AntiForgeryToken()
+
+                <div class="modal-header bg-light">
+
+                    <h5 class="modal-title fw-bold" style="color: var(--erp-primary); font-size: 16px;">
+
+                        <i class="fa-solid fa-map-location-dot me-2"></i>Register New State / Jurisdiction
+
+                    </h5>
+
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+
+                </div>
+
+                <div class="modal-body p-4">
+
+                    <div class="row g-3">
+
+                        <div class="col-md-5">
+
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">State Code (GST) <span class="text-danger">*</span></label>
+
+                            <input type="text" name="stateCode" class="form-control text-uppercase" placeholder="e.g. 07" maxlength="2" required />
+
+                            <small class="text-muted" style="font-size: 11px;">2-Digit Statutory Code</small>
+
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Phone / Mobile</label>
-                            <input type="text" name="phone" id="createClientPhone" class="form-control" placeholder="e.g. +91 98765 43210" />
+
+                        <div class="col-md-7">
+
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">State / Territory Name <span class="text-danger">*</span></label>
+
+                            <input type="text" name="stateName" class="form-control" placeholder="e.g. Delhi" required />
+
                         </div>
+
                         <div class="col-12">
-                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Billing Address <span class="text-danger">*</span></label>
-                            <textarea name="billingAddress" id="createClientAddress" class="form-control" rows="2" placeholder="Complete statutory billing address..." required></textarea>
+
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Jurisdiction Type</label>
+
+                            <select name="stateType" class="form-select">
+
+                                <option value="State" selected>State</option>
+
+                                <option value="Union Territory">Union Territory</option>
+
+                                <option value="Special Territory">Special Territory / Centre Jurisdiction</option>
+
+                            </select>
+
                         </div>
+
                     </div>
+
                 </div>
+
                 <div class="modal-footer bg-light">
+
                     <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+
                     <button type="submit" class="btn btn-primary btn-sm px-4" style="background: var(--erp-primary);">
-                        <i class="fa-solid fa-check me-1"></i> Save Client
+
+                        <i class="fa-solid fa-check me-1"></i> Save State
+
                     </button>
+
                 </div>
+
             </form>
+
         </div>
+
     </div>
+
 </div>
 
 <!-- ========================================================================= -->
-<!-- CREATE VENDOR MODAL -->
+
+<!-- CREATE CLIENT MODAL -->
+
 <!-- ========================================================================= -->
-<div class="modal fade" id="createVendorModal" tabindex="-1" aria-hidden="true">
+
+<div class="modal fade" id="createClientModal" tabindex="-1" aria-hidden="true">
+
     <div class="modal-dialog modal-dialog-centered modal-lg">
+
         <div class="modal-content border-0 shadow">
-            <form method="post" asp-controller="Masters" asp-action="CreateVendor">
+
+            <form method="post" asp-controller="Masters" asp-action="CreateClient">
+
                 @Html.AntiForgeryToken()
+
                 <div class="modal-header bg-light">
+
                     <h5 class="modal-title fw-bold" style="color: var(--erp-primary); font-size: 16px;">
-                        <i class="fa-solid fa-truck-field me-2"></i>Register Supplier / Vendor
+
+                        <i class="fa-solid fa-user-tie me-2"></i>Register Enterprise Client
+
                     </h5>
+
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+
                 </div>
+
                 <div class="modal-body p-4">
+
                     <div class="row g-3">
+
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Vendor Code <span class="text-danger">*</span></label>
-                            <input type="text" name="vendorCode" class="form-control" value="VEN-@DateTime.Now.ToString("MMddHHmm")" required />
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Vendor Name <span class="text-danger">*</span></label>
-                            <input type="text" name="vendorName" id="createVendorName" class="form-control" placeholder="e.g. Apex Hardware Supplies" required />
-                        </div>
-                        <div class="col-md-6">
+
                             <label class="form-label fw-semibold d-flex justify-content-between align-items-center" style="font-size: 12.5px;">
-                                <span>GSTIN</span>
-                                <span class="text-muted" style="font-size: 11px;"><i class="fa-solid fa-bolt text-warning me-1"></i>Auto-fills PAN &amp; Details</span>
+
+                                <span>Client Code <span class="text-danger">*</span></span>
+
+                                <span class="text-primary" style="font-size: 11px;"><i class="fa-solid fa-pen-to-square me-1"></i>Editable</span>
+
                             </label>
+
+                            <input type="text" name="clientCode" class="form-control fw-semibold" value="CL-@DateTime.Now.ToString("MMddHHmm")" placeholder="e.g. CL-0101 or custom code" required />
+
+                        </div>
+
+                        <div class="col-md-6">
+
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Client / Company Name <span class="text-danger">*</span></label>
+
+                            <input type="text" name="clientName" id="createClientName" class="form-control" placeholder="e.g. Reliance Infra Ltd" required />
+
+                        </div>
+
+                        <div class="col-md-6">
+
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Client Category <span class="text-danger">*</span></label>
+
+                            <select name="clientCategory" id="createClientCategory" class="form-select">
+
+                                <option value="B2B" selected>B2B (Business to Business)</option>
+
+                                <option value="B2C">B2C (Retail / Consumer)</option>
+
+                                <option value="EXPORT">EXPORT (Overseas / SEZ)</option>
+
+                                <option value="GOVERNMENT">GOVERNMENT (Gov / PSU)</option>
+
+                            </select>
+
+                        </div>
+
+                        <div class="col-md-6">
+
+                            <label class="form-label fw-semibold d-flex justify-content-between align-items-center" style="font-size: 12.5px;">
+
+                                <span>GSTIN</span>
+
+                                <span class="text-muted" style="font-size: 11px;"><i class="fa-solid fa-bolt text-warning me-1"></i>Auto-fills PAN, State &amp; Details</span>
+
+                            </label>
+
                             <div class="input-group">
-                                <input type="text" name="gstin" id="createVendorGstin" class="form-control text-uppercase gstin-lookup-input" placeholder="e.g. 07AAAAA0000A1Z5" maxlength="15" autocomplete="off" />
-                                <button class="btn btn-outline-primary" type="button" id="btnFetchVendorGstin" title="Auto-Fetch Vendor details from GSTIN">
+
+                                <input type="text" name="gstin" id="createClientGstin" class="form-control text-uppercase gstin-lookup-input" placeholder="e.g. 07AAAAA0000A1Z5" maxlength="15" autocomplete="off" />
+
+                                <button class="btn btn-outline-primary" type="button" id="btnFetchClientGstin" title="Auto-Fetch Client details from GSTIN">
+
                                     <i class="fa-solid fa-wand-magic-sparkles me-1"></i> Auto-Fetch
+
                                 </button>
+
                             </div>
-                            <div id="vendorGstinFeedback" class="mt-1" style="font-size: 11.5px; display: none;"></div>
+
+                            <div id="clientGstinFeedback" class="mt-1" style="font-size: 11.5px; display: none;"></div>
+
                         </div>
+
                         <div class="col-md-6">
+
                             <label class="form-label fw-semibold" style="font-size: 12.5px;">PAN</label>
-                            <input type="text" name="pan" id="createVendorPan" class="form-control text-uppercase" placeholder="e.g. AAAAA0000A" maxlength="10" />
+
+                            <input type="text" name="pan" id="createClientPan" class="form-control text-uppercase" placeholder="e.g. AAAAA0000A" maxlength="10" />
+
                         </div>
+
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Category</label>
-                            <select name="vendorCategory" id="createVendorCategory" class="form-select">
-                                <option value="HARDWARE" selected>Hardware &amp; Equipment</option>
-                                <option value="SERVICES">Services &amp; Subcontractors</option>
-                                <option value="GENERAL">General Consumables</option>
-                            </select>
+
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Contact Person</label>
+
+                            <input type="text" name="contactPerson" id="createClientContactPerson" class="form-control" placeholder="e.g. Procurement Lead" />
+
                         </div>
+
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold" style="font-size: 12.5px;">MSME Classification</label>
-                            <select name="msmeType" id="createVendorMsmeType" class="form-select">
-                                <option value="">Non-MSME (Standard 30 Days)</option>
-                                <option value="MICRO">Micro Enterprise (45-Day Rule)</option>
-                                <option value="SMALL">Small Enterprise (45-Day Rule)</option>
-                                <option value="MEDIUM">Medium Enterprise</option>
-                            </select>
+
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Phone / Mobile</label>
+
+                            <input type="text" name="phone" id="createClientPhone" class="form-control" placeholder="e.g. +91 98765 43210" />
+
                         </div>
+
+                        <div class="col-md-6">
+
+                            <label class="form-label fw-semibold d-flex justify-content-between align-items-center" style="font-size: 12.5px;">
+
+                                <span>State Name</span>
+
+                                <span class="text-muted" style="font-size: 11px;"><i class="fa-solid fa-sync text-primary me-1"></i>Auto-syncs code</span>
+
+                            </label>
+
+                            <input type="text" name="stateName" id="createClientStateName" class="form-control" list="indianStatesList" placeholder="e.g. Delhi" onchange="window.syncStateToCode(this, 'createClientStateCode')" />
+
+                        </div>
+
+                        <div class="col-md-6">
+
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">State Code (GST)</label>
+
+                            <input type="text" name="stateCode" id="createClientStateCode" class="form-control" placeholder="e.g. 07" maxlength="2" onchange="window.syncCodeToState(this, 'createClientStateName')" />
+
+                        </div>
+
+                        <div class="col-12">
+
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Billing Address <span class="text-danger">*</span></label>
+
+                            <textarea name="billingAddress" id="createClientAddress" class="form-control" rows="2" placeholder="Complete statutory billing address..." required></textarea>
+
+                        </div>
+
                     </div>
+
                 </div>
+
                 <div class="modal-footer bg-light">
+
                     <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+
                     <button type="submit" class="btn btn-primary btn-sm px-4" style="background: var(--erp-primary);">
-                        <i class="fa-solid fa-check me-1"></i> Save Vendor
+
+                        <i class="fa-solid fa-check me-1"></i> Save Client
+
                     </button>
+
                 </div>
+
             </form>
+
         </div>
+
     </div>
+
 </div>
 
 <!-- ========================================================================= -->
-<!-- CREATE ITEM MODAL -->
+
+<!-- CREATE VENDOR MODAL -->
+
 <!-- ========================================================================= -->
-<div class="modal fade" id="createItemModal" tabindex="-1" aria-hidden="true">
+
+<div class="modal fade" id="createVendorModal" tabindex="-1" aria-hidden="true">
+
     <div class="modal-dialog modal-dialog-centered modal-lg">
+
         <div class="modal-content border-0 shadow">
-            <form method="post" asp-controller="Masters" asp-action="CreateItem">
+
+            <form method="post" asp-controller="Masters" asp-action="CreateVendor">
+
                 @Html.AntiForgeryToken()
+
                 <div class="modal-header bg-light">
+
                     <h5 class="modal-title fw-bold" style="color: var(--erp-primary); font-size: 16px;">
-                        <i class="fa-solid fa-box-archive me-2"></i>Add Consumable Item
+
+                        <i class="fa-solid fa-truck-field me-2"></i>Register Supplier / Vendor
+
                     </h5>
+
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+
                 </div>
+
                 <div class="modal-body p-4">
+
                     <div class="row g-3">
+
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Item Code <span class="text-danger">*</span></label>
-                            <input type="text" name="itemCode" class="form-control" value="ITM-@DateTime.Now.ToString("MMddHHmm")" required />
+
+                            <label class="form-label fw-semibold d-flex justify-content-between align-items-center" style="font-size: 12.5px;">
+
+                                <span>Vendor Code <span class="text-danger">*</span></span>
+
+                                <span class="text-primary" style="font-size: 11px;"><i class="fa-solid fa-pen-to-square me-1"></i>Editable</span>
+
+                            </label>
+
+                            <input type="text" name="vendorCode" class="form-control fw-semibold" value="VEN-@DateTime.Now.ToString("MMddHHmm")" placeholder="e.g. VEN-0101 or custom code" required />
+
                         </div>
+
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Item Name <span class="text-danger">*</span></label>
-                            <input type="text" name="itemName" class="form-control" placeholder="e.g. Cat6 Ethernet Cable (305m Roll)" required />
+
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Vendor Name <span class="text-danger">*</span></label>
+
+                            <input type="text" name="vendorName" id="createVendorName" class="form-control" placeholder="e.g. Apex Hardware Supplies" required />
+
                         </div>
+
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Unit Cost (&#8377;) <span class="text-danger">*</span></label>
-                            <input type="number" step="0.01" min="0" name="unitCost" class="form-control" placeholder="0.00" required />
+
+                            <label class="form-label fw-semibold d-flex justify-content-between align-items-center" style="font-size: 12.5px;">
+
+                                <span>GSTIN</span>
+
+                                <span class="text-muted" style="font-size: 11px;"><i class="fa-solid fa-bolt text-warning me-1"></i>Auto-fills PAN &amp; Details</span>
+
+                            </label>
+
+                            <div class="input-group">
+
+                                <input type="text" name="gstin" id="createVendorGstin" class="form-control text-uppercase gstin-lookup-input" placeholder="e.g. 07AAAAA0000A1Z5" maxlength="15" autocomplete="off" />
+
+                                <button class="btn btn-outline-primary" type="button" id="btnFetchVendorGstin" title="Auto-Fetch Vendor details from GSTIN">
+
+                                    <i class="fa-solid fa-wand-magic-sparkles me-1"></i> Auto-Fetch
+
+                                </button>
+
+                            </div>
+
+                            <div id="vendorGstinFeedback" class="mt-1" style="font-size: 11.5px; display: none;"></div>
+
                         </div>
+
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Minimum Reorder Level Qty</label>
-                            <input type="number" step="1" min="0" name="reorderLevelQty" class="form-control" placeholder="0" />
+
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">PAN</label>
+
+                            <input type="text" name="pan" id="createVendorPan" class="form-control text-uppercase" placeholder="e.g. AAAAA0000A" maxlength="10" />
+
                         </div>
+
+                        <div class="col-md-6">
+
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Category</label>
+
+                            <select name="vendorCategory" id="createVendorCategory" class="form-select">
+
+                                <option value="HARDWARE" selected>Hardware &amp; Equipment</option>
+
+                                <option value="SERVICES">Services &amp; Subcontractors</option>
+
+                                <option value="GENERAL">General Consumables</option>
+
+                            </select>
+
+                        </div>
+
+                        <div class="col-md-6">
+
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">MSME Classification</label>
+
+                            <select name="msmeType" id="createVendorMsmeType" class="form-select">
+
+                                <option value="">Non-MSME (Standard 30 Days)</option>
+
+                                <option value="MICRO">Micro Enterprise (45-Day Rule)</option>
+
+                                <option value="SMALL">Small Enterprise (45-Day Rule)</option>
+
+                                <option value="MEDIUM">Medium Enterprise</option>
+
+                            </select>
+
+                        </div>
+
+                        <div class="col-md-6">
+
+                            <label class="form-label fw-semibold d-flex justify-content-between align-items-center" style="font-size: 12.5px;">
+
+                                <span>State Name</span>
+
+                                <span class="text-muted" style="font-size: 11px;"><i class="fa-solid fa-sync text-primary me-1"></i>Auto-syncs code</span>
+
+                            </label>
+
+                            <input type="text" name="stateName" id="createVendorStateName" class="form-control" list="indianStatesList" placeholder="e.g. Delhi" onchange="window.syncStateToCode(this, 'createVendorStateCode')" />
+
+                        </div>
+
+                        <div class="col-md-6">
+
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">State Code (GST)</label>
+
+                            <input type="text" name="stateCode" id="createVendorStateCode" class="form-control" placeholder="e.g. 07" maxlength="2" onchange="window.syncCodeToState(this, 'createVendorStateName')" />
+
+                        </div>
+
                     </div>
+
                 </div>
+
                 <div class="modal-footer bg-light">
+
                     <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+
                     <button type="submit" class="btn btn-primary btn-sm px-4" style="background: var(--erp-primary);">
-                        <i class="fa-solid fa-check me-1"></i> Save Item
+
+                        <i class="fa-solid fa-check me-1"></i> Save Vendor
+
                     </button>
+
                 </div>
+
             </form>
+
         </div>
+
     </div>
+
 </div>
+
+<!-- ========================================================================= -->
+
+<!-- CREATE ITEM MODAL -->
+
+<!-- ========================================================================= -->
+
+<div class="modal fade" id="createItemModal" tabindex="-1" aria-hidden="true">
+
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+
+        <div class="modal-content border-0 shadow">
+
+            <form method="post" asp-controller="Masters" asp-action="CreateItem">
+
+                @Html.AntiForgeryToken()
+
+                <div class="modal-header bg-light">
+
+                    <h5 class="modal-title fw-bold" style="color: var(--erp-primary); font-size: 16px;">
+
+                        <i class="fa-solid fa-box-archive me-2"></i>Add Consumable Item
+
+                    </h5>
+
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+
+                </div>
+
+                <div class="modal-body p-4">
+
+                    <div class="row g-3">
+
+                        <div class="col-md-6">
+
+                            <label class="form-label fw-semibold d-flex justify-content-between align-items-center" style="font-size: 12.5px;">
+
+                                <span>Item Code <span class="text-danger">*</span></span>
+
+                                <span class="text-muted" style="font-size: 11px;"><i class="fa-solid fa-lock me-1"></i>Auto-Generated</span>
+
+                            </label>
+
+                            <input type="text" name="itemCode" class="form-control bg-light text-muted fw-semibold" value="ITM-@DateTime.Now.ToString("MMddHHmm")" readonly required />
+
+                        </div>
+
+                        <div class="col-md-6">
+
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Item Name <span class="text-danger">*</span></label>
+
+                            <input type="text" name="itemName" class="form-control" placeholder="e.g. Cat6 Ethernet Cable (305m Roll)" required />
+
+                        </div>
+
+                        <div class="col-md-6">
+
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Unit Cost (&#8377;) <span class="text-danger">*</span></label>
+
+                            <input type="number" step="0.01" min="0" name="unitCost" class="form-control" placeholder="0.00" required />
+
+                        </div>
+
+                        <div class="col-md-6">
+
+                            <label class="form-label fw-semibold" style="font-size: 12.5px;">Minimum Reorder Level Qty</label>
+
+                            <input type="number" step="1" min="0" name="reorderLevelQty" class="form-control" placeholder="0" />
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <div class="modal-footer bg-light">
+
+                    <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+
+                    <button type="submit" class="btn btn-primary btn-sm px-4" style="background: var(--erp-primary);">
+
+                        <i class="fa-solid fa-check me-1"></i> Save Item
+
+                    </button>
+
+                </div>
+
+            </form>
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- Shared Indian States Datalist for Auto-complete -->
+
+<datalist id="indianStatesList">
+
+@if (Model?.States != null && Model.States.Any())
+
+{
+
+    foreach (var st in Model.States.Where(x => x.IsActive))
+
+    {
+
+        <option value="@st.StateName" data-code="@st.StateCode">@st.StateCode - @st.StateName</option>
+
+    }
+
+}
+
+else
+
+{
+
+    <option value="Delhi" data-code="07">07 - Delhi</option>
+
+    <option value="Maharashtra" data-code="27">27 - Maharashtra</option>
+
+    <option value="Karnataka" data-code="29">29 - Karnataka</option>
+
+    <option value="Uttar Pradesh" data-code="09">09 - Uttar Pradesh</option>
+
+    <option value="Tamil Nadu" data-code="33">33 - Tamil Nadu</option>
+
+}
+
+</datalist>
 
 @section Scripts {
+
 <script>
-    (function () {
-        // Highlight animation helper
-        function flashField(el) {
-            if (!el) return;
-            el.style.transition = 'all 0.35s ease';
-            el.style.backgroundColor = '#EFF6FF';
-            el.style.borderColor = '#3B82F6';
-            setTimeout(() => {
-                el.style.backgroundColor = '';
-                el.style.borderColor = '';
-            }, 1200);
+
+    const stateCodeMap = {
+
+        '01': 'Jammu and Kashmir', '02': 'Himachal Pradesh', '03': 'Punjab', '04': 'Chandigarh',
+
+        '05': 'Uttarakhand', '06': 'Haryana', '07': 'Delhi', '08': 'Rajasthan',
+
+        '09': 'Uttar Pradesh', '10': 'Bihar', '11': 'Sikkim', '12': 'Arunachal Pradesh',
+
+        '13': 'Nagaland', '14': 'Manipur', '15': 'Mizoram', '16': 'Tripura',
+
+        '17': 'Meghalaya', '18': 'Assam', '19': 'West Bengal', '20': 'Jharkhand',
+
+        '21': 'Odisha', '22': 'Chhattisgarh', '23': 'Madhya Pradesh', '24': 'Gujarat',
+
+        '26': 'Dadra & Nagar Haveli and Daman & Diu', '27': 'Maharashtra', '29': 'Karnataka',
+
+        '30': 'Goa', '31': 'Lakshadweep', '32': 'Kerala', '33': 'Tamil Nadu',
+
+        '34': 'Puducherry', '35': 'Andaman and Nicobar Islands', '36': 'Telangana', '37': 'Andhra Pradesh',
+
+        '38': 'Ladakh'
+
+    };
+
+    const stateNameMap = {};
+
+    Object.keys(stateCodeMap).forEach(code => {
+
+        stateNameMap[stateCodeMap[code].toLowerCase()] = code;
+
+    });
+
+    window.syncStateToCode = function (nameInput, codeInputId) {
+
+        if (!nameInput) return;
+
+        const codeInput = document.getElementById(codeInputId);
+
+        if (!codeInput) return;
+
+        const inputVal = (nameInput.value || '').trim().toLowerCase();
+
+        const matchedCode = stateNameMap[inputVal];
+
+        if (matchedCode) {
+
+            codeInput.value = matchedCode;
+
+            if (window.flashField) window.flashField(codeInput);
+
         }
 
+    };
+
+    window.syncCodeToState = function (codeInput, nameInputId) {
+
+        if (!codeInput) return;
+
+        const nameInput = document.getElementById(nameInputId);
+
+        if (!nameInput) return;
+
+        const code = (codeInput.value || '').trim().padStart(2, '0');
+
+        const matchedName = stateCodeMap[code];
+
+        if (matchedName) {
+
+            nameInput.value = matchedName;
+
+            if (window.flashField) window.flashField(nameInput);
+
+        }
+
+    };
+
+    (function () {
+
+        // Highlight animation helper
+
+        function flashField(el) {
+
+            if (!el) return;
+
+            el.style.transition = 'all 0.35s ease';
+
+            el.style.backgroundColor = '#EFF6FF';
+
+            el.style.borderColor = '#3B82F6';
+
+            setTimeout(() => {
+
+                el.style.backgroundColor = '';
+
+                el.style.borderColor = '';
+
+            }, 1200);
+
+        }
+
+        window.flashField = flashField;
+
         // Generic GSTIN Auto-fetch function
+
         async function lookupGstin(gstinVal, targetType) {
+
             const cleanGstin = (gstinVal || '').trim().toUpperCase();
+
             const feedbackEl = document.getElementById(targetType === 'vendor' ? 'vendorGstinFeedback' : 'clientGstinFeedback');
+
             const nameEl = document.getElementById(targetType === 'vendor' ? 'createVendorName' : 'createClientName');
+
             const panEl = document.getElementById(targetType === 'vendor' ? 'createVendorPan' : 'createClientPan');
+
             const categoryEl = targetType === 'vendor' ? document.getElementById('createVendorCategory') : null;
+
             const msmeEl = targetType === 'vendor' ? document.getElementById('createVendorMsmeType') : null;
+
             const addrEl = targetType === 'client' ? document.getElementById('createClientAddress') : null;
+
             const contactEl = targetType === 'client' ? document.getElementById('createClientContactPerson') : null;
+
             const phoneEl = targetType === 'client' ? document.getElementById('createClientPhone') : null;
 
+            const stateCodeEl = document.getElementById(targetType === 'vendor' ? 'createVendorStateCode' : 'createClientStateCode');
+
+            const stateNameEl = document.getElementById(targetType === 'vendor' ? 'createVendorStateName' : 'createClientStateName');
+
             if (!cleanGstin || cleanGstin.length !== 15) {
+
                 if (feedbackEl) {
+
                     feedbackEl.style.display = 'block';
+
                     feedbackEl.innerHTML = '<span class="text-danger"><i class="fa-solid fa-circle-exclamation me-1"></i> GSTIN must be exactly 15 alphanumeric characters.</span>';
+
                 }
+
                 return;
+
             }
 
-            // Immediately derive 10-digit PAN from characters 3-12
+            // Immediately derive 10-digit PAN from characters 3-12 and 2-digit State from 1-2
+
             const derivedPan = cleanGstin.substring(2, 12);
+
             if (panEl && (!panEl.value || panEl.value.length !== 10)) {
+
                 panEl.value = derivedPan;
+
                 flashField(panEl);
+
+            }
+
+            const derivedStateCode = cleanGstin.substring(0, 2);
+
+            if (stateCodeEl && !stateCodeEl.value) {
+
+                stateCodeEl.value = derivedStateCode;
+
+                flashField(stateCodeEl);
+
+            }
+
+            if (stateNameEl && !stateNameEl.value && stateCodeMap[derivedStateCode]) {
+
+                stateNameEl.value = stateCodeMap[derivedStateCode];
+
+                flashField(stateNameEl);
+
             }
 
             if (feedbackEl) {
+
                 feedbackEl.style.display = 'block';
+
                 feedbackEl.innerHTML = '<span class="text-primary"><i class="fa-solid fa-spinner fa-spin me-1"></i> Verifying GSTIN &amp; fetching taxpayer details...</span>';
+
             }
 
             try {
+
                 const response = await fetch(`/Masters/LookupGstin?gstin=${encodeURIComponent(cleanGstin)}`);
+
                 if (!response.ok) throw new Error('Lookup failed');
+
                 const data = await response.json();
 
                 if (data && data.success) {
+
                     if (nameEl && data.tradeName) {
+
                         nameEl.value = data.tradeName;
+
                         flashField(nameEl);
+
                     }
+
                     if (panEl && data.pan) {
+
                         panEl.value = data.pan;
+
                         flashField(panEl);
+
                     }
+
                     if (categoryEl && data.category) {
+
                         categoryEl.value = data.category;
+
                         flashField(categoryEl);
+
                     }
+
                     if (msmeEl && data.msmeType !== undefined) {
+
                         msmeEl.value = data.msmeType;
+
                         flashField(msmeEl);
+
                     }
+
                     if (addrEl && data.address) {
+
                         addrEl.value = data.address;
+
                         flashField(addrEl);
+
                     }
+
                     if (contactEl && data.contactPerson) {
+
                         contactEl.value = data.contactPerson;
+
                         flashField(contactEl);
+
                     }
+
                     if (phoneEl && data.phone) {
+
                         phoneEl.value = data.phone;
+
                         flashField(phoneEl);
+
+                    }
+
+                    if (stateCodeEl && data.stateCode) {
+
+                        stateCodeEl.value = data.stateCode;
+
+                        flashField(stateCodeEl);
+
+                    }
+
+                    if (stateNameEl && data.stateName) {
+
+                        stateNameEl.value = data.stateName;
+
+                        flashField(stateNameEl);
+
                     }
 
                     if (feedbackEl) {
+
                         if (data.isKnown && data.tradeName) {
+
                             feedbackEl.innerHTML = `
+
                                 <div class="alert alert-success py-1 px-2 mb-0 d-flex align-items-center gap-2 border-0 shadow-sm" style="font-size: 11px; background: #ECFDF5; color: #065F46;">
+
                                     <i class="fa-solid fa-circle-check fs-6 text-success"></i>
+
                                     <div>
+
                                         <strong>GSTIN Verified: Active</strong> &bull; ${data.stateName} (${data.stateCode})<br>
+
                                         <span style="font-size: 10px; color: #047857;">Constitution: ${data.constitution}</span>
+
                                     </div>
+
                                 </div>`;
+
                         } else {
+
                             if (nameEl && !nameEl.value) {
+
                                 nameEl.focus();
+
                             }
+
                             feedbackEl.innerHTML = `
+
                                 <div class="alert alert-info py-1 px-2 mb-0 d-flex align-items-center gap-2 border-0 shadow-sm" style="font-size: 11px; background: #EFF6FF; color: #1E40AF;">
+
                                     <i class="fa-solid fa-circle-check fs-6 text-primary"></i>
+
                                     <div>
+
                                         <strong>GSTIN &amp; PAN (${data.pan}) Verified</strong> &bull; ${data.stateName} (${data.stateCode})<br>
+
                                         <span style="font-size: 10px; color: #2563EB;">Type: <strong>${data.constitution}</strong> &bull; Please enter the Trade / Company Name.</span>
+
                                     </div>
-                                </div>`;
+
+                                
+
+    
+
+</div>`;
+
                         }
+
                     }
+
                 } else {
+
                     if (feedbackEl) {
+
                         feedbackEl.innerHTML = `<span class="text-danger"><i class="fa-solid fa-circle-exclamation me-1"></i> ${data.message || 'Unable to retrieve details for this GSTIN.'}</span>`;
+
                     }
+
                 }
+
             } catch (err) {
+
                 console.error(err);
+
                 if (feedbackEl) {
+
                     feedbackEl.innerHTML = `<span class="text-danger"><i class="fa-solid fa-triangle-exclamation me-1"></i> Network error connecting to GSTIN verification service.</span>`;
+
                 }
+
             }
+
         }
 
         // Setup Vendor GSTIN handlers
+
         const vendorGstinInput = document.getElementById('createVendorGstin');
+
         const vendorPanInput = document.getElementById('createVendorPan');
+
         const btnFetchVendor = document.getElementById('btnFetchVendorGstin');
 
         if (vendorGstinInput) {
+
             vendorGstinInput.addEventListener('input', function (e) {
+
                 this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+
                 if (this.value.length >= 12 && vendorPanInput) {
+
                     vendorPanInput.value = this.value.substring(2, 12);
+
                 }
+
                 if (this.value.length === 15) {
+
                     lookupGstin(this.value, 'vendor');
+
                 }
+
             });
 
             vendorGstinInput.addEventListener('paste', function () {
+
                 setTimeout(() => {
+
                     this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+
                     if (this.value.length === 15) lookupGstin(this.value, 'vendor');
+
                 }, 50);
+
             });
+
         }
 
         if (btnFetchVendor && vendorGstinInput) {
+
             btnFetchVendor.addEventListener('click', function () {
+
                 lookupGstin(vendorGstinInput.value, 'vendor');
+
             });
+
         }
 
         // Setup Client GSTIN handlers
+
         const clientGstinInput = document.getElementById('createClientGstin');
+
         const clientPanInput = document.getElementById('createClientPan');
+
         const btnFetchClient = document.getElementById('btnFetchClientGstin');
 
         if (clientGstinInput) {
+
             clientGstinInput.addEventListener('input', function (e) {
+
                 this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+
                 if (this.value.length >= 12 && clientPanInput) {
+
                     clientPanInput.value = this.value.substring(2, 12);
+
                 }
+
                 if (this.value.length === 15) {
+
                     lookupGstin(this.value, 'client');
+
                 }
+
             });
 
             clientGstinInput.addEventListener('paste', function () {
+
                 setTimeout(() => {
+
                     this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+
                     if (this.value.length === 15) lookupGstin(this.value, 'client');
+
                 }, 50);
+
             });
+
         }
 
         if (btnFetchClient && clientGstinInput) {
+
             btnFetchClient.addEventListener('click', function () {
+
                 lookupGstin(clientGstinInput.value, 'client');
+
             });
+
         }
 
         // Support for edit vendor & client modals (auto-extract PAN)
+
         document.querySelectorAll('input[name="gstin"]').forEach(input => {
+
             if (input.id !== 'createVendorGstin' && input.id !== 'createClientGstin') {
+
                 input.addEventListener('input', function () {
+
                     this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+
                     const row = this.closest('.row');
+
                     if (row && this.value.length >= 12) {
+
                         const panField = row.querySelector('input[name="pan"]');
+
                         if (panField && (!panField.value || panField.value.length !== 10)) {
+
                             panField.value = this.value.substring(2, 12);
+
                             flashField(panField);
+
                         }
+
                     }
+
                 });
+
             }
+
         });
 
         // Dynamic Global Add Record Button behavior based on active tab
+
         const globalAddBtn = document.getElementById('btnGlobalAddRecord');
+
         const globalAddBtnText = document.getElementById('btnGlobalAddRecordText');
 
         const tabConfig = {
+
             '#clients': { modal: '#createClientModal', label: 'Add Client' },
+
             '#vendors': { modal: '#createVendorModal', label: 'Add Vendor' },
+
             '#items': { modal: '#createItemModal', label: 'Add Item' },
+
             '#projecttypes': { modal: '#createProjectTypeModal', label: 'Add Project Type' },
+
             '#expensetypes': { modal: '#createExpenseTypeModal', label: 'Add Expense Type' },
+
+            '#states': { modal: '#createStateModal', label: 'Add State' },
+
             '#tax': { modal: '', label: 'Add Record', hide: true },
+
             '#coa': { modal: '', label: 'Add Record', hide: true }
+
         };
 
         // Expense Types client-side search filter
+
         const expSearchInput = document.getElementById('expenseTypeSearchInput');
+
         if (expSearchInput) {
+
             expSearchInput.addEventListener('input', function () {
+
                 const term = this.value.toLowerCase().trim();
+
                 const rows = document.querySelectorAll('#expenseTypesTable tbody tr.expense-type-row');
+
                 rows.forEach(row => {
+
                     const name = row.getAttribute('data-name') || '';
+
                     const desc = row.getAttribute('data-desc') || '';
+
                     if (!term || name.includes(term) || desc.includes(term)) {
+
                         row.style.display = '';
+
                     } else {
+
                         row.style.display = 'none';
+
                     }
+
                 });
+
             });
+
         }
 
         // Expense Types edit & delete modal bindings
+
         document.querySelectorAll('.edit-exp-btn').forEach(btn => {
+
             btn.addEventListener('click', function () {
+
                 document.getElementById('editExpenseTypeId').value = this.getAttribute('data-id');
+
                 document.getElementById('editExpenseTypeName').value = this.getAttribute('data-name');
+
                 document.getElementById('editDescription').value = this.getAttribute('data-desc');
+
                 document.getElementById('editIsProjectRelated').checked = this.getAttribute('data-isproject') === 'true';
+
                 document.getElementById('editReceiveDirectPayments').checked = this.getAttribute('data-isdirect') === 'true';
+
                 document.getElementById('editOpeningAmount').value = this.getAttribute('data-opening') || '';
 
                 const modal = new bootstrap.Modal(document.getElementById('editExpenseTypeModal'));
+
                 modal.show();
+
             });
+
         });
 
         document.querySelectorAll('.delete-exp-btn').forEach(btn => {
+
             btn.addEventListener('click', function () {
+
                 const id = this.getAttribute('data-id');
+
                 const name = this.getAttribute('data-name');
+
                 document.getElementById('deleteExpenseTypeId').value = id;
+
                 document.getElementById('deleteExpenseTypeMessage').innerText = 'Are you sure you want to delete or deactivate "' + name + '"?';
 
                 const modal = new bootstrap.Modal(document.getElementById('deleteExpenseTypeModal'));
+
                 modal.show();
+
             });
+
         });
 
         function updateGlobalAddButton(targetId) {
+
             if (!globalAddBtn) return;
+
             const config = tabConfig[targetId] || { modal: '#createClientModal', label: 'Add Record' };
+
             if (config.hide) {
+
                 globalAddBtn.style.display = 'none';
+
             } else {
+
                 globalAddBtn.style.display = 'inline-flex';
+
                 globalAddBtn.setAttribute('data-bs-target', config.modal);
+
                 if (globalAddBtnText) globalAddBtnText.textContent = config.label;
+
             }
+
         }
 
         // Listen for tab switch
+
         const tabTriggerList = document.querySelectorAll('#masterTabs button[data-bs-toggle="pill"]');
+
         tabTriggerList.forEach(triggerEl => {
+
             triggerEl.addEventListener('shown.bs.tab', event => {
+
                 const targetId = event.target.getAttribute('data-bs-target');
+
                 updateGlobalAddButton(targetId);
+
                 if (history.replaceState) {
+
                     history.replaceState(null, null, targetId);
+
                 }
+
             });
+
         });
 
         // Handle URL hash or ?tab= query parameter on page load
+
         const urlParams = new URLSearchParams(window.location.search);
+
         const tabParam = urlParams.get('tab') || window.location.hash.replace('#', '');
+
         if (tabParam) {
+
             const tabBtn = document.getElementById(tabParam + '-tab');
+
             if (tabBtn) {
+
                 const bsTab = new bootstrap.Tab(tabBtn);
+
                 bsTab.show();
+
                 updateGlobalAddButton('#' + tabParam);
+
             }
+
         } else {
+
             const activeTab = document.querySelector('#masterTabs .nav-link.active');
+
             if (activeTab) {
+
                 updateGlobalAddButton(activeTab.getAttribute('data-bs-target'));
+
             }
+
         }
+
     })();
+
 </script>
+
 }
+

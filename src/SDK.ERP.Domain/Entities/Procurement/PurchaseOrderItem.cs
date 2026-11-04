@@ -6,6 +6,7 @@ public class PurchaseOrderItem
 {
     public long Id { get; set; }
     public long PoId { get; set; }
+    public long? PurchaseOrderId { get; set; }
     public long? ItemId { get; set; }
     public string ItemDescription { get; set; } = string.Empty;
     public string? HsnSacCode { get; set; }

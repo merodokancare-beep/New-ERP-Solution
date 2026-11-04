@@ -9,9 +9,11 @@ public class Vendor : ITenantEntity
     public long CompanyId { get; set; }
     public string VendorCode { get; set; } = string.Empty;
     public string VendorName { get; set; } = string.Empty;
-    public string VendorCategory { get; set; } = "GENERAL";
+    public string? VendorCategory { get; set; } = "GENERAL";
+    public string? StateCode { get; set; }
+    public string? StateName { get; set; }
     public string? Gstin { get; set; }
-    public string Pan { get; set; } = string.Empty;
+    public string? Pan { get; set; } = string.Empty;
     public string? MsmeType { get; set; }
     public string? BankName { get; set; }
     public string? BankAccountNo { get; set; }

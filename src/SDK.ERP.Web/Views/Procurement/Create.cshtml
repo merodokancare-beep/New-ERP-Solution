@@ -264,9 +264,9 @@
             </div>
         </div>
 
-        <!-- Row 2: Vendor Name & Project Name -->
+        <!-- Row 2: Vendor Name, Project Name & Expense Head -->
         <div class="row g-3 mb-3">
-            <div class="col-md-6">
+            <div class="col-md-4">
                 <label class="proc-label">Vendor Name <span class="text-danger">*</span></label>
                 <select name="vendorId" id="vendorId" class="form-select proc-input" required>
                     <option value="">--- Select Vendor Name ---</option>
@@ -278,7 +278,7 @@
                     }
                 </select>
             </div>
-            <div class="col-md-6">
+            <div class="col-md-4">
                 <label class="proc-label">Project Name (If Applicable)</label>
                 <select name="projectId" id="projectId" class="form-select proc-input">
                     <option value="">--- Select Project Name ---</option>
@@ -296,6 +296,17 @@
                         </option>
                     }
                 </select>
+            </div>
+            <div class="col-md-4">
+                <label class="proc-label">Expense Head / Ledger Account</label>
+                <input type="text" name="expenseHead" id="expenseHead" class="form-control proc-input" list="expenseHeadOptions" placeholder="e.g. Office Asset (Ledger - Computer &amp; Accessories)" />
+                <datalist id="expenseHeadOptions">
+                    <option value="Project (Ledger - Project Ledger)" />
+                    <option value="Office Asset (Ledger - Computer &amp; Accessories (Asset))" />
+                    <option value="Consumables &amp; Office Supplies" />
+                    <option value="Direct Engineering &amp; Service" />
+                    <option value="Plant &amp; Machinery (Asset)" />
+                </datalist>
             </div>
         </div>
 

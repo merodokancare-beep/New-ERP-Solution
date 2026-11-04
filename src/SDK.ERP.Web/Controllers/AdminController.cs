@@ -215,9 +215,15 @@ public class AdminController : Controller
                     // -------------------------------------------------------------
                     if (isAll)
                     {
+                        try { await _db.Database.ExecuteSqlRawAsync("DELETE FROM [dbo].[PurchaseOrderItems]"); } catch { }
+                        try { await _db.Database.ExecuteSqlRawAsync("DELETE FROM [dbo].[PurchaseBillItems]"); } catch { }
+                        try { await _db.Database.ExecuteSqlRawAsync("DELETE FROM [dbo].[GrnItems]"); } catch { }
+                        try { await _db.Database.ExecuteSqlRawAsync("DELETE FROM [dbo].[PurchaseRequisitionItems]"); } catch { }
+                        try { await _db.Database.ExecuteSqlRawAsync("DELETE FROM [dbo].[SalesInvoiceItems]"); } catch { }
+
                         await _db.GrnItems.IgnoreQueryFilters().ExecuteDeleteAsync();
                         await _db.PurchaseBillItems.IgnoreQueryFilters().ExecuteDeleteAsync();
-                        await _db.PurchaseOrderItems.IgnoreQueryFilters().ExecuteDeleteAsync();
+                        try { await _db.PurchaseOrderItems.IgnoreQueryFilters().ExecuteDeleteAsync(); } catch { }
                         await _db.PurchaseRequisitionItems.IgnoreQueryFilters().ExecuteDeleteAsync();
                         await _db.SalesInvoiceItems.IgnoreQueryFilters().ExecuteDeleteAsync();
                         await _db.JournalLines.IgnoreQueryFilters().ExecuteDeleteAsync();
@@ -233,11 +239,31 @@ public class AdminController : Controller
                         var jEntryIds = await _db.JournalEntries.Where(x => x.CompanyId == companyId).Select(x => x.Id).ToListAsync();
                         var runIds = await _db.PayrollRuns.Where(x => x.CompanyId == companyId).Select(x => x.Id).ToListAsync();
 
+                        if (poIds.Any())
+                        {
+                            var poIdsCsv = string.Join(",", poIds);
+                            try { await _db.Database.ExecuteSqlRawAsync($"DELETE FROM [dbo].[PurchaseOrderItems] WHERE [PurchaseOrderId] IN ({poIdsCsv}) OR [PoId] IN ({poIdsCsv})"); } catch { }
+                            try { await _db.Database.ExecuteSqlRawAsync($"DELETE FROM [dbo].[GoodsReceiptNotes] WHERE [PoId] IN ({poIdsCsv})"); } catch { }
+                        }
+                        if (billIds.Any())
+                        {
+                            var billIdsCsv = string.Join(",", billIds);
+                            try { await _db.Database.ExecuteSqlRawAsync($"DELETE FROM [dbo].[PurchaseBillItems] WHERE [PurchaseBillId] IN ({billIdsCsv})"); } catch { }
+                        }
+                        if (prIds.Any())
+                        {
+                            var prIdsCsv = string.Join(",", prIds);
+                            try { await _db.Database.ExecuteSqlRawAsync($"DELETE FROM [dbo].[PurchaseRequisitionItems] WHERE [PrId] IN ({prIdsCsv})"); } catch { }
+                        }
+                        if (invIds.Any())
+                        {
+                            var invIdsCsv = string.Join(",", invIds);
+                            try { await _db.Database.ExecuteSqlRawAsync($"DELETE FROM [dbo].[SalesInvoiceItems] WHERE [InvoiceId] IN ({invIdsCsv})"); } catch { }
+                        }
+
                         await _db.GrnItems.Where(x => grnIds.Contains(x.GrnId)).ExecuteDeleteAsync();
                         await _db.PurchaseBillItems.Where(x => billIds.Contains(x.PurchaseBillId)).ExecuteDeleteAsync();
-                        await _db.PurchaseOrderItems.Where(x => x.PurchaseOrder.CompanyId == companyId).ExecuteDeleteAsync();
-                        await _db.PurchaseOrderItems.Where(x => poIds.Contains(x.PoId)).ExecuteDeleteAsync();
-                        await _db.PurchaseRequisitionItems.Where(x => x.Requisition.CompanyId == companyId).ExecuteDeleteAsync();
+                        try { await _db.PurchaseOrderItems.Where(x => poIds.Contains(x.PoId)).ExecuteDeleteAsync(); } catch { }
                         await _db.PurchaseRequisitionItems.Where(x => prIds.Contains(x.PrId)).ExecuteDeleteAsync();
                         await _db.SalesInvoiceItems.Where(x => invIds.Contains(x.InvoiceId)).ExecuteDeleteAsync();
                         await _db.JournalLines.Where(x => jEntryIds.Contains(x.JournalEntryId)).ExecuteDeleteAsync();
@@ -280,6 +306,7 @@ public class AdminController : Controller
                     // -------------------------------------------------------------
                     if (isAll)
                     {
+                        try { await _db.Database.ExecuteSqlRawAsync("DELETE FROM [dbo].[PurchaseOrderItems]"); } catch { }
                         await _db.DirectExpenses.IgnoreQueryFilters().ExecuteDeleteAsync();
                         await _db.VendorPayments.IgnoreQueryFilters().ExecuteDeleteAsync();
                         await _db.PurchaseBills.IgnoreQueryFilters().ExecuteDeleteAsync();
@@ -302,6 +329,12 @@ public class AdminController : Controller
 
                         await _db.DirectExpenses.Where(x => x.CompanyId == companyId).ExecuteDeleteAsync();
                         await _db.VendorPayments.Where(x => x.CompanyId == companyId).ExecuteDeleteAsync();
+                        var currentPoIds = await _db.PurchaseOrders.Where(x => x.CompanyId == companyId).Select(x => x.Id).ToListAsync();
+                        if (currentPoIds.Any())
+                        {
+                            var poIdsCsv = string.Join(",", currentPoIds);
+                            try { await _db.Database.ExecuteSqlRawAsync($"DELETE FROM [dbo].[PurchaseOrderItems] WHERE [PurchaseOrderId] IN ({poIdsCsv}) OR [PoId] IN ({poIdsCsv})"); } catch { }
+                        }
                         await _db.PurchaseBills.Where(x => x.CompanyId == companyId).ExecuteDeleteAsync();
                         await _db.PurchaseOrders.Where(x => x.CompanyId == companyId).ExecuteDeleteAsync();
                         await _db.PurchaseRequisitions.Where(x => x.CompanyId == companyId).ExecuteDeleteAsync();

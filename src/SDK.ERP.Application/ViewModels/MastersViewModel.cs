@@ -12,4 +12,5 @@ public class MastersViewModel
     public List<AccountGroup> AccountGroups { get; set; } = new();
     public List<ProjectType> ProjectTypes { get; set; } = new();
     public List<ExpenseType> ExpenseTypes { get; set; } = new();
+    public List<StateMaster> States { get; set; } = new();
 }

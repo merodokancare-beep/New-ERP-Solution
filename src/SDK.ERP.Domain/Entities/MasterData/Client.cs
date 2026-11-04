@@ -9,12 +9,14 @@ public class Client : ITenantEntity
     public long CompanyId { get; set; }
     public string ClientCode { get; set; } = string.Empty;
     public string ClientName { get; set; } = string.Empty;
+    public string? ClientCategory { get; set; } = "B2B";
     public string? ContactPerson { get; set; }
     public string? Email { get; set; }
     public string? Phone { get; set; }
-    public string BillingAddress { get; set; } = string.Empty;
+    public string? BillingAddress { get; set; } = string.Empty;
     public string? ShippingAddress { get; set; }
-    public string StateCode { get; set; } = string.Empty;
+    public string? StateCode { get; set; } = string.Empty;
+    public string? StateName { get; set; }
     public string? Gstin { get; set; }
     public string? Pan { get; set; }
     public decimal CreditLimit { get; set; }
