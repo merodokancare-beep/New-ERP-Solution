@@ -195,6 +195,17 @@
 }
 
 <!-- ========================================================================= -->
+@if (ViewBag.DatabaseError != null)
+{
+    <div class="alert alert-danger shadow-sm mb-3 d-flex align-items-center gap-2">
+        <i class="fa-solid fa-triangle-exclamation fs-4"></i>
+        <div>
+            <strong>Database Schema Notice:</strong> Missing database columns on hosted server.
+            <div class="small mt-1">Please execute the migration script at the bottom of <code>SDK_ERP_Database_Complete.sql</code> in SQL Server Management Studio to complete the setup.</div>
+        </div>
+    </div>
+}
+
 <!-- TOP FILTERS BAR (Image 5: Vendor Name, Reference No, Status) -->
 <!-- ========================================================================= -->
 <div class="p-3 mb-3 rounded-3 shadow-sm" style="background: #FFFFFF; border: 1px solid #E2E8F0;">

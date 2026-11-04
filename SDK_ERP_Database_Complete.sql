@@ -995,13 +995,34 @@ CREATE TABLE [PurchaseOrders] (
     [ProjectId] bigint NULL,
     [PrId] bigint NULL,
     [PoNumber] nvarchar(max) NOT NULL,
+    [PoType] nvarchar(100) NULL,
     [PoDate] datetime2 NOT NULL,
     [DeliveryDueDate] datetime2 NULL,
+    [ShipTo] nvarchar(max) NULL,
+    [Remarks] nvarchar(max) NULL,
+    [TermsConditions] nvarchar(max) NULL,
     [TaxableAmount] decimal(18,2) NOT NULL,
     [GstAmount] decimal(18,2) NOT NULL,
+    [CgstAmount] decimal(18,2) NOT NULL DEFAULT 0,
+    [SgstAmount] decimal(18,2) NOT NULL DEFAULT 0,
+    [IgstAmount] decimal(18,2) NOT NULL DEFAULT 0,
     [TotalPoValue] decimal(18,2) NOT NULL,
-    [ApprovalStatus] nvarchar(max) NOT NULL,
+    [PaidAmount] decimal(18,2) NOT NULL DEFAULT 0,
+    [MarkedAmount] decimal(18,2) NOT NULL DEFAULT 0,
+    [MarkedPaymentType] nvarchar(50) NULL,
+    [ExpenseHead] nvarchar(250) NULL,
+    [ApprovalStatus] nvarchar(max) NOT NULL DEFAULT 'APPROVED',
     [ApprovedBy] bigint NULL,
+    [ApprovedAt] datetime2 NULL,
+    [CreatedBy] bigint NULL,
+    [CreatedByName] nvarchar(150) NULL,
+    [CreatedByRole] nvarchar(50) NULL,
+    [RejectionReason] nvarchar(max) NULL,
+    [MarkedForPaymentAt] datetime2 NULL,
+    [PaymentApprovedBy] bigint NULL,
+    [PaymentApprovedByName] nvarchar(150) NULL,
+    [PaymentApprovedAt] datetime2 NULL,
+    [PaymentApprovalRemarks] nvarchar(max) NULL,
     [RequisitionId] bigint NULL,
     [ApproverId] bigint NULL,
     CONSTRAINT [PK_PurchaseOrders] PRIMARY KEY ([Id]),
@@ -2608,77 +2629,133 @@ PRINT '  - Demo Masters: Clients, Vendors, Projects, POs, Delivery Challans, Inv
 PRINT '=============================================================================';
 
 
--- Migration for Procurement PO and VendorPayments
+-- Migration for Procurement PO Lifecycle, Multi-stage Approvals & Audit Trails
+-- 1. Ensure columns on [PurchaseOrders]
+IF OBJECT_ID(N'[PurchaseOrders]', N'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrders]') AND name = 'PoType')
+        ALTER TABLE [PurchaseOrders] ADD [PoType] NVARCHAR(100) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrders]') AND name = 'ShipTo')
+        ALTER TABLE [PurchaseOrders] ADD [ShipTo] NVARCHAR(MAX) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrders]') AND name = 'Remarks')
+        ALTER TABLE [PurchaseOrders] ADD [Remarks] NVARCHAR(MAX) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrders]') AND name = 'TermsConditions')
+        ALTER TABLE [PurchaseOrders] ADD [TermsConditions] NVARCHAR(MAX) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrders]') AND name = 'CgstAmount')
+        ALTER TABLE [PurchaseOrders] ADD [CgstAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrders]') AND name = 'SgstAmount')
+        ALTER TABLE [PurchaseOrders] ADD [SgstAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrders]') AND name = 'IgstAmount')
+        ALTER TABLE [PurchaseOrders] ADD [IgstAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrders]') AND name = 'PaidAmount')
+        ALTER TABLE [PurchaseOrders] ADD [PaidAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrders]') AND name = 'MarkedAmount')
+        ALTER TABLE [PurchaseOrders] ADD [MarkedAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrders]') AND name = 'MarkedPaymentType')
+        ALTER TABLE [PurchaseOrders] ADD [MarkedPaymentType] NVARCHAR(50) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrders]') AND name = 'ExpenseHead')
+        ALTER TABLE [PurchaseOrders] ADD [ExpenseHead] NVARCHAR(250) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrders]') AND name = 'CreatedBy')
+        ALTER TABLE [PurchaseOrders] ADD [CreatedBy] BIGINT NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrders]') AND name = 'CreatedByName')
+        ALTER TABLE [PurchaseOrders] ADD [CreatedByName] NVARCHAR(150) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrders]') AND name = 'CreatedByRole')
+        ALTER TABLE [PurchaseOrders] ADD [CreatedByRole] NVARCHAR(50) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrders]') AND name = 'ApprovedAt')
+        ALTER TABLE [PurchaseOrders] ADD [ApprovedAt] DATETIME2 NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrders]') AND name = 'RejectionReason')
+        ALTER TABLE [PurchaseOrders] ADD [RejectionReason] NVARCHAR(MAX) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrders]') AND name = 'MarkedForPaymentAt')
+        ALTER TABLE [PurchaseOrders] ADD [MarkedForPaymentAt] DATETIME2 NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrders]') AND name = 'PaymentApprovedBy')
+        ALTER TABLE [PurchaseOrders] ADD [PaymentApprovedBy] BIGINT NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrders]') AND name = 'PaymentApprovedByName')
+        ALTER TABLE [PurchaseOrders] ADD [PaymentApprovedByName] NVARCHAR(150) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrders]') AND name = 'PaymentApprovedAt')
+        ALTER TABLE [PurchaseOrders] ADD [PaymentApprovedAt] DATETIME2 NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrders]') AND name = 'PaymentApprovalRemarks')
+        ALTER TABLE [PurchaseOrders] ADD [PaymentApprovalRemarks] NVARCHAR(MAX) NULL;
+END
+GO
+
+-- 2. Ensure columns on [VendorPayments]
 IF OBJECT_ID(N'[VendorPayments]', N'U') IS NOT NULL
 BEGIN
     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[VendorPayments]') AND name = 'PoId')
-        ALTER TABLE [VendorPayments] ADD [PoId] bigint NULL;
+        ALTER TABLE [VendorPayments] ADD [PoId] BIGINT NULL;
     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[VendorPayments]') AND name = 'Remarks')
-        ALTER TABLE [VendorPayments] ADD [Remarks] nvarchar(max) NULL;
+        ALTER TABLE [VendorPayments] ADD [Remarks] NVARCHAR(MAX) NULL;
 END
 GO
 
-IF OBJECT_ID(N'[PurchaseOrders]', N'U') IS NOT NULL
-BEGIN
-    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrders]') AND name = 'PaidAmount')
-        ALTER TABLE [PurchaseOrders] ADD [PaidAmount] decimal(18,2) NOT NULL DEFAULT 0;
-    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrders]') AND name = 'MarkedAmount')
-        ALTER TABLE [PurchaseOrders] ADD [MarkedAmount] decimal(18,2) NOT NULL DEFAULT 0;
-    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrders]') AND name = 'MarkedPaymentType')
-        ALTER TABLE [PurchaseOrders] ADD [MarkedPaymentType] nvarchar(50) NULL;
-    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrders]') AND name = 'ExpenseHead')
-        ALTER TABLE [PurchaseOrders] ADD [ExpenseHead] nvarchar(250) NULL;
-END
-GO
-
-
+-- 3. Ensure columns on [PurchaseOrderItems]
 IF OBJECT_ID(N'[PurchaseOrderItems]', N'U') IS NOT NULL
 BEGIN
     IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrderItems]') AND name = 'PoId' AND is_nullable = 0)
-        ALTER TABLE [PurchaseOrderItems] ALTER COLUMN [PoId] bigint NULL;
+        ALTER TABLE [PurchaseOrderItems] ALTER COLUMN [PoId] BIGINT NULL;
     IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrderItems]') AND name = 'PurchaseOrderId' AND is_nullable = 0)
-        ALTER TABLE [PurchaseOrderItems] ALTER COLUMN [PurchaseOrderId] bigint NULL;
-    IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrderItems]') AND name = 'UnitId' AND is_nullable = 0)
-        ALTER TABLE [PurchaseOrderItems] ALTER COLUMN [UnitId] int NULL;
+        ALTER TABLE [PurchaseOrderItems] ALTER COLUMN [PurchaseOrderId] BIGINT NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrderItems]') AND name = 'PurchaseOrderId')
+        ALTER TABLE [PurchaseOrderItems] ADD [PurchaseOrderId] BIGINT NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrderItems]') AND name = 'GstRate')
+        ALTER TABLE [PurchaseOrderItems] ADD [GstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrderItems]') AND name = 'IgstRate')
+        ALTER TABLE [PurchaseOrderItems] ADD [IgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrderItems]') AND name = 'CgstRate')
+        ALTER TABLE [PurchaseOrderItems] ADD [CgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrderItems]') AND name = 'SgstRate')
+        ALTER TABLE [PurchaseOrderItems] ADD [SgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrderItems]') AND name = 'TaxAmount')
+        ALTER TABLE [PurchaseOrderItems] ADD [TaxAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;
     IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrderItems]') AND name = 'TaxRateId' AND is_nullable = 0)
-        ALTER TABLE [PurchaseOrderItems] ALTER COLUMN [TaxRateId] int NULL;
+        ALTER TABLE [PurchaseOrderItems] ALTER COLUMN [TaxRateId] INT NULL;
+    IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrderItems]') AND name = 'UnitId' AND is_nullable = 0)
+        ALTER TABLE [PurchaseOrderItems] ALTER COLUMN [UnitId] INT NULL;
 END
 GO
 
-
-IF OBJECT_ID(N'[PurchaseOrders]', N'U') IS NOT NULL
-BEGIN
-    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrders]') AND name = 'PaymentApprovedBy')
-        ALTER TABLE [PurchaseOrders] ADD [PaymentApprovedBy] bigint NULL;
-    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrders]') AND name = 'PaymentApprovedByName')
-        ALTER TABLE [PurchaseOrders] ADD [PaymentApprovedByName] nvarchar(150) NULL;
-    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrders]') AND name = 'PaymentApprovedAt')
-        ALTER TABLE [PurchaseOrders] ADD [PaymentApprovedAt] datetime2 NULL;
-    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrders]') AND name = 'PaymentApprovalRemarks')
-        ALTER TABLE [PurchaseOrders] ADD [PaymentApprovalRemarks] nvarchar(max) NULL;
-END
-GO
-
-
+-- 4. Ensure [PurchaseOrderLogs] table exists with both PoId and PurchaseOrderId
 IF OBJECT_ID(N'[PurchaseOrderLogs]', N'U') IS NULL
 BEGIN
     CREATE TABLE [PurchaseOrderLogs] (
-        [Id] bigint NOT NULL IDENTITY,
-        [PoId] bigint NOT NULL,
-        [ActionType] nvarchar(50) NOT NULL,
-        [Title] nvarchar(200) NOT NULL,
-        [Description] nvarchar(max) NULL,
-        [Amount] decimal(18,2) NULL,
-        [PaymentMode] nvarchar(50) NULL,
-        [VoucherOrRefNo] nvarchar(100) NULL,
-        [PerformedById] bigint NULL,
-        [PerformedByName] nvarchar(150) NOT NULL,
-        [PerformedByRole] nvarchar(50) NULL,
-        [Remarks] nvarchar(max) NULL,
-        [CreatedAt] datetime2 NOT NULL DEFAULT GETUTCDATE(),
+        [Id] BIGINT NOT NULL IDENTITY,
+        [PoId] BIGINT NOT NULL,
+        [PurchaseOrderId] BIGINT NULL,
+        [ActionType] NVARCHAR(50) NOT NULL,
+        [Title] NVARCHAR(200) NOT NULL,
+        [Description] NVARCHAR(MAX) NULL,
+        [Amount] DECIMAL(18,2) NULL,
+        [PaymentMode] NVARCHAR(50) NULL,
+        [VoucherOrRefNo] NVARCHAR(100) NULL,
+        [PerformedById] BIGINT NULL,
+        [PerformedByName] NVARCHAR(150) NOT NULL,
+        [PerformedByRole] NVARCHAR(50) NULL,
+        [Remarks] NVARCHAR(MAX) NULL,
+        [CreatedAt] DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
         CONSTRAINT [PK_PurchaseOrderLogs] PRIMARY KEY ([Id]),
         CONSTRAINT [FK_PurchaseOrderLogs_PurchaseOrders_PoId] FOREIGN KEY ([PoId]) REFERENCES [PurchaseOrders] ([Id]) ON DELETE CASCADE
     );
     CREATE INDEX [IX_PurchaseOrderLogs_PoId_CreatedAt] ON [PurchaseOrderLogs] ([PoId], [CreatedAt]);
+END
+ELSE
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrderLogs]') AND name = 'PurchaseOrderId')
+        ALTER TABLE [PurchaseOrderLogs] ADD [PurchaseOrderId] BIGINT NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrderLogs]') AND name = 'PoId')
+        ALTER TABLE [PurchaseOrderLogs] ADD [PoId] BIGINT NULL;
+END
+GO
+
+-- 5. Backfill amounts for legacy Purchase Orders
+IF OBJECT_ID(N'[PurchaseOrders]', N'U') IS NOT NULL
+BEGIN
+    IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrders]') AND name = 'PaidAmount')
+    BEGIN
+        EXEC('UPDATE [PurchaseOrders] SET [PaidAmount] = [TotalPoValue] WHERE [ApprovalStatus] = ''PAID'' AND ([PaidAmount] IS NULL OR [PaidAmount] = 0)');
+    END
+    IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrders]') AND name = 'MarkedAmount')
+    BEGIN
+        EXEC('UPDATE [PurchaseOrders] SET [MarkedAmount] = [TotalPoValue], [MarkedPaymentType] = ''FULL'' WHERE [ApprovalStatus] = ''MARKED_FOR_PAYMENT'' AND ([MarkedAmount] IS NULL OR [MarkedAmount] = 0)');
+    END
 END
 GO

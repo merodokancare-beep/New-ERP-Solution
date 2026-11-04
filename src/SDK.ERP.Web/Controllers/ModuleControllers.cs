@@ -4388,13 +4388,36 @@ public class ProcurementController : Controller
             }
         }
 
-        var purchaseOrders = await _db.PurchaseOrders
-            .Include(p => p.Vendor)
-            .Include(p => p.Project)
-            .OrderByDescending(p => p.PoDate)
-            .ThenByDescending(p => p.Id)
-            .AsNoTracking()
-            .ToListAsync();
+        List<PurchaseOrder> purchaseOrders;
+        try
+        {
+            purchaseOrders = await _db.PurchaseOrders
+                .Include(p => p.Vendor)
+                .Include(p => p.Project)
+                .OrderByDescending(p => p.PoDate)
+                .ThenByDescending(p => p.Id)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+        catch
+        {
+            await EnsurePurchaseOrderColumnsAsync();
+            try
+            {
+                purchaseOrders = await _db.PurchaseOrders
+                    .Include(p => p.Vendor)
+                    .Include(p => p.Project)
+                    .OrderByDescending(p => p.PoDate)
+                    .ThenByDescending(p => p.Id)
+                    .AsNoTracking()
+                    .ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                purchaseOrders = new List<PurchaseOrder>();
+                ViewBag.DatabaseError = ex.Message;
+            }
+        }
 
         // Load & Backfill PO Activity History Logs
         try
