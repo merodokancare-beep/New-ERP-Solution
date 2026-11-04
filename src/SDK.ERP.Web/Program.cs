@@ -82,6 +82,187 @@ using (var scope = app.Services.CreateScope())
             db.Database.EnsureCreated();
         }
 
+        // Independent isolated schema patches to guarantee critical columns exist
+        async Task RunPatchAsync(string sql)
+        {
+            try { await db.Database.ExecuteSqlRawAsync(sql); }
+            catch (Exception ex) { app.Logger.LogWarning("Schema patch note: {Msg}", ex.Message); }
+        }
+
+        // 1. Critical Vendor & Client columns (Fixes Invalid column name 'StateCode'/'StateName')
+        await RunPatchAsync("IF OBJECT_ID('[master].[vendors]') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[master].[vendors]') AND name = 'StateCode') ALTER TABLE [master].[vendors] ADD [StateCode] NVARCHAR(10) NULL;");
+        await RunPatchAsync("IF OBJECT_ID('[master].[vendors]') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[master].[vendors]') AND name = 'StateName') ALTER TABLE [master].[vendors] ADD [StateName] NVARCHAR(100) NULL;");
+        await RunPatchAsync("IF OBJECT_ID('[master].[vendors]') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[master].[vendors]') AND name = 'VendorCategory') ALTER TABLE [master].[vendors] ADD [VendorCategory] NVARCHAR(50) NULL DEFAULT 'GENERAL';");
+        await RunPatchAsync("IF OBJECT_ID('[master].[vendors]') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[master].[vendors]') AND name = 'MsmeType') ALTER TABLE [master].[vendors] ADD [MsmeType] NVARCHAR(50) NULL;");
+        await RunPatchAsync("IF OBJECT_ID('[master].[vendors]') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[master].[vendors]') AND name = 'BankName') ALTER TABLE [master].[vendors] ADD [BankName] NVARCHAR(150) NULL;");
+        await RunPatchAsync("IF OBJECT_ID('[master].[vendors]') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[master].[vendors]') AND name = 'BankAccountNo') ALTER TABLE [master].[vendors] ADD [BankAccountNo] NVARCHAR(50) NULL;");
+        await RunPatchAsync("IF OBJECT_ID('[master].[vendors]') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[master].[vendors]') AND name = 'IfscCode') ALTER TABLE [master].[vendors] ADD [IfscCode] NVARCHAR(20) NULL;");
+        await RunPatchAsync("IF OBJECT_ID('[master].[vendors]') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[master].[vendors]') AND name = 'PaymentTermsDays') ALTER TABLE [master].[vendors] ADD [PaymentTermsDays] INT NOT NULL DEFAULT 30;");
+
+        await RunPatchAsync("IF OBJECT_ID('[master].[clients]') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[master].[clients]') AND name = 'StateName') ALTER TABLE [master].[clients] ADD [StateName] NVARCHAR(100) NULL;");
+        await RunPatchAsync("IF OBJECT_ID('[master].[clients]') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[master].[clients]') AND name = 'ClientCategory') ALTER TABLE [master].[clients] ADD [ClientCategory] NVARCHAR(30) NULL DEFAULT 'B2B';");
+        await RunPatchAsync("IF OBJECT_ID('[master].[clients]') IS NOT NULL UPDATE [master].[clients] SET [ClientCategory] = 'B2B' WHERE [ClientCategory] IS NULL;");
+
+        // 2. Ensure master.states table
+        await RunPatchAsync(@"IF OBJECT_ID('[master].[states]') IS NULL
+        BEGIN
+            CREATE TABLE [master].[states] (
+                [Id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                [StateCode] NVARCHAR(10) NOT NULL,
+                [StateName] NVARCHAR(100) NOT NULL,
+                [StateType] NVARCHAR(50) NULL,
+                [IsActive] BIT NOT NULL DEFAULT 1
+            );
+        END");
+
+        // 3. Ensure DirectExpenses, CashWithdrawals, CashUtilisations, CashAllocations
+        await RunPatchAsync(@"IF OBJECT_ID('[DirectExpenses]') IS NULL AND OBJECT_ID('[dbo].[DirectExpenses]') IS NULL
+        BEGIN
+            CREATE TABLE [dbo].[DirectExpenses] (
+                [Id] BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                [CompanyId] BIGINT NOT NULL,
+                [ExpenseHead] NVARCHAR(250) NOT NULL,
+                [ExpenseHeadId] BIGINT NULL,
+                [IsVendorApplicable] BIT NOT NULL DEFAULT 0,
+                [VendorId] BIGINT NULL,
+                [LedgerId] BIGINT NULL,
+                [LedgerName] NVARCHAR(250) NOT NULL DEFAULT '',
+                [PaymentDate] DATETIME2 NOT NULL,
+                [Amount] DECIMAL(18,2) NOT NULL DEFAULT 0,
+                [IsPipelineProject] BIT NOT NULL DEFAULT 0,
+                [ProjectId] BIGINT NULL,
+                [Purpose] NVARCHAR(MAX) NOT NULL DEFAULT '',
+                [Remarks] NVARCHAR(MAX) NULL,
+                [Status] NVARCHAR(50) NOT NULL DEFAULT 'PENDING',
+                [CreatedByUserId] BIGINT NULL,
+                [CreatedByUserName] NVARCHAR(150) NULL,
+                [CreatedAt] DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+                [ApprovedByUserId] BIGINT NULL,
+                [ApprovedByUserName] NVARCHAR(150) NULL,
+                [ApprovedAt] DATETIME2 NULL,
+                [ApprovalRemarks] NVARCHAR(MAX) NULL,
+                [DeclinedByUserId] BIGINT NULL,
+                [DeclinedByUserName] NVARCHAR(150) NULL,
+                [DeclinedAt] DATETIME2 NULL,
+                [DeclineReason] NVARCHAR(MAX) NULL,
+                [SettledByUserId] BIGINT NULL,
+                [SettledByUserName] NVARCHAR(150) NULL,
+                [SettledAt] DATETIME2 NULL,
+                [SettlementPaymentMode] NVARCHAR(100) NULL,
+                [SettlementReference] NVARCHAR(150) NULL,
+                [SettlementBankAccountId] BIGINT NULL,
+                [SettlementBankName] NVARCHAR(150) NULL,
+                [SettlementNotes] NVARCHAR(MAX) NULL,
+                [JournalEntryId] BIGINT NULL
+            );
+        END");
+
+        await RunPatchAsync(@"IF OBJECT_ID('[CashWithdrawals]') IS NULL AND OBJECT_ID('[dbo].[CashWithdrawals]') IS NULL
+        BEGIN
+            CREATE TABLE [dbo].[CashWithdrawals] (
+                [Id] BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                [CompanyId] BIGINT NOT NULL,
+                [ReferenceNumber] NVARCHAR(50) NOT NULL,
+                [WithdrawalDate] DATETIME2 NOT NULL,
+                [SourceType] NVARCHAR(50) NOT NULL DEFAULT 'BANK_WITHDRAWAL',
+                [BankAccountId] BIGINT NULL,
+                [ChequeOrRefNo] NVARCHAR(100) NULL,
+                [Amount] DECIMAL(18,2) NOT NULL DEFAULT 0,
+                [UtilisedAmount] DECIMAL(18,2) NOT NULL DEFAULT 0,
+                [WithdrawnBy] NVARCHAR(150) NOT NULL DEFAULT '',
+                [Purpose] NVARCHAR(MAX) NOT NULL DEFAULT '',
+                [ApprovedBy] NVARCHAR(150) NOT NULL DEFAULT '',
+                [BankStatementLineId] BIGINT NULL,
+                [BankStatementRef] NVARCHAR(200) NULL,
+                [Status] NVARCHAR(50) NOT NULL DEFAULT 'OPEN',
+                [Notes] NVARCHAR(MAX) NULL,
+                [CreatedAt] DATETIME2 NOT NULL DEFAULT GETUTCDATE()
+            );
+        END");
+
+        await RunPatchAsync(@"IF OBJECT_ID('[CashUtilisations]') IS NULL AND OBJECT_ID('[dbo].[CashUtilisations]') IS NULL
+        BEGIN
+            CREATE TABLE [dbo].[CashUtilisations] (
+                [Id] BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                [CompanyId] BIGINT NOT NULL,
+                [CashWithdrawalId] BIGINT NOT NULL,
+                [UtilisationDate] DATETIME2 NOT NULL,
+                [ExpenseHead] NVARCHAR(200) NOT NULL,
+                [ExpenseHeadId] BIGINT NULL,
+                [LedgerId] BIGINT NULL,
+                [LedgerName] NVARCHAR(200) NOT NULL DEFAULT '',
+                [ProjectId] BIGINT NULL,
+                [Amount] DECIMAL(18,2) NOT NULL DEFAULT 0,
+                [VoucherNumber] NVARCHAR(50) NOT NULL DEFAULT '',
+                [SpentBy] NVARCHAR(150) NOT NULL DEFAULT '',
+                [Description] NVARCHAR(MAX) NOT NULL DEFAULT '',
+                [ReceiptAttachmentPath] NVARCHAR(500) NULL,
+                [Status] NVARCHAR(50) NOT NULL DEFAULT 'RECORDED',
+                [CreatedAt] DATETIME2 NOT NULL DEFAULT GETUTCDATE()
+            );
+        END");
+
+        await RunPatchAsync(@"IF OBJECT_ID('[CashAllocations]') IS NULL AND OBJECT_ID('[dbo].[CashAllocations]') IS NULL
+        BEGIN
+            CREATE TABLE [dbo].[CashAllocations] (
+                [Id] BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                [CompanyId] BIGINT NOT NULL,
+                [CashWithdrawalId] BIGINT NOT NULL,
+                [RecipientUserId] BIGINT NULL,
+                [RecipientName] NVARCHAR(150) NOT NULL,
+                [AllocatedAmount] DECIMAL(18,2) NOT NULL DEFAULT 0,
+                [UtilisedAmount] DECIMAL(18,2) NOT NULL DEFAULT 0,
+                [AllocationDate] DATETIME2 NOT NULL,
+                [Purpose] NVARCHAR(MAX) NOT NULL DEFAULT '',
+                [Status] NVARCHAR(50) NOT NULL DEFAULT 'ALLOCATED',
+                [Notes] NVARCHAR(MAX) NULL,
+                [CreatedAt] DATETIME2 NOT NULL DEFAULT GETUTCDATE()
+            );
+        END");
+
+        // 4. Ensure PurchaseOrderLogs audit table
+        await RunPatchAsync(@"IF OBJECT_ID(N'[PurchaseOrderLogs]', N'U') IS NULL
+        BEGIN
+            CREATE TABLE [PurchaseOrderLogs] (
+                [Id] BIGINT IDENTITY(1,1) NOT NULL,
+                [PurchaseOrderId] BIGINT NULL,
+                [PoId] BIGINT NULL,
+                [ActionType] NVARCHAR(100) NOT NULL,
+                [Title] NVARCHAR(200) NOT NULL,
+                [Description] NVARCHAR(MAX) NULL,
+                [Amount] DECIMAL(18,2) NULL,
+                [PaymentMode] NVARCHAR(50) NULL,
+                [VoucherOrRefNo] NVARCHAR(100) NULL,
+                [PerformedById] BIGINT NULL,
+                [PerformedByName] NVARCHAR(150) NOT NULL,
+                [PerformedByRole] NVARCHAR(50) NULL,
+                [Remarks] NVARCHAR(MAX) NULL,
+                [CreatedAt] DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+                CONSTRAINT [PK_PurchaseOrderLogs] PRIMARY KEY ([Id])
+            );
+            CREATE INDEX [IX_PurchaseOrderLogs_PoId_CreatedAt] ON [PurchaseOrderLogs] ([PoId], [CreatedAt]);
+        END");
+        await RunPatchAsync("IF OBJECT_ID(N'[PurchaseOrderLogs]') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrderLogs]') AND name = 'PoId') ALTER TABLE [PurchaseOrderLogs] ADD [PoId] BIGINT NULL;");
+        await RunPatchAsync("IF OBJECT_ID(N'[PurchaseOrderLogs]') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrderLogs]') AND name = 'PurchaseOrderId') ALTER TABLE [PurchaseOrderLogs] ADD [PurchaseOrderId] BIGINT NULL;");
+
+        // 5. Ensure PurchaseOrders columns exist
+        await RunPatchAsync("IF OBJECT_ID('[PurchaseOrders]') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[PurchaseOrders]') AND name = 'PoType') ALTER TABLE [PurchaseOrders] ADD [PoType] NVARCHAR(100) NULL;");
+        await RunPatchAsync("IF OBJECT_ID('[PurchaseOrders]') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[PurchaseOrders]') AND name = 'ShipTo') ALTER TABLE [PurchaseOrders] ADD [ShipTo] NVARCHAR(MAX) NULL;");
+        await RunPatchAsync("IF OBJECT_ID('[PurchaseOrders]') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[PurchaseOrders]') AND name = 'Remarks') ALTER TABLE [PurchaseOrders] ADD [Remarks] NVARCHAR(MAX) NULL;");
+        await RunPatchAsync("IF OBJECT_ID('[PurchaseOrders]') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[PurchaseOrders]') AND name = 'TermsConditions') ALTER TABLE [PurchaseOrders] ADD [TermsConditions] NVARCHAR(MAX) NULL;");
+        await RunPatchAsync("IF OBJECT_ID('[PurchaseOrders]') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[PurchaseOrders]') AND name = 'CgstAmount') ALTER TABLE [PurchaseOrders] ADD [CgstAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;");
+        await RunPatchAsync("IF OBJECT_ID('[PurchaseOrders]') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[PurchaseOrders]') AND name = 'SgstAmount') ALTER TABLE [PurchaseOrders] ADD [SgstAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;");
+        await RunPatchAsync("IF OBJECT_ID('[PurchaseOrders]') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[PurchaseOrders]') AND name = 'IgstAmount') ALTER TABLE [PurchaseOrders] ADD [IgstAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;");
+        await RunPatchAsync("IF OBJECT_ID('[PurchaseOrders]') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[PurchaseOrders]') AND name = 'ApprovedAt') ALTER TABLE [PurchaseOrders] ADD [ApprovedAt] DATETIME2 NULL;");
+        await RunPatchAsync("IF OBJECT_ID('[PurchaseOrders]') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[PurchaseOrders]') AND name = 'RejectionReason') ALTER TABLE [PurchaseOrders] ADD [RejectionReason] NVARCHAR(MAX) NULL;");
+        await RunPatchAsync("IF OBJECT_ID('[PurchaseOrders]') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[PurchaseOrders]') AND name = 'MarkedForPaymentAt') ALTER TABLE [PurchaseOrders] ADD [MarkedForPaymentAt] DATETIME2 NULL;");
+        await RunPatchAsync("IF OBJECT_ID('[PurchaseOrders]') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[PurchaseOrders]') AND name = 'MarkedPaymentType') ALTER TABLE [PurchaseOrders] ADD [MarkedPaymentType] NVARCHAR(50) NULL;");
+        await RunPatchAsync("IF OBJECT_ID('[PurchaseOrders]') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[PurchaseOrders]') AND name = 'MarkedAmount') ALTER TABLE [PurchaseOrders] ADD [MarkedAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;");
+        await RunPatchAsync("IF OBJECT_ID('[PurchaseOrders]') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[PurchaseOrders]') AND name = 'PaymentApprovedBy') ALTER TABLE [PurchaseOrders] ADD [PaymentApprovedBy] BIGINT NULL;");
+        await RunPatchAsync("IF OBJECT_ID('[PurchaseOrders]') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[PurchaseOrders]') AND name = 'PaymentApprovedByName') ALTER TABLE [PurchaseOrders] ADD [PaymentApprovedByName] NVARCHAR(150) NULL;");
+        await RunPatchAsync("IF OBJECT_ID('[PurchaseOrders]') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[PurchaseOrders]') AND name = 'PaymentApprovedAt') ALTER TABLE [PurchaseOrders] ADD [PaymentApprovedAt] DATETIME2 NULL;");
+        await RunPatchAsync("IF OBJECT_ID('[PurchaseOrders]') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[PurchaseOrders]') AND name = 'PaymentApprovalRemarks') ALTER TABLE [PurchaseOrders] ADD [PaymentApprovalRemarks] NVARCHAR(MAX) NULL;");
+
         // Ensure PAN, GSTIN, Company & User columns accommodate flexible inputs
         try
         {
