@@ -37,14 +37,63 @@ public class ExpensesController : Controller
             normalizedTab = "unsettled";
         }
 
-        // Base query for counts (optionally filtered by projectId)
-        var countQuery = _db.DirectExpenses.AsQueryable();
-        if (projectId.HasValue) countQuery = countQuery.Where(e => e.ProjectId == projectId.Value);
+        int unsettledCount = 0, settledCount = 0, pendingCount = 0, declinedCount = 0;
+        int totalRecords = 0, totalPages = 1;
+        var items = new List<DirectExpense>();
+        var projects = new List<Project>();
+        var bankAccounts = new List<BankAccount>();
 
-        var unsettledCount = await countQuery.CountAsync(e => e.Status == "UNSETTLED");
-        var settledCount = await countQuery.CountAsync(e => e.Status == "SETTLED");
-        var pendingCount = await countQuery.CountAsync(e => e.Status == "PENDING");
-        var declinedCount = await countQuery.CountAsync(e => e.Status == "DECLINED");
+        try
+        {
+            // Base query for counts (optionally filtered by projectId)
+            var countQuery = _db.DirectExpenses.AsQueryable();
+            if (projectId.HasValue) countQuery = countQuery.Where(e => e.ProjectId == projectId.Value);
+
+            unsettledCount = await countQuery.CountAsync(e => e.Status == "UNSETTLED");
+            settledCount = await countQuery.CountAsync(e => e.Status == "SETTLED");
+            pendingCount = await countQuery.CountAsync(e => e.Status == "PENDING");
+            declinedCount = await countQuery.CountAsync(e => e.Status == "DECLINED");
+
+            var query = _db.DirectExpenses
+                .Include(e => e.Vendor)
+                .Include(e => e.Project)
+                .Where(e => e.Status == normalizedTab.ToUpper());
+
+            if (projectId.HasValue)
+            {
+                query = query.Where(e => e.ProjectId == projectId.Value);
+            }
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var s = search.Trim();
+                query = query.Where(e => e.Purpose.Contains(s) ||
+                                         e.ExpenseHead.Contains(s) ||
+                                         e.LedgerName.Contains(s) ||
+                                         (e.Remarks != null && e.Remarks.Contains(s)) ||
+                                         (e.Project != null && (e.Project.ProjectName.Contains(s) || e.Project.ProjectCode.Contains(s))));
+            }
+
+            totalRecords = await query.CountAsync();
+            totalPages = Math.Max(1, (int)Math.Ceiling((double)totalRecords / pageSize));
+            if (page < 1) page = 1;
+            if (page > totalPages) page = totalPages;
+
+            items = await query
+                .OrderByDescending(e => e.PaymentDate)
+                .ThenByDescending(e => e.Id)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            ViewBag.DatabaseError = ex.Message;
+        }
+
+        try { projects = await _db.Projects.OrderBy(p => p.ProjectName).AsNoTracking().ToListAsync(); } catch { }
+        try { bankAccounts = await _db.BankAccounts.Where(b => b.IsActive).OrderBy(b => b.BankName).AsNoTracking().ToListAsync(); } catch { }
 
         ViewBag.ActiveTab = normalizedTab;
         ViewBag.Search = search ?? string.Empty;
@@ -53,50 +102,12 @@ public class ExpensesController : Controller
         ViewBag.SettledCount = settledCount;
         ViewBag.PendingCount = pendingCount;
         ViewBag.DeclinedCount = declinedCount;
-
-        var query = _db.DirectExpenses
-            .Include(e => e.Vendor)
-            .Include(e => e.Project)
-            .Where(e => e.Status == normalizedTab.ToUpper());
-
-        if (projectId.HasValue)
-        {
-            query = query.Where(e => e.ProjectId == projectId.Value);
-        }
-
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            var s = search.Trim();
-            query = query.Where(e => e.Purpose.Contains(s) ||
-                                     e.ExpenseHead.Contains(s) ||
-                                     e.LedgerName.Contains(s) ||
-                                     (e.Remarks != null && e.Remarks.Contains(s)) ||
-                                     (e.Project != null && (e.Project.ProjectName.Contains(s) || e.Project.ProjectCode.Contains(s))));
-        }
-
-        var totalRecords = await query.CountAsync();
-        var totalPages = Math.Max(1, (int)Math.Ceiling((double)totalRecords / pageSize));
-        if (page < 1) page = 1;
-        if (page > totalPages) page = totalPages;
-
-        var items = await query
-            .OrderByDescending(e => e.PaymentDate)
-            .ThenByDescending(e => e.Id)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .AsNoTracking()
-            .ToListAsync();
-
         ViewBag.Page = page;
         ViewBag.PageSize = pageSize;
         ViewBag.TotalRecords = totalRecords;
         ViewBag.TotalPages = totalPages;
-
-        // Load active projects for project filter dropdown
-        ViewBag.Projects = await _db.Projects.OrderBy(p => p.ProjectName).AsNoTracking().ToListAsync();
-
-        // Load bank accounts for settlement modal
-        ViewBag.BankAccounts = await _db.BankAccounts.Where(b => b.IsActive).OrderBy(b => b.BankName).AsNoTracking().ToListAsync();
+        ViewBag.Projects = projects;
+        ViewBag.BankAccounts = bankAccounts;
 
         return View(items);
     }

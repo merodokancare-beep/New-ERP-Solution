@@ -2905,3 +2905,116 @@ BEGIN
     END
 END
 GO
+
+-- 6. DirectExpenses, CashWithdrawals, CashUtilisations & CashAllocations
+IF OBJECT_ID(N'[DirectExpenses]', N'U') IS NULL AND OBJECT_ID(N'[dbo].[DirectExpenses]', N'U') IS NULL
+BEGIN
+    CREATE TABLE [dbo].[DirectExpenses] (
+        [Id] BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [CompanyId] BIGINT NOT NULL,
+        [ExpenseHead] NVARCHAR(250) NOT NULL,
+        [ExpenseHeadId] BIGINT NULL,
+        [IsVendorApplicable] BIT NOT NULL DEFAULT 0,
+        [VendorId] BIGINT NULL,
+        [LedgerId] BIGINT NULL,
+        [LedgerName] NVARCHAR(250) NOT NULL DEFAULT '',
+        [PaymentDate] DATETIME2 NOT NULL,
+        [Amount] DECIMAL(18,2) NOT NULL DEFAULT 0,
+        [IsPipelineProject] BIT NOT NULL DEFAULT 0,
+        [ProjectId] BIGINT NULL,
+        [Purpose] NVARCHAR(MAX) NOT NULL DEFAULT '',
+        [Remarks] NVARCHAR(MAX) NULL,
+        [Status] NVARCHAR(50) NOT NULL DEFAULT 'PENDING',
+        [CreatedByUserId] BIGINT NULL,
+        [CreatedByUserName] NVARCHAR(150) NULL,
+        [CreatedAt] DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+        [ApprovedByUserId] BIGINT NULL,
+        [ApprovedByUserName] NVARCHAR(150) NULL,
+        [ApprovedAt] DATETIME2 NULL,
+        [ApprovalRemarks] NVARCHAR(MAX) NULL,
+        [DeclinedByUserId] BIGINT NULL,
+        [DeclinedByUserName] NVARCHAR(150) NULL,
+        [DeclinedAt] DATETIME2 NULL,
+        [DeclineReason] NVARCHAR(MAX) NULL,
+        [SettledByUserId] BIGINT NULL,
+        [SettledByUserName] NVARCHAR(150) NULL,
+        [SettledAt] DATETIME2 NULL,
+        [SettlementPaymentMode] NVARCHAR(100) NULL,
+        [SettlementReference] NVARCHAR(150) NULL,
+        [SettlementBankAccountId] BIGINT NULL,
+        [SettlementBankName] NVARCHAR(150) NULL,
+        [SettlementNotes] NVARCHAR(MAX) NULL,
+        [JournalEntryId] BIGINT NULL
+    );
+    CREATE INDEX [IX_DirectExpenses_CompanyId_Status] ON [dbo].[DirectExpenses] ([CompanyId], [Status]);
+END
+GO
+
+IF OBJECT_ID(N'[CashWithdrawals]', N'U') IS NULL AND OBJECT_ID(N'[dbo].[CashWithdrawals]', N'U') IS NULL
+BEGIN
+    CREATE TABLE [dbo].[CashWithdrawals] (
+        [Id] BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [CompanyId] BIGINT NOT NULL,
+        [ReferenceNumber] NVARCHAR(50) NOT NULL,
+        [WithdrawalDate] DATETIME2 NOT NULL,
+        [SourceType] NVARCHAR(50) NOT NULL DEFAULT 'BANK_WITHDRAWAL',
+        [BankAccountId] BIGINT NULL,
+        [ChequeOrRefNo] NVARCHAR(100) NULL,
+        [Amount] DECIMAL(18,2) NOT NULL DEFAULT 0,
+        [UtilisedAmount] DECIMAL(18,2) NOT NULL DEFAULT 0,
+        [WithdrawnBy] NVARCHAR(150) NOT NULL DEFAULT '',
+        [Purpose] NVARCHAR(MAX) NOT NULL DEFAULT '',
+        [ApprovedBy] NVARCHAR(150) NOT NULL DEFAULT '',
+        [BankStatementLineId] BIGINT NULL,
+        [BankStatementRef] NVARCHAR(200) NULL,
+        [Status] NVARCHAR(50) NOT NULL DEFAULT 'OPEN',
+        [Notes] NVARCHAR(MAX) NULL,
+        [CreatedAt] DATETIME2 NOT NULL DEFAULT GETUTCDATE()
+    );
+    CREATE INDEX [IX_CashWithdrawals_CompanyId_WithdrawalDate] ON [dbo].[CashWithdrawals] ([CompanyId], [WithdrawalDate]);
+END
+GO
+
+IF OBJECT_ID(N'[CashUtilisations]', N'U') IS NULL AND OBJECT_ID(N'[dbo].[CashUtilisations]', N'U') IS NULL
+BEGIN
+    CREATE TABLE [dbo].[CashUtilisations] (
+        [Id] BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [CompanyId] BIGINT NOT NULL,
+        [VoucherNumber] NVARCHAR(50) NOT NULL,
+        [ExpenseDate] DATETIME2 NOT NULL,
+        [Amount] DECIMAL(18,2) NOT NULL DEFAULT 0,
+        [AllocatedAmount] DECIMAL(18,2) NOT NULL DEFAULT 0,
+        [Payee] NVARCHAR(200) NOT NULL DEFAULT '',
+        [ExpenseCategory] NVARCHAR(150) NOT NULL DEFAULT '',
+        [ExpenseAccountId] BIGINT NULL,
+        [ProjectId] BIGINT NULL,
+        [CostCenter] NVARCHAR(100) NULL,
+        [Purpose] NVARCHAR(MAX) NOT NULL DEFAULT '',
+        [AttachmentFileName] NVARCHAR(250) NULL,
+        [AttachmentFilePath] NVARCHAR(500) NULL,
+        [PaidBy] NVARCHAR(150) NOT NULL DEFAULT '',
+        [ApprovedBy] NVARCHAR(150) NOT NULL DEFAULT '',
+        [Status] NVARCHAR(50) NOT NULL DEFAULT 'DRAFT',
+        [CreatedAt] DATETIME2 NOT NULL DEFAULT GETUTCDATE()
+    );
+    CREATE INDEX [IX_CashUtilisations_CompanyId_ExpenseDate] ON [dbo].[CashUtilisations] ([CompanyId], [ExpenseDate]);
+END
+GO
+
+IF OBJECT_ID(N'[CashAllocations]', N'U') IS NULL AND OBJECT_ID(N'[dbo].[CashAllocations]', N'U') IS NULL
+BEGIN
+    CREATE TABLE [dbo].[CashAllocations] (
+        [Id] BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [CompanyId] BIGINT NOT NULL,
+        [WithdrawalId] BIGINT NOT NULL,
+        [UtilisationId] BIGINT NOT NULL,
+        [Amount] DECIMAL(18,2) NOT NULL DEFAULT 0,
+        [AllocationDate] DATETIME2 NOT NULL,
+        [AllocatedBy] NVARCHAR(150) NULL,
+        [IsManualOverride] BIT NOT NULL DEFAULT 0,
+        [Notes] NVARCHAR(MAX) NULL
+    );
+    CREATE INDEX [IX_CashAllocations_WithdrawalId] ON [dbo].[CashAllocations] ([WithdrawalId]);
+    CREATE INDEX [IX_CashAllocations_UtilisationId] ON [dbo].[CashAllocations] ([UtilisationId]);
+END
+GO

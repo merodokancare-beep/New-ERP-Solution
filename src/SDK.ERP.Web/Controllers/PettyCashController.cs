@@ -28,61 +28,102 @@ public class PettyCashController : Controller
         ViewData["ActiveMenu"] = "PettyCash";
         var companyId = GetTenantCompanyId();
 
-        var withdrawals = await _db.CashWithdrawals
-            .Include(w => w.BankAccount)
-            .Include(w => w.Allocations)
-                .ThenInclude(a => a.Utilisation)
-            .OrderByDescending(w => w.WithdrawalDate)
-            .ThenByDescending(w => w.Id)
-            .AsNoTracking()
-            .ToListAsync();
+        var withdrawals = new List<CashWithdrawal>();
+        var utilisations = new List<CashUtilisation>();
+        var allocations = new List<CashAllocation>();
+        var bankAccounts = new List<BankAccount>();
+        var projects = new List<Project>();
+        var expenseTypes = new List<ExpenseType>();
+        var bankTransactions = new List<BankTransaction>();
+        var users = new List<User>();
 
-        var utilisations = await _db.CashUtilisations
-            .Include(u => u.Project)
-            .Include(u => u.Allocations)
-                .ThenInclude(a => a.Withdrawal)
-            .OrderByDescending(u => u.ExpenseDate)
-            .ThenByDescending(u => u.Id)
-            .AsNoTracking()
-            .ToListAsync();
+        try
+        {
+            withdrawals = await _db.CashWithdrawals
+                .Include(w => w.BankAccount)
+                .Include(w => w.Allocations)
+                    .ThenInclude(a => a.Utilisation)
+                .OrderByDescending(w => w.WithdrawalDate)
+                .ThenByDescending(w => w.Id)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+        catch { }
 
-        var allocations = await _db.CashAllocations
-            .Include(a => a.Withdrawal)
-            .Include(a => a.Utilisation)
-            .OrderByDescending(a => a.AllocationDate)
-            .ThenByDescending(a => a.Id)
-            .AsNoTracking()
-            .ToListAsync();
+        try
+        {
+            utilisations = await _db.CashUtilisations
+                .Include(u => u.Project)
+                .Include(u => u.Allocations)
+                    .ThenInclude(a => a.Withdrawal)
+                .OrderByDescending(u => u.ExpenseDate)
+                .ThenByDescending(u => u.Id)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+        catch { }
 
-        var bankAccounts = await _db.BankAccounts
-            .Where(b => b.IsActive)
-            .OrderBy(b => b.BankName)
-            .AsNoTracking()
-            .ToListAsync();
+        try
+        {
+            allocations = await _db.CashAllocations
+                .Include(a => a.Withdrawal)
+                .Include(a => a.Utilisation)
+                .OrderByDescending(a => a.AllocationDate)
+                .ThenByDescending(a => a.Id)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+        catch { }
 
-        var projects = await _db.Projects
-            .OrderBy(p => p.ProjectName)
-            .AsNoTracking()
-            .ToListAsync();
+        try
+        {
+            bankAccounts = await _db.BankAccounts
+                .Where(b => b.IsActive)
+                .OrderBy(b => b.BankName)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+        catch { }
 
-        var expenseTypes = await _db.ExpenseTypes
-            .Where(e => e.IsActive)
-            .OrderBy(e => e.Name)
-            .AsNoTracking()
-            .ToListAsync();
+        try
+        {
+            projects = await _db.Projects
+                .OrderBy(p => p.ProjectName)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+        catch { }
 
-        var bankTransactions = await _db.BankTransactions
-            .Where(t => !t.IsReconciled)
-            .OrderByDescending(t => t.TransactionDate)
-            .Take(50)
-            .AsNoTracking()
-            .ToListAsync();
+        try
+        {
+            expenseTypes = await _db.ExpenseTypes
+                .Where(e => e.IsActive)
+                .OrderBy(e => e.Name)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+        catch { }
 
-        var users = await _db.Users
-            .Where(u => u.IsActive)
-            .OrderBy(u => u.FullName)
-            .AsNoTracking()
-            .ToListAsync();
+        try
+        {
+            bankTransactions = await _db.BankTransactions
+                .Where(t => !t.IsReconciled)
+                .OrderByDescending(t => t.TransactionDate)
+                .Take(50)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+        catch { }
+
+        try
+        {
+            users = await _db.Users
+                .Where(u => u.IsActive)
+                .OrderBy(u => u.FullName)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+        catch { }
 
         var totalInflow = withdrawals.Sum(w => w.Amount);
         var totalUtilised = utilisations.Where(u => u.Status != "DRAFT").Sum(u => u.Amount);
