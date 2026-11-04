@@ -170,7 +170,7 @@ using (var scope = app.Services.CreateScope())
                 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[admin].[companies]') AND name = 'TermsAndConditions')
                     ALTER TABLE [admin].[companies] ADD [TermsAndConditions] NVARCHAR(MAX) NULL;
 
-                // Ensure Self-Service User Profile Columns
+                -- Ensure Self-Service User Profile Columns
                 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[admin].[users]') AND name = 'FullName')
                     ALTER TABLE [admin].[users] ADD [FullName] NVARCHAR(150) NULL;
                 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[admin].[users]') AND name = 'Designation')
@@ -352,7 +352,7 @@ using (var scope = app.Services.CreateScope())
             app.Logger.LogError(ex, "Schema adjustment SQL error: {Message}", ex.Message);
         }
 
-        // Dedicated PurchaseOrders & PurchaseOrderItems Schema Migration
+        // Dedicated PurchaseOrders, VendorPayments & PurchaseOrderLogs Complete Schema Migration
         try
         {
             await db.Database.ExecuteSqlRawAsync(@"
@@ -372,6 +372,14 @@ using (var scope = app.Services.CreateScope())
                         ALTER TABLE [PurchaseOrders] ADD [SgstAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;
                     IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrders]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrders]')) AND name = 'IgstAmount')
                         ALTER TABLE [PurchaseOrders] ADD [IgstAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrders]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrders]')) AND name = 'PaidAmount')
+                        ALTER TABLE [PurchaseOrders] ADD [PaidAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrders]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrders]')) AND name = 'MarkedAmount')
+                        ALTER TABLE [PurchaseOrders] ADD [MarkedAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrders]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrders]')) AND name = 'MarkedPaymentType')
+                        ALTER TABLE [PurchaseOrders] ADD [MarkedPaymentType] NVARCHAR(50) NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrders]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrders]')) AND name = 'ExpenseHead')
+                        ALTER TABLE [PurchaseOrders] ADD [ExpenseHead] NVARCHAR(250) NULL;
                     IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrders]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrders]')) AND name = 'CreatedBy')
                         ALTER TABLE [PurchaseOrders] ADD [CreatedBy] BIGINT NULL;
                     IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrders]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrders]')) AND name = 'CreatedByName')
@@ -384,10 +392,32 @@ using (var scope = app.Services.CreateScope())
                         ALTER TABLE [PurchaseOrders] ADD [RejectionReason] NVARCHAR(MAX) NULL;
                     IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrders]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrders]')) AND name = 'MarkedForPaymentAt')
                         ALTER TABLE [PurchaseOrders] ADD [MarkedForPaymentAt] DATETIME2 NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrders]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrders]')) AND name = 'PaymentApprovedBy')
+                        ALTER TABLE [PurchaseOrders] ADD [PaymentApprovedBy] BIGINT NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrders]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrders]')) AND name = 'PaymentApprovedByName')
+                        ALTER TABLE [PurchaseOrders] ADD [PaymentApprovedByName] NVARCHAR(150) NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrders]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrders]')) AND name = 'PaymentApprovedAt')
+                        ALTER TABLE [PurchaseOrders] ADD [PaymentApprovedAt] DATETIME2 NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrders]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrders]')) AND name = 'PaymentApprovalRemarks')
+                        ALTER TABLE [PurchaseOrders] ADD [PaymentApprovalRemarks] NVARCHAR(MAX) NULL;
+                END
+
+                IF OBJECT_ID('[VendorPayments]') IS NOT NULL OR OBJECT_ID('[dbo].[VendorPayments]') IS NOT NULL
+                BEGIN
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[VendorPayments]') OR object_id = OBJECT_ID('[dbo].[VendorPayments]')) AND name = 'PoId')
+                        ALTER TABLE [VendorPayments] ADD [PoId] BIGINT NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[VendorPayments]') OR object_id = OBJECT_ID('[dbo].[VendorPayments]')) AND name = 'Remarks')
+                        ALTER TABLE [VendorPayments] ADD [Remarks] NVARCHAR(MAX) NULL;
                 END
 
                 IF OBJECT_ID('[PurchaseOrderItems]') IS NOT NULL OR OBJECT_ID('[dbo].[PurchaseOrderItems]') IS NOT NULL
                 BEGIN
+                    IF EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrderItems]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrderItems]')) AND name = 'PoId' AND is_nullable = 0)
+                        ALTER TABLE [PurchaseOrderItems] ALTER COLUMN [PoId] BIGINT NULL;
+                    IF EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrderItems]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrderItems]')) AND name = 'PurchaseOrderId' AND is_nullable = 0)
+                        ALTER TABLE [PurchaseOrderItems] ALTER COLUMN [PurchaseOrderId] BIGINT NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrderItems]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrderItems]')) AND name = 'PurchaseOrderId')
+                        ALTER TABLE [PurchaseOrderItems] ADD [PurchaseOrderId] BIGINT NULL;
                     IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrderItems]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrderItems]')) AND name = 'GstRate')
                         ALTER TABLE [PurchaseOrderItems] ADD [GstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
                     IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrderItems]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrderItems]')) AND name = 'IgstRate')
@@ -402,6 +432,44 @@ using (var scope = app.Services.CreateScope())
                         ALTER TABLE [PurchaseOrderItems] ALTER COLUMN [TaxRateId] INT NULL;
                     IF EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrderItems]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrderItems]')) AND name = 'UnitId' AND is_nullable = 0)
                         ALTER TABLE [PurchaseOrderItems] ALTER COLUMN [UnitId] INT NULL;
+                END
+
+                IF OBJECT_ID(N'[PurchaseOrderLogs]', N'U') IS NULL
+                BEGIN
+                    CREATE TABLE [PurchaseOrderLogs] (
+                        [Id] BIGINT NOT NULL IDENTITY,
+                        [PoId] BIGINT NOT NULL,
+                        [PurchaseOrderId] BIGINT NULL,
+                        [ActionType] NVARCHAR(50) NOT NULL,
+                        [Title] NVARCHAR(200) NOT NULL,
+                        [Description] NVARCHAR(MAX) NULL,
+                        [Amount] DECIMAL(18,2) NULL,
+                        [PaymentMode] NVARCHAR(50) NULL,
+                        [VoucherOrRefNo] NVARCHAR(100) NULL,
+                        [PerformedById] BIGINT NULL,
+                        [PerformedByName] NVARCHAR(150) NOT NULL,
+                        [PerformedByRole] NVARCHAR(50) NULL,
+                        [Remarks] NVARCHAR(MAX) NULL,
+                        [CreatedAt] DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+                        CONSTRAINT [PK_PurchaseOrderLogs] PRIMARY KEY ([Id]),
+                        CONSTRAINT [FK_PurchaseOrderLogs_PurchaseOrders_PoId] FOREIGN KEY ([PoId]) REFERENCES [PurchaseOrders] ([Id]) ON DELETE CASCADE
+                    );
+                    CREATE INDEX [IX_PurchaseOrderLogs_PoId_CreatedAt] ON [PurchaseOrderLogs] ([PoId], [CreatedAt]);
+                END
+                ELSE
+                BEGIN
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrderLogs]') AND name = 'PurchaseOrderId')
+                        ALTER TABLE [PurchaseOrderLogs] ADD [PurchaseOrderId] BIGINT NULL;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[PurchaseOrderLogs]') AND name = 'PoId')
+                        ALTER TABLE [PurchaseOrderLogs] ADD [PoId] BIGINT NULL;
+                END
+
+                IF OBJECT_ID('[PurchaseOrders]') IS NOT NULL OR OBJECT_ID('[dbo].[PurchaseOrders]') IS NOT NULL
+                BEGIN
+                    IF EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrders]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrders]')) AND name = 'PaidAmount')
+                        EXEC('UPDATE [PurchaseOrders] SET [PaidAmount] = [TotalPoValue] WHERE [ApprovalStatus] = ''PAID'' AND ([PaidAmount] IS NULL OR [PaidAmount] = 0)');
+                    IF EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[PurchaseOrders]') OR object_id = OBJECT_ID('[dbo].[PurchaseOrders]')) AND name = 'MarkedAmount')
+                        EXEC('UPDATE [PurchaseOrders] SET [MarkedAmount] = [TotalPoValue], [MarkedPaymentType] = ''FULL'' WHERE [ApprovalStatus] = ''MARKED_FOR_PAYMENT'' AND ([MarkedAmount] IS NULL OR [MarkedAmount] = 0)');
                 END
             ");
         }
