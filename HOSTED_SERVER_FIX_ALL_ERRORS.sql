@@ -476,6 +476,33 @@ BEGIN
 END
 GO
 
+-- =========================================================================================
+-- [9/9] PROJECT CLOSURE, SETTLEMENT & PREMATURE CLOSURE COLUMNS
+-- =========================================================================================
+PRINT '>>> [9/9] Ensuring Project Closure, Settlement & Premature Document columns...';
+
+IF OBJECT_ID('[project].[projects]') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[project].[projects]') AND name = 'ClosureReason')
+        ALTER TABLE [project].[projects] ADD [ClosureReason] NVARCHAR(250) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[project].[projects]') AND name = 'ClosureDocumentPath')
+        ALTER TABLE [project].[projects] ADD [ClosureDocumentPath] NVARCHAR(500) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[project].[projects]') AND name = 'ClosureDocumentName')
+        ALTER TABLE [project].[projects] ADD [ClosureDocumentName] NVARCHAR(250) NULL;
+END
+GO
+
+IF OBJECT_ID('[Projects]') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[Projects]') AND name = 'ClosureReason')
+        ALTER TABLE [Projects] ADD [ClosureReason] NVARCHAR(250) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[Projects]') AND name = 'ClosureDocumentPath')
+        ALTER TABLE [Projects] ADD [ClosureDocumentPath] NVARCHAR(500) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[Projects]') AND name = 'ClosureDocumentName')
+        ALTER TABLE [Projects] ADD [ClosureDocumentName] NVARCHAR(250) NULL;
+END
+GO
+
 PRINT '=========================================================================================';
 PRINT '  SUCCESS: ALL DATABASE TABLES, COLUMNS, SEEDS & AUDIT TRAILS ARE 100% REPAIRED!';
 PRINT '  Target URLs can now be loaded without error:';

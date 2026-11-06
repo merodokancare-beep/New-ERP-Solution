@@ -1987,6 +1987,12 @@ public class ProjectsController : Controller
                     ALTER TABLE [project].[projects] ADD [Division] NVARCHAR(200) NULL;
                 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[project].[projects]') AND name = 'PhysicalFileStatus')
                     ALTER TABLE [project].[projects] ADD [PhysicalFileStatus] NVARCHAR(100) NULL;
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[project].[projects]') AND name = 'ClosureReason')
+                    ALTER TABLE [project].[projects] ADD [ClosureReason] NVARCHAR(250) NULL;
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[project].[projects]') AND name = 'ClosureDocumentPath')
+                    ALTER TABLE [project].[projects] ADD [ClosureDocumentPath] NVARCHAR(500) NULL;
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[project].[projects]') AND name = 'ClosureDocumentName')
+                    ALTER TABLE [project].[projects] ADD [ClosureDocumentName] NVARCHAR(250) NULL;
 
                 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[Projects]') AND name = 'Description')
                     ALTER TABLE [Projects] ADD [Description] NVARCHAR(MAX) NULL;
@@ -1994,6 +2000,12 @@ public class ProjectsController : Controller
                     ALTER TABLE [Projects] ADD [Division] NVARCHAR(200) NULL;
                 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[Projects]') AND name = 'PhysicalFileStatus')
                     ALTER TABLE [Projects] ADD [PhysicalFileStatus] NVARCHAR(100) NULL;
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[Projects]') AND name = 'ClosureReason')
+                    ALTER TABLE [Projects] ADD [ClosureReason] NVARCHAR(250) NULL;
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[Projects]') AND name = 'ClosureDocumentPath')
+                    ALTER TABLE [Projects] ADD [ClosureDocumentPath] NVARCHAR(500) NULL;
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[Projects]') AND name = 'ClosureDocumentName')
+                    ALTER TABLE [Projects] ADD [ClosureDocumentName] NVARCHAR(250) NULL;
 
                 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[projects].[projects]') AND name = 'Description')
                     ALTER TABLE [projects].[projects] ADD [Description] NVARCHAR(MAX) NULL;
@@ -2001,6 +2013,12 @@ public class ProjectsController : Controller
                     ALTER TABLE [projects].[projects] ADD [Division] NVARCHAR(200) NULL;
                 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[projects].[projects]') AND name = 'PhysicalFileStatus')
                     ALTER TABLE [projects].[projects] ADD [PhysicalFileStatus] NVARCHAR(100) NULL;
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[projects].[projects]') AND name = 'ClosureReason')
+                    ALTER TABLE [projects].[projects] ADD [ClosureReason] NVARCHAR(250) NULL;
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[projects].[projects]') AND name = 'ClosureDocumentPath')
+                    ALTER TABLE [projects].[projects] ADD [ClosureDocumentPath] NVARCHAR(500) NULL;
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[projects].[projects]') AND name = 'ClosureDocumentName')
+                    ALTER TABLE [projects].[projects] ADD [ClosureDocumentName] NVARCHAR(250) NULL;
             ");
         }
         catch { }
@@ -2283,7 +2301,14 @@ public class ProjectsController : Controller
         project.StartDate = startDate == default ? project.StartDate : startDate;
         project.ExpectedEndDate = expectedEndDate;
         project.ManagerId = managerId.HasValue && managerId.Value > 0 ? managerId.Value : project.ManagerId;
-        project.Status = string.IsNullOrWhiteSpace(status) ? project.Status : status.Trim().ToUpperInvariant();
+        if ((status == "CLOSED" || status == "SCRAPPED") && project.Status != "CLOSED" && project.Status != "SCRAPPED")
+        {
+            TempData["ErrorMessage"] = "To close, complete, settle, or prematurely terminate a project, please use the Status / Close action button to provide the mandatory valid reason and upload the required supporting document.";
+        }
+        else
+        {
+            project.Status = string.IsNullOrWhiteSpace(status) ? project.Status : status.Trim().ToUpperInvariant();
+        }
         project.PhysicalFileStatus = string.IsNullOrWhiteSpace(physicalFileStatus) ? project.PhysicalFileStatus : physicalFileStatus.Trim();
         project.Description = description?.Trim();
         project.UpdatedAt = DateTime.UtcNow;
@@ -2319,41 +2344,141 @@ public class ProjectsController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> UpdateStatus(long id, string status)
+    public async Task<IActionResult> UpdateStatus(
+        long id,
+        string status,
+        string? closureType = null,
+        string? closureReason = null,
+        string? closureNotes = null,
+        DateTime? closureDate = null,
+        IFormFile? closureDocument = null)
     {
+        await EnsureProjectColumnsAsync();
         var project = await _db.Projects.FindAsync(id);
-        if (project != null)
+        if (project == null)
         {
-            project.Status = string.IsNullOrWhiteSpace(status) ? "OPEN" : status.Trim().ToUpperInvariant();
-            if (project.Status == "CLOSED")
+            TempData["ErrorMessage"] = "Project not found.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var normalizedStatus = string.IsNullOrWhiteSpace(status) ? "OPEN" : status.Trim().ToUpperInvariant();
+
+        // If target status is CLOSED or SCRAPPED (Premature, Completed, Settled)
+        if (normalizedStatus == "CLOSED" || normalizedStatus == "SCRAPPED")
+        {
+            if (closureDocument == null || closureDocument.Length == 0)
             {
-                project.ActualClosedDate = DateTime.Today;
+                TempData["ErrorMessage"] = "Every time a project is closed, settled, or prematurely terminated, uploading a related supporting document (Completion Certificate, Handover Sign-off, Settlement Agreement, or Premature Termination Letter) is STRICTLY MANDATORY!";
+                return RedirectToAction(nameof(Index));
+            }
+
+            if (string.IsNullOrWhiteSpace(closureNotes) || closureNotes.Trim().Length < 5)
+            {
+                TempData["ErrorMessage"] = "A valid detailed reason / justification is strictly mandatory to close, settle, or prematurely terminate this project!";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var ext = Path.GetExtension(closureDocument.FileName).ToLowerInvariant();
+            var allowedExtensions = new[] { ".pdf", ".docx", ".doc", ".xlsx", ".xls", ".zip", ".png", ".jpg", ".jpeg" };
+            if (!allowedExtensions.Contains(ext) || closureDocument.Length > 15 * 1024 * 1024)
+            {
+                TempData["ErrorMessage"] = "Closure document must be a valid file (PDF, Word, Excel, Scanned Sign-off Image, ZIP) under 15 MB.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var uploadsDir = Path.Combine(_env.WebRootPath, "uploads", "tenants", $"org_{project.CompanyId}", "project_closures");
+            if (!Directory.Exists(uploadsDir)) Directory.CreateDirectory(uploadsDir);
+
+            var safeFileName = $"CLOSURE_PRJ_{project.ProjectCode}_{DateTime.UtcNow:yyyyMMddHHmmss}{ext}";
+            var filePath = Path.Combine(uploadsDir, safeFileName);
+
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await closureDocument.CopyToAsync(stream);
+            }
+
+            var relativePath = $"/uploads/tenants/org_{project.CompanyId}/project_closures/{safeFileName}";
+            var effectiveUserId = await GetEffectiveUserIdAsync();
+            var attachment = new DocumentAttachment
+            {
+                EntityType = "ProjectClosure",
+                EntityId = project.Id,
+                FileName = closureDocument.FileName,
+                FilePath = relativePath,
+                FileSizeBytes = closureDocument.Length,
+                MimeType = closureDocument.ContentType ?? "application/octet-stream",
+                FileHashSha256 = Guid.NewGuid().ToString("N"),
+                UploadedBy = effectiveUserId,
+                UploaderId = effectiveUserId,
+                UploadedAt = DateTime.UtcNow,
+                VersionNumber = 1
+            };
+            _db.DocumentAttachments.Add(attachment);
+
+            var cleanReason = !string.IsNullOrWhiteSpace(closureReason) 
+                ? closureReason.Trim() 
+                : (!string.IsNullOrWhiteSpace(closureType) ? closureType.Trim() : (normalizedStatus == "SCRAPPED" ? "Premature Closure / Scrapped" : "Work Completed & Settled"));
+
+            project.Status = normalizedStatus;
+            project.ActualClosedDate = closureDate ?? DateTime.Today;
+            project.ClosureReason = cleanReason;
+            project.ClosureNotes = closureNotes.Trim();
+            project.ClosureDocumentPath = relativePath;
+            project.ClosureDocumentName = closureDocument.FileName;
+            project.ClosureApprovedBy = effectiveUserId;
+            project.UpdatedAt = DateTime.UtcNow;
+
+            await _db.SaveChangesAsync();
+            TempData["SuccessMessage"] = $"Project <strong>{project.ProjectCode}</strong> successfully marked as <strong>{project.Status}</strong> ({cleanReason}) with supporting document '<strong>{closureDocument.FileName}</strong>' archived!";
+        }
+        else
+        {
+            // Reopening / setting to OPEN or SUPPORT
+            project.Status = normalizedStatus;
+            if (project.Status == "OPEN" || project.Status == "SUPPORT")
+            {
+                project.ActualClosedDate = null;
             }
             project.UpdatedAt = DateTime.UtcNow;
             await _db.SaveChangesAsync();
-            TempData["SuccessMessage"] = $"Status of Project {project.ProjectCode} updated to {project.Status}.";
+            TempData["SuccessMessage"] = $"Status of Project <strong>{project.ProjectCode}</strong> updated to <strong>{project.Status}</strong>.";
         }
+
         return RedirectToAction(nameof(Index));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> CloseProject(long id, string? closureNotes, bool isPrematureClosure = false, IFormFile? closureDocument = null)
+    public async Task<IActionResult> CloseProject(
+        long id,
+        string? closureType,
+        string? closureReason,
+        string? closureNotes,
+        DateTime? closureDate,
+        bool isPrematureClosure = false,
+        IFormFile? closureDocument = null)
     {
+        await EnsureProjectColumnsAsync();
         var project = await _db.Projects.FindAsync(id);
         if (project != null)
         {
             if (closureDocument == null || closureDocument.Length == 0)
             {
-                TempData["ErrorMessage"] = "Project closure document / handover sign-off certificate is mandatory to close the project!";
+                TempData["ErrorMessage"] = "Every time a project is closed, settled, or prematurely terminated, uploading a related supporting document (Completion Certificate, Handover Sign-off, Settlement Agreement, or Premature Termination Letter) is STRICTLY MANDATORY!";
+                return RedirectToAction(nameof(Detail), new { id });
+            }
+
+            if (string.IsNullOrWhiteSpace(closureNotes) || closureNotes.Trim().Length < 5)
+            {
+                TempData["ErrorMessage"] = "A valid detailed reason / justification is strictly mandatory to close, settle, or prematurely terminate this project!";
                 return RedirectToAction(nameof(Detail), new { id });
             }
 
             var ext = Path.GetExtension(closureDocument.FileName).ToLowerInvariant();
-            var allowedExtensions = new[] { ".pdf", ".docx", ".xlsx", ".zip", ".png", ".jpg" };
-            if (!allowedExtensions.Contains(ext) || closureDocument.Length > 10 * 1024 * 1024)
+            var allowedExtensions = new[] { ".pdf", ".docx", ".doc", ".xlsx", ".xls", ".zip", ".png", ".jpg", ".jpeg" };
+            if (!allowedExtensions.Contains(ext) || closureDocument.Length > 15 * 1024 * 1024)
             {
-                TempData["ErrorMessage"] = "Closure certificate must be a valid document (PDF, Word, Excel, ZIP, Image) and under 10 MB.";
+                TempData["ErrorMessage"] = "Closure certificate must be a valid document (PDF, Word, Excel, Scanned Sign-off Image, ZIP) and under 15 MB.";
                 return RedirectToAction(nameof(Detail), new { id });
             }
 
@@ -2386,14 +2511,23 @@ public class ProjectsController : Controller
             };
             _db.DocumentAttachments.Add(attachment);
 
-            project.Status = "CLOSED";
-            project.ActualClosedDate = DateTime.Today;
-            var prefix = isPrematureClosure ? "[PREMATURE CLOSURE / SCOPE TERMINATION] " : "";
-            project.ClosureNotes = prefix + (string.IsNullOrWhiteSpace(closureNotes) ? "Project executed, delivered and financially closed." : closureNotes) + $" [Closure Certificate: {closureDocument.FileName}]";
+            var isPremature = isPrematureClosure || closureType == "PREMATURE_CLOSURE" || closureType == "SCRAPPED";
+            var cleanReason = !string.IsNullOrWhiteSpace(closureReason) 
+                ? closureReason.Trim() 
+                : (!string.IsNullOrWhiteSpace(closureType) ? closureType.Trim() : (isPremature ? "Premature Closure / Scrapped" : "Full Completion & Handover"));
+
+            project.Status = isPremature ? "SCRAPPED" : "CLOSED";
+            project.ActualClosedDate = closureDate ?? DateTime.Today;
+            project.ClosureReason = cleanReason;
+            project.ClosureNotes = closureNotes.Trim();
+            project.ClosureDocumentPath = relativePath;
+            project.ClosureDocumentName = closureDocument.FileName;
+            project.ClosureApprovedBy = effectiveUserId;
             project.UpdatedAt = DateTime.UtcNow;
+
             await _db.SaveChangesAsync();
 
-            TempData["SuccessMessage"] = $"Project {project.ProjectCode} has been formally closed and closure certificate '{closureDocument.FileName}' archived!";
+            TempData["SuccessMessage"] = $"Project {project.ProjectCode} has been formally closed ({cleanReason}) and supporting document '{closureDocument.FileName}' archived!";
         }
         return RedirectToAction(nameof(Detail), new { id });
     }

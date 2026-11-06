@@ -3018,3 +3018,15 @@ BEGIN
     CREATE INDEX [IX_CashAllocations_UtilisationId] ON [dbo].[CashAllocations] ([UtilisationId]);
 END
 GO
+
+-- Ensure Project Closure & Supporting Document columns
+IF OBJECT_ID('[project].[projects]') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[project].[projects]') AND name = 'ClosureReason')
+        ALTER TABLE [project].[projects] ADD [ClosureReason] NVARCHAR(250) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[project].[projects]') AND name = 'ClosureDocumentPath')
+        ALTER TABLE [project].[projects] ADD [ClosureDocumentPath] NVARCHAR(500) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[project].[projects]') AND name = 'ClosureDocumentName')
+        ALTER TABLE [project].[projects] ADD [ClosureDocumentName] NVARCHAR(250) NULL;
+END
+GO

@@ -263,6 +263,14 @@ using (var scope = app.Services.CreateScope())
         await RunPatchAsync("IF OBJECT_ID('[PurchaseOrders]') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[PurchaseOrders]') AND name = 'PaymentApprovedAt') ALTER TABLE [PurchaseOrders] ADD [PaymentApprovedAt] DATETIME2 NULL;");
         await RunPatchAsync("IF OBJECT_ID('[PurchaseOrders]') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[PurchaseOrders]') AND name = 'PaymentApprovalRemarks') ALTER TABLE [PurchaseOrders] ADD [PaymentApprovalRemarks] NVARCHAR(MAX) NULL;");
 
+        // 6. Ensure Projects closure columns exist
+        await RunPatchAsync("IF OBJECT_ID('[project].[projects]') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[project].[projects]') AND name = 'ClosureReason') ALTER TABLE [project].[projects] ADD [ClosureReason] NVARCHAR(250) NULL;");
+        await RunPatchAsync("IF OBJECT_ID('[project].[projects]') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[project].[projects]') AND name = 'ClosureDocumentPath') ALTER TABLE [project].[projects] ADD [ClosureDocumentPath] NVARCHAR(500) NULL;");
+        await RunPatchAsync("IF OBJECT_ID('[project].[projects]') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[project].[projects]') AND name = 'ClosureDocumentName') ALTER TABLE [project].[projects] ADD [ClosureDocumentName] NVARCHAR(250) NULL;");
+        await RunPatchAsync("IF OBJECT_ID('[Projects]') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[Projects]') AND name = 'ClosureReason') ALTER TABLE [Projects] ADD [ClosureReason] NVARCHAR(250) NULL;");
+        await RunPatchAsync("IF OBJECT_ID('[Projects]') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[Projects]') AND name = 'ClosureDocumentPath') ALTER TABLE [Projects] ADD [ClosureDocumentPath] NVARCHAR(500) NULL;");
+        await RunPatchAsync("IF OBJECT_ID('[Projects]') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[Projects]') AND name = 'ClosureDocumentName') ALTER TABLE [Projects] ADD [ClosureDocumentName] NVARCHAR(250) NULL;");
+
         // Ensure PAN, GSTIN, Company & User columns accommodate flexible inputs
         try
         {

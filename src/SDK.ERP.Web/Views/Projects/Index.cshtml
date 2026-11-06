@@ -660,7 +660,12 @@
                          data-status="@rawStatus"
                          data-status-category="@statusCategory"
                          data-physical-status="@physicalStatus"
-                         data-description="@desc">
+                         data-description="@desc"
+                         data-closure-reason="@(p.ClosureReason ?? "")"
+                         data-closure-notes="@(p.ClosureNotes ?? "")"
+                         data-closure-doc-path="@(p.ClosureDocumentPath ?? "")"
+                         data-closure-doc-name="@(p.ClosureDocumentName ?? "")"
+                         data-actual-closed-date="@(p.ActualClosedDate?.ToString("yyyy-MM-dd") ?? "")">
 
                         <!-- Center / Main Details Grid -->
                         <div class="project-details-grid">
@@ -724,6 +729,32 @@
                                         <span class="text-secondary">@desc</span>
                                     }
                                 </div>
+
+                                @if (statusCategory == "CLOSED" || statusCategory == "SCRAPPED" || !string.IsNullOrWhiteSpace(p.ClosureReason) || !string.IsNullOrWhiteSpace(p.ClosureDocumentPath))
+                                {
+                                    <div class="mt-2 p-2 rounded bg-light border d-flex flex-wrap align-items-center justify-content-between gap-2" style="font-size: 12px; border-left: 3px solid @(statusCategory == "CLOSED" ? "#10B981" : "#EF4444") !important;">
+                                        <div class="d-flex flex-wrap align-items-center gap-2">
+                                            <span class="badge @(statusCategory == "CLOSED" ? "bg-success" : "bg-danger") px-2 py-1" style="font-size: 11px; font-weight: 600;">
+                                                <i class="fa-solid @(statusCategory == "CLOSED" ? "fa-circle-check" : "fa-ban") me-1"></i>
+                                                @(string.IsNullOrWhiteSpace(p.ClosureReason) ? statusDisplay : p.ClosureReason)
+                                            </span>
+                                            @if (p.ActualClosedDate.HasValue)
+                                            {
+                                                <span class="text-muted"><i class="fa-regular fa-calendar-check me-1"></i>Closed on <strong>@p.ActualClosedDate.Value.ToString("dd MMM yyyy")</strong></span>
+                                            }
+                                            @if (!string.IsNullOrWhiteSpace(p.ClosureNotes))
+                                            {
+                                                <span class="text-secondary">&bull; <em>@p.ClosureNotes</em></span>
+                                            }
+                                        </div>
+                                        @if (!string.IsNullOrWhiteSpace(p.ClosureDocumentPath))
+                                        {
+                                            <a href="@p.ClosureDocumentPath" target="_blank" class="btn btn-sm btn-outline-success py-1 px-2 fw-semibold text-decoration-none shadow-sm" style="font-size: 11px;" title="Download / View Signed Closure Certificate or Document">
+                                                <i class="fa-solid fa-file-shield me-1"></i>@(string.IsNullOrWhiteSpace(p.ClosureDocumentName) ? "View Closure Certificate" : p.ClosureDocumentName)
+                                            </a>
+                                        }
+                                    </div>
+                                }
                             </div>
 
                             <!-- Right Side Meta (Status, Type, Date, Added By) -->
@@ -1038,32 +1069,117 @@
 </div>
 
 <!-- ========================================================================= -->
-<!-- 3. QUICK STATUS CHANGE MODAL -->
+<!-- 3. PROJECT STATUS & MANDATORY CLOSURE / SETTLEMENT GOVERNANCE MODAL -->
 <!-- ========================================================================= -->
 <div class="modal fade" id="statusChangeModal" tabindex="-1" aria-labelledby="statusChangeModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content border-0 shadow">
-            <form method="post" asp-controller="Projects" asp-action="UpdateStatus">
+            <form method="post" asp-controller="Projects" asp-action="UpdateStatus" enctype="multipart/form-data">
                 @Html.AntiForgeryToken()
                 <input type="hidden" name="id" id="statusProjectId" />
-                <div class="modal-header py-2 bg-light">
-                    <h6 class="modal-title fw-bold" id="statusChangeModalLabel" style="font-size: 13.5px;">
-                        <i class="fa-solid fa-arrows-rotate me-1 text-primary"></i> Change Status
-                    </h6>
+                <div class="modal-header py-3 bg-light border-bottom">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-primary-subtle text-primary p-2 rounded-circle fs-6">
+                            <i class="fa-solid fa-clipboard-check"></i>
+                        </span>
+                        <div>
+                            <h6 class="modal-title fw-bold text-dark mb-0" id="statusChangeModalLabel" style="font-size: 15px;">
+                                Project Status &amp; Mandatory Closure Governance
+                            </h6>
+                            <small class="text-muted" id="statusModalSubtitle">Project Details</small>
+                        </div>
+                    </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <div class="modal-body p-3">
-                    <p class="text-muted mb-2" style="font-size: 12px;" id="statusProjectText">Select new status:</p>
-                    <select name="status" id="quickStatusSelect" class="form-select form-select-sm mb-3">
-                        <option value="OPEN">Open</option>
-                        <option value="SUPPORT">Project Under Support</option>
-                        <option value="CLOSED">Closed</option>
-                        <option value="SCRAPPED">Close Scrapped</option>
-                    </select>
+                <div class="modal-body p-4">
+                    <!-- Existing Closure Record Banner (shown if project is already closed/scrapped) -->
+                    <div id="existingClosureBanner" class="alert alert-warning py-2 px-3 mb-3 d-none" style="font-size: 12.5px;">
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                            <div>
+                                <i class="fa-solid fa-clock-rotate-left me-1 text-warning"></i>
+                                <strong>Existing Record:</strong> <span id="existingClosureReason" class="fw-semibold"></span>
+                                <div class="text-muted small mt-1" id="existingClosureNotes"></div>
+                            </div>
+                            <div id="existingClosureDocContainer"></div>
+                        </div>
+                    </div>
+
+                    <!-- Target Status Selection -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark" style="font-size: 13px;">
+                            Select Project Status <span class="text-danger">*</span>
+                        </label>
+                        <select name="status" id="quickStatusSelect" class="form-select form-select-lg fw-semibold" style="font-size: 13.5px;" onchange="toggleClosureFields()">
+                            <option value="OPEN">Open (Active Project Execution)</option>
+                            <option value="SUPPORT">Project Under Support &amp; Maintenance</option>
+                            <option value="CLOSED">Closed (Completed &amp; Handed Over / Financially Settled)</option>
+                            <option value="SCRAPPED">Close Scrapped (Premature Termination / Cancelled)</option>
+                        </select>
+                    </div>
+
+                    <!-- Reopen Notice (for OPEN/SUPPORT) -->
+                    <div id="reopenNoticeSection" class="alert alert-info py-2 px-3 mb-3 d-none" style="font-size: 12.5px;">
+                        <i class="fa-solid fa-info-circle me-1"></i>
+                        Setting status to <strong>Open</strong> or <strong>Under Support</strong> keeps or re-opens this project for operational work orders, invoicing, and procurement.
+                    </div>
+
+                    <!-- Mandatory Closure, Settlement & Premature Termination Governance Panel -->
+                    <div id="closureGovernanceSection" class="p-3 rounded border bg-light-subtle mb-2">
+                        <div class="alert alert-danger py-2 px-3 mb-3 d-flex align-items-center gap-2 shadow-sm" style="font-size: 12px;">
+                            <i class="fa-solid fa-shield-halved fs-5 text-danger flex-shrink-0"></i>
+                            <div>
+                                <strong>Strict Governance Rule:</strong>
+                                Every time a project is <strong>closed</strong>, <strong>completed</strong>, <strong>settled</strong>, or <strong>prematurely closed/scrapped</strong>, you must provide a valid reason and upload a signed completion certificate, handover sign-off, settlement agreement, or termination authorization letter.
+                            </div>
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-md-7">
+                                <label class="form-label fw-bold" style="font-size: 12px;">
+                                    Closure Category / Reason Type <span class="text-danger">*</span>
+                                </label>
+                                <select name="closureType" id="statusClosureType" class="form-select form-select-sm">
+                                    <option value="Full Completion &amp; Handover">Full Completion &amp; Client Handover Sign-Off</option>
+                                    <option value="Financially Settled &amp; Billing Closed">Financially Settled, Retention Cleared &amp; Closed</option>
+                                    <option value="Premature Closure / Scope Terminated Early">Premature Closure / Scope Terminated Early by Client</option>
+                                    <option value="Close Scrapped / Non-Viable / Cancelled">Close Scrapped / Commercial Cancellation / Abandoned</option>
+                                    <option value="Completed Implementation &amp; Handed to Support">Completed Execution &amp; Transferred to Support / AMC</option>
+                                    <option value="Other Legitimate Reason">Other Authorized Business Reason</option>
+                                </select>
+                            </div>
+                            <div class="col-md-5">
+                                <label class="form-label fw-bold" style="font-size: 12px;">
+                                    Closure Date <span class="text-danger">*</span>
+                                </label>
+                                <input type="date" name="closureDate" id="statusClosureDate" class="form-control form-control-sm" value="@DateTime.Today.ToString("yyyy-MM-dd")" />
+                            </div>
+
+                            <div class="col-12">
+                                <label class="form-label fw-bold" style="font-size: 12px;">
+                                    Valid Reason &amp; Detailed Justification <span class="text-danger">*</span>
+                                </label>
+                                <textarea name="closureNotes" id="statusClosureNotes" class="form-control" rows="3" placeholder="Provide clear explanation and background for closing, settling, or prematurely terminating this project (minimum 5 characters)..."></textarea>
+                                <small class="text-muted" style="font-size: 11px;">Explain the scope completion, client acceptance, retention clearance, or premature termination grounds.</small>
+                            </div>
+
+                            <div class="col-12">
+                                <label class="form-label fw-bold" style="font-size: 12px;">
+                                    Upload Related Supporting Document <span class="text-danger">*</span>
+                                </label>
+                                <input type="file" name="closureDocument" id="statusClosureDocument" class="form-control" accept=".pdf,.docx,.doc,.xlsx,.xls,.zip,.png,.jpg,.jpeg" />
+                                <small class="text-muted" style="font-size: 11px;">
+                                    <i class="fa-solid fa-file-arrow-up text-primary me-1"></i>
+                                    Accepted formats: PDF, Word, Excel, Scanned Sign-off Image, ZIP (Max 15 MB). File will be archived in the project records.
+                                </small>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="modal-footer py-2 bg-light">
-                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-success btn-sm px-3 fw-semibold">Save Status</button>
+                <div class="modal-footer py-2 bg-light border-top">
+                    <button type="button" class="btn btn-outline-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" id="btnSaveStatusSubmit" class="btn btn-success btn-sm px-4 fw-semibold">
+                        <i class="fa-solid fa-check me-1"></i> Save Status &amp; Document
+                    </button>
                 </div>
             </form>
         </div>
@@ -1271,13 +1387,90 @@
         modal.show();
     }
 
-    // Modal Handlers: Open Status Change Modal
+    // Modal Handlers: Open Status Change & Closure Modal
     function openStatusModal(projectId, currentStatus, projectCode) {
+        const item = document.querySelector(`.project-row-item[data-project-id="${projectId}"]`);
+        if (!item) return;
+
+        const pName = item.dataset.projectName || "";
+        const cName = item.dataset.clientName || "";
+        const rawStatus = (currentStatus || item.dataset.status || "OPEN").trim().toUpperCase();
+        const closureReason = item.dataset.closureReason || "";
+        const closureNotes = item.dataset.closureNotes || "";
+        const closureDocPath = item.dataset.closureDocPath || "";
+        const closureDocName = item.dataset.closureDocName || "Closure Certificate";
+        const actualClosedDate = item.dataset.actualClosedDate || "";
+
         document.getElementById("statusProjectId").value = projectId;
-        document.getElementById("statusProjectText").textContent = `Update status for ${projectCode}:`;
-        document.getElementById("quickStatusSelect").value = currentStatus || "OPEN";
+        document.getElementById("statusModalSubtitle").textContent = `${projectCode} - ${pName} | Client: ${cName} (Current: ${rawStatus})`;
+
+        const quickStatusSelect = document.getElementById("quickStatusSelect");
+        quickStatusSelect.value = (rawStatus === "ACTIVE" || rawStatus === "OPEN") ? "OPEN" : rawStatus;
+
+        // Existing closure info display
+        const existingBanner = document.getElementById("existingClosureBanner");
+        const existingDocContainer = document.getElementById("existingClosureDocContainer");
+        if (rawStatus === "CLOSED" || rawStatus === "SCRAPPED" || closureReason || closureDocPath) {
+            existingBanner.classList.remove("d-none");
+            document.getElementById("existingClosureReason").textContent = closureReason || rawStatus;
+            document.getElementById("existingClosureNotes").textContent = closureNotes ? `Notes: ${closureNotes}` : "";
+            if (closureDocPath) {
+                existingDocContainer.innerHTML = `<a href="${closureDocPath}" target="_blank" class="btn btn-sm btn-outline-success fw-semibold"><i class="fa-solid fa-file-shield me-1"></i>${closureDocName}</a>`;
+            } else {
+                existingDocContainer.innerHTML = `<span class="badge bg-warning text-dark">No Document Attached</span>`;
+            }
+        } else {
+            existingBanner.classList.add("d-none");
+            existingDocContainer.innerHTML = "";
+        }
+
+        if (actualClosedDate) {
+            document.getElementById("statusClosureDate").value = actualClosedDate;
+        }
+
+        if (closureReason) {
+            const closureTypeSelect = document.getElementById("statusClosureType");
+            for (let i = 0; i < closureTypeSelect.options.length; i++) {
+                if (closureTypeSelect.options[i].value === closureReason) {
+                    closureTypeSelect.selectedIndex = i;
+                    break;
+                }
+            }
+        }
+
+        if (closureNotes) {
+            document.getElementById("statusClosureNotes").value = closureNotes;
+        }
+
+        toggleClosureFields();
+
         const modal = new bootstrap.Modal(document.getElementById("statusChangeModal"));
         modal.show();
+    }
+
+    function toggleClosureFields() {
+        const status = document.getElementById("quickStatusSelect").value;
+        const closureSection = document.getElementById("closureGovernanceSection");
+        const reopenNotice = document.getElementById("reopenNoticeSection");
+        const notesInput = document.getElementById("statusClosureNotes");
+        const docInput = document.getElementById("statusClosureDocument");
+        const btnSubmit = document.getElementById("btnSaveStatusSubmit");
+
+        if (status === "CLOSED" || status === "SCRAPPED") {
+            closureSection.classList.remove("d-none");
+            reopenNotice.classList.add("d-none");
+            notesInput.required = true;
+            docInput.required = true;
+            btnSubmit.innerHTML = `<i class="fa-solid fa-award me-1"></i> Confirm &amp; Save Closure Document`;
+            btnSubmit.className = status === "CLOSED" ? "btn btn-success btn-sm px-4 fw-semibold" : "btn btn-danger btn-sm px-4 fw-semibold";
+        } else {
+            closureSection.classList.add("d-none");
+            reopenNotice.classList.remove("d-none");
+            notesInput.required = false;
+            docInput.required = false;
+            btnSubmit.innerHTML = `<i class="fa-solid fa-check me-1"></i> Update Status to ${status}`;
+            btnSubmit.className = "btn btn-primary btn-sm px-4 fw-semibold";
+        }
     }
 
     // Modal Handlers: Open Delete Modal

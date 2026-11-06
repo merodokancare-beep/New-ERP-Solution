@@ -439,6 +439,41 @@
                                 <span class="text-secondary">N/A</span>
                             }
                         </div>
+
+                        @if (Model.Status == "CLOSED" || Model.Status == "SCRAPPED" || !string.IsNullOrWhiteSpace(Model.ClosureReason) || !string.IsNullOrWhiteSpace(Model.ClosureDocumentPath))
+                        {
+                            <div class="mt-3 p-3 rounded bg-light border" style="border-left: 4px solid @(Model.Status == "CLOSED" ? "#10B981" : "#EF4444") !important;">
+                                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="badge @(Model.Status == "CLOSED" ? "bg-success" : "bg-danger") px-2 py-1 fs-6">
+                                            <i class="fa-solid @(Model.Status == "CLOSED" ? "fa-circle-check" : "fa-ban") me-1"></i>
+                                            @(string.IsNullOrWhiteSpace(Model.ClosureReason) ? (Model.Status == "CLOSED" ? "Project Closed" : "Close Scrapped / Premature") : Model.ClosureReason)
+                                        </span>
+                                        @if (Model.ActualClosedDate.HasValue)
+                                        {
+                                            <span class="text-muted small">
+                                                <i class="fa-regular fa-calendar-check me-1"></i>Closed on @Model.ActualClosedDate.Value.ToString("dd MMM yyyy")
+                                            </span>
+                                        }
+                                    </div>
+                                    @if (!string.IsNullOrWhiteSpace(Model.ClosureDocumentPath))
+                                    {
+                                        <a href="@Model.ClosureDocumentPath" target="_blank" class="btn btn-sm btn-outline-success fw-bold text-decoration-none shadow-sm">
+                                            <i class="fa-solid fa-file-shield me-1"></i>@(string.IsNullOrWhiteSpace(Model.ClosureDocumentName) ? "View Closure Certificate" : Model.ClosureDocumentName)
+                                        </a>
+                                    }
+                                </div>
+                                @if (!string.IsNullOrWhiteSpace(Model.ClosureNotes))
+                                {
+                                    <div class="text-secondary small mt-1">
+                                        <strong>Closure Reason &amp; Justification:</strong>
+                                        <div class="p-2 rounded bg-white border mt-1 text-dark">
+                                            <em>@Model.ClosureNotes</em>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
                     </div>
                 </div>
 
@@ -1115,38 +1150,82 @@
 </div>
 
 <!-- ========================================================================= -->
-<!-- MODAL: UPLOAD COMPLETION CERTIFICATE / CLOSURE -->
+<!-- MODAL: UPLOAD COMPLETION CERTIFICATE / CLOSURE & SETTLEMENT -->
 <!-- ========================================================================= -->
 <div class="modal fade" id="uploadCertificateModal" tabindex="-1" aria-labelledby="uploadCertificateModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-md">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content border-0 shadow">
             <form method="post" asp-controller="Projects" asp-action="CloseProject" enctype="multipart/form-data">
                 @Html.AntiForgeryToken()
                 <input type="hidden" name="id" value="@Model?.Id" />
-                <div class="modal-header bg-light">
-                    <h6 class="modal-title fw-bold" id="uploadCertificateModalLabel">
-                        <i class="fa-solid fa-award text-success me-2"></i>Upload Completion Certificate &amp; Close Project
-                    </h6>
+                <div class="modal-header py-3 bg-light border-bottom">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-success-subtle text-success p-2 rounded-circle fs-6">
+                            <i class="fa-solid fa-award"></i>
+                        </span>
+                        <div>
+                            <h6 class="modal-title fw-bold text-dark mb-0" id="uploadCertificateModalLabel" style="font-size: 15px;">
+                                Project Closure, Settlement &amp; Handover Sign-Off
+                            </h6>
+                            <small class="text-muted">@Model?.ProjectCode &mdash; @Model?.ProjectName</small>
+                        </div>
+                    </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body p-4" style="font-size: 13px;">
-                    <div class="alert alert-info py-2 px-3 mb-3" style="font-size: 12px;">
-                        <i class="fa-solid fa-info-circle me-1"></i> Uploading the client-signed project completion certificate will archive the project and record final closure.
+                    <div class="alert alert-danger py-2 px-3 mb-3 d-flex align-items-center gap-2 shadow-sm" style="font-size: 12px;">
+                        <i class="fa-solid fa-shield-halved fs-5 text-danger flex-shrink-0"></i>
+                        <div>
+                            <strong>Mandatory Closure Governance:</strong>
+                            Every time a project is closed, completed, settled, or prematurely terminated/scrapped, you <strong>must provide a valid reason</strong> and <strong>upload the related official document</strong> (Client Completion Certificate, Handover Sign-off, Settlement Agreement, or Premature Termination Letter).
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold" style="font-size: 12px;">Completion Certificate File <span class="text-danger">*</span></label>
-                        <input type="file" name="closureDocument" class="form-control" accept=".pdf,.docx,.jpg,.png,.zip" required />
-                        <small class="text-muted" style="font-size: 11px;">Accepted formats: PDF, Word, Scanned Images (Max 10 MB).</small>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold" style="font-size: 12px;">Closure Notes / Handover Remarks</label>
-                        <textarea name="closureNotes" class="form-control" rows="3" placeholder="Project deliverables completed, hand-over sign-off acquired."></textarea>
+
+                    <div class="row g-3">
+                        <div class="col-md-7">
+                            <label class="form-label fw-bold" style="font-size: 12px;">
+                                Closure Category / Settlement Type <span class="text-danger">*</span>
+                            </label>
+                            <select name="closureType" id="detailClosureType" class="form-select form-select-sm">
+                                <option value="Full Completion &amp; Handover">Full Completion &amp; Client Handover Sign-Off</option>
+                                <option value="Financially Settled &amp; Billing Closed">Financially Settled, Retention Cleared &amp; Closed</option>
+                                <option value="Premature Closure / Scope Terminated Early">Premature Closure / Scope Terminated Early by Client</option>
+                                <option value="Close Scrapped / Non-Viable / Cancelled">Close Scrapped / Commercial Cancellation / Abandoned</option>
+                                <option value="Completed Implementation &amp; Handed to Support">Completed Execution &amp; Transferred to Support / AMC</option>
+                                <option value="Other Legitimate Reason">Other Authorized Business Reason</option>
+                            </select>
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label fw-bold" style="font-size: 12px;">
+                                Closure Date <span class="text-danger">*</span>
+                            </label>
+                            <input type="date" name="closureDate" class="form-control form-control-sm" value="@DateTime.Today.ToString("yyyy-MM-dd")" required />
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label fw-bold" style="font-size: 12px;">
+                                Valid Reason &amp; Detailed Justification <span class="text-danger">*</span>
+                            </label>
+                            <textarea name="closureNotes" class="form-control" rows="3" placeholder="Provide clear explanation and background for closing, settling, or prematurely terminating this project (minimum 5 characters)..." required></textarea>
+                            <small class="text-muted" style="font-size: 11px;">State the handover deliverables, client sign-off reference, retention release, or premature termination background.</small>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label fw-bold" style="font-size: 12px;">
+                                Upload Related Supporting Document <span class="text-danger">*</span>
+                            </label>
+                            <input type="file" name="closureDocument" class="form-control" accept=".pdf,.docx,.doc,.xlsx,.xls,.zip,.png,.jpg,.jpeg" required />
+                            <small class="text-muted" style="font-size: 11px;">
+                                <i class="fa-solid fa-file-arrow-up text-primary me-1"></i>
+                                Accepted formats: PDF, Word, Excel, Scanned Sign-off Image, ZIP (Max 15 MB). Document will be permanently archived in the project records.
+                            </small>
+                        </div>
                     </div>
                 </div>
-                <div class="modal-footer bg-light py-2">
-                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <div class="modal-footer bg-light py-2 border-top">
+                    <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-success btn-sm px-4 fw-bold">
-                        <i class="fa-solid fa-upload me-1"></i> Upload &amp; Close
+                        <i class="fa-solid fa-award me-1"></i> Confirm &amp; Close Project
                     </button>
                 </div>
             </form>
