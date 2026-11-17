@@ -1,0 +1,1279 @@
+@model SDK.ERP.Domain.Entities.Sales.SalesInvoice
+@{
+    ViewData["Title"] = $"Edit Invoice #{Model.InvoiceNumber}";
+    ViewData["ActiveMenu"] = "Sales";
+    var company = ViewBag.Company as SDK.ERP.Domain.Entities.Admin.Company;
+    var projects = ViewBag.Projects as IEnumerable<SDK.ERP.Domain.Entities.Projects.Project> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Projects.Project>();
+    var clients = ViewBag.Clients as IEnumerable<SDK.ERP.Domain.Entities.MasterData.Client> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.MasterData.Client>();
+    var companyState = company?.StateCode ?? "07";
+    var isProjectBased = Model.ProjectId.HasValue && Model.ProjectId.Value > 0;
+}
+
+<style>
+    .inv-card {
+        background: #ffffff;
+        border: 1px solid #E2E8F0;
+        border-radius: 12px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+        margin-bottom: 20px;
+    }
+    .inv-card-header {
+        padding: 14px 20px;
+        border-bottom: 1px solid #F1F5F9;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .inv-card-title {
+        font-size: 14.5px;
+        font-weight: 700;
+        color: #1E293B;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .inv-card-body {
+        padding: 20px;
+    }
+    .inv-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: #475569;
+        margin-bottom: 6px;
+        display: block;
+    }
+    .inv-input {
+        font-size: 13px;
+        border: 1px solid #CBD5E1;
+        border-radius: 8px;
+        padding: 8px 12px;
+        color: #1E293B;
+        transition: all 0.15s ease-in-out;
+    }
+    .inv-input:focus {
+        border-color: #6366F1;
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+        outline: none;
+    }
+    .input-icon-group {
+        position: relative;
+    }
+    .input-icon-group .icon-addon {
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #94A3B8;
+        font-size: 13px;
+        pointer-events: none;
+    }
+    .input-icon-group input {
+        padding-left: 34px;
+    }
+    .inv-table th {
+        background: #F8FAFC;
+        color: #475569;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 10px 12px;
+        border-top: none;
+        border-bottom: 1px solid #E2E8F0;
+        white-space: nowrap;
+    }
+    .inv-table td {
+        padding: 10px 12px;
+        vertical-align: middle;
+        border-bottom: 1px solid #F1F5F9;
+    }
+    .btn-purple {
+        background: #7C3AED;
+        color: #ffffff;
+        border: none;
+        transition: background 0.15s ease;
+    }
+    .btn-purple:hover {
+        background: #6D28D9;
+        color: #ffffff;
+    }
+    .btn-purple-gradient {
+        background: linear-gradient(135deg, #7C3AED 0%, #6366F1 100%);
+        color: #ffffff;
+        border: none;
+        transition: opacity 0.15s ease;
+    }
+    .btn-purple-gradient:hover {
+        opacity: 0.93;
+        color: #ffffff;
+    }
+    .summary-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 6px 0;
+        font-size: 13px;
+        color: #475569;
+    }
+    .summary-row.bold {
+        font-weight: 700;
+        color: #0F172A;
+    }
+    .badge-company {
+        background: #EFF6FF;
+        color: #2563EB;
+        font-size: 11px;
+        font-weight: 600;
+        border-radius: 9999px;
+        padding: 4px 10px;
+    }
+    .badge-customer {
+        background: #ECFDF5;
+        color: #059669;
+        font-size: 11px;
+        font-weight: 600;
+        border-radius: 9999px;
+        padding: 4px 10px;
+    }
+</style>
+
+<form id="editInvoiceForm" method="post" asp-controller="Sales" asp-action="Edit" asp-route-id="@Model.Id">
+    @Html.AntiForgeryToken()
+
+    <!-- Top Breadcrumb & Actions Bar -->
+    <div class="mb-3">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-1" style="font-size: 12.5px;">
+                <li class="breadcrumb-item">
+                    <a asp-controller="Home" asp-action="Index" class="text-decoration-none text-muted">
+                        <i class="fa-solid fa-house me-1 text-primary"></i> Home
+                    </a>
+                </li>
+                <li class="breadcrumb-item">
+                    <a asp-controller="Sales" asp-action="Index" class="text-decoration-none text-muted">Invoices</a>
+                </li>
+                <li class="breadcrumb-item active fw-semibold text-dark" aria-current="page">Edit Invoice #@Model.InvoiceNumber</li>
+            </ol>
+        </nav>
+
+        <div class="d-flex align-items-center justify-content-between">
+            <div class="d-flex align-items-center gap-2">
+                <a asp-controller="Sales" asp-action="Index" class="text-dark text-decoration-none me-1" title="Back to Invoices">
+                    <i class="fa-solid fa-arrow-left fs-5"></i>
+                </a>
+                <h4 class="mb-0 fw-bold" style="color: #0F172A; font-size: 21px; letter-spacing: -0.3px;">
+                    Edit Invoice: <span class="text-primary">#@Model.InvoiceNumber</span>
+                </h4>
+                <span class="badge rounded-pill ms-2 px-2.5 py-1 text-uppercase" 
+                      style="font-size: 11px; background: @(Model.Status == "PAID" ? "#DEF7EC" : Model.Status == "PARTIALLY_PAID" ? "#FEF08A" : "#DBEAFE"); color: @(Model.Status == "PAID" ? "#03543F" : Model.Status == "PARTIALLY_PAID" ? "#854D0E" : "#1E40AF");">
+                    @Model.Status
+                </span>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <a asp-controller="Sales" asp-action="PrintInvoice" asp-route-id="@Model.Id" target="_blank" class="btn btn-sm btn-outline-secondary px-3 py-1.5 rounded-pill fw-semibold" style="font-size: 13px;">
+                    <i class="fa-solid fa-eye me-1"></i> View / Print
+                </a>
+                <a asp-controller="Sales" asp-action="Index" class="btn btn-sm bg-white px-3 py-1.5 rounded-pill fw-semibold text-secondary" style="border: 1px solid #CBD5E1; font-size: 13px;">
+                    <i class="fa-solid fa-arrow-left me-1"></i> Back to List
+                </a>
+                <button type="submit" class="btn btn-sm btn-purple-gradient px-3 py-1.5 rounded-pill fw-semibold shadow-sm" style="font-size: 13px;">
+                    <i class="fa-solid fa-check me-1"></i> Update Invoice
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 1. Invoice Details Card -->
+    <div class="inv-card">
+        <div class="inv-card-header">
+            <h5 class="inv-card-title">
+                <i class="fa-regular fa-file-lines text-primary"></i> Invoice Details
+            </h5>
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge rounded-pill px-3 py-1.5" style="background: #EFF6FF; color: #1D4ED8; font-size: 12px; font-weight: 600;">
+                    <i class="fa-regular fa-calendar me-1"></i> @ViewBag.FinancialYearCode
+                </span>
+                <span class="badge rounded-pill px-3 py-1.5" style="background: #ECFDF5; color: #047857; font-size: 12px; font-weight: 600;">
+                    <i class="fa-solid fa-indian-rupee-sign me-1"></i> Currency: @(company?.BaseCurrency ?? "INR")
+                </span>
+            </div>
+        </div>
+        <div class="inv-card-body">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="inv-label">Reference Number / Invoice No <span class="text-danger">*</span></label>
+                    <div class="input-icon-group">
+                        <span class="icon-addon"><i class="fa-solid fa-hashtag"></i></span>
+                        <input type="text" name="invoiceNumber" class="form-control inv-input" value="@Model.InvoiceNumber" required />
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <label class="inv-label">Invoice Date <span class="text-danger">*</span></label>
+                    <div class="input-icon-group">
+                        <span class="icon-addon"><i class="fa-regular fa-calendar"></i></span>
+                        <input type="date" name="invoiceDate" class="form-control inv-input" value="@Model.InvoiceDate.ToString("yyyy-MM-dd")" required />
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <label class="inv-label">Payment Due Date</label>
+                    <div class="input-icon-group">
+                        <span class="icon-addon"><i class="fa-regular fa-calendar-check"></i></span>
+                        <input type="date" name="dueDate" class="form-control inv-input" value="@Model.DueDate.ToString("yyyy-MM-dd")" />
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <label class="inv-label">Work Order / PO No.</label>
+                    <div class="input-icon-group">
+                        <span class="icon-addon"><i class="fa-regular fa-file"></i></span>
+                        <input type="text" name="workOrderNo" id="workOrderNoInput" class="form-control inv-input" value="@Model.WorkOrderNo" placeholder="Enter Order No." />
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <label class="inv-label">Work Order Date</label>
+                    <div class="input-icon-group">
+                        <span class="icon-addon"><i class="fa-regular fa-calendar"></i></span>
+                        <input type="date" name="workOrderDate" id="workOrderDateInput" class="form-control inv-input" value="@(Model.WorkOrderDate.HasValue ? Model.WorkOrderDate.Value.ToString("yyyy-MM-dd") : "")" />
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Billing Parties (Bill From & Bill To) -->
+    <div class="row g-3 mb-4">
+        <!-- Bill From (Billed By) -->
+        <div class="col-md-6">
+            <div class="inv-card h-100 mb-0">
+                <div class="inv-card-header">
+                    <h5 class="inv-card-title">
+                        <i class="fa-solid fa-building text-primary"></i> Bill From (Billed By)
+                    </h5>
+                    <span class="badge-company">Company</span>
+                </div>
+                <div class="inv-card-body">
+                    <div class="fw-bold text-primary mb-1" style="font-size: 15px;">
+                        @(string.IsNullOrEmpty(company?.CompanyName) ? "SDK Solutions & Engineering Services" : company.CompanyName)
+                    </div>
+                    <div class="text-muted mb-2" style="font-size: 13px;">
+                        @(string.IsNullOrEmpty(company?.AddressLine1) ? "Corporate Office & Engineering Center" : $"{company.AddressLine1}, {company.City} - {company.Pincode}")
+                    </div>
+                    <div class="text-secondary" style="font-size: 12.5px;">
+                        <i class="fa-solid fa-id-card text-muted me-1"></i>
+                        GSTIN: <strong>@(string.IsNullOrEmpty(company?.Gstin) ? "Registered Regular Taxpayer" : company.Gstin)</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bill To (Client & Project) -->
+        <div class="col-md-6">
+            <div class="inv-card h-100 mb-0">
+                <div class="inv-card-header">
+                    <h5 class="inv-card-title">
+                        <i class="fa-solid fa-user-tie text-success"></i> Bill To (Client &amp; Project)
+                    </h5>
+                    <span class="badge-customer" id="billToCustomerBadge">Customer</span>
+                </div>
+                <div class="inv-card-body">
+                    <!-- Radio Button Selection: Project vs Client -->
+                    <div class="mb-3">
+                        <label class="inv-label d-flex align-items-center justify-content-between mb-2">
+                            <span>Invoice Against <span class="text-danger">*</span></span>
+                            <span class="text-muted" style="font-size: 11px; font-weight: normal;">Generate against project or client only</span>
+                        </label>
+                        <div class="d-flex align-items-center gap-2 p-1.5 rounded-3" style="background: #F8FAFC; border: 1px solid #E2E8F0;">
+                            <label class="btn btn-sm flex-fill text-center py-2 px-3 rounded-2 fw-semibold mb-0 invoice-type-label" 
+                                   id="labelTypeProject" for="radioTypeProject" 
+                                   style="cursor: pointer; font-size: 13px; border: 1px solid @(isProjectBased ? "#6366F1" : "#CBD5E1"); background: @(isProjectBased ? "#EEF2FF" : "#FFFFFF"); color: @(isProjectBased ? "#4338CA" : "#475569"); transition: all 0.2s;">
+                                <input class="form-check-input me-1.5" type="radio" name="invoiceAgainst" id="radioTypeProject" value="Project" @(isProjectBased ? "checked" : "") onchange="toggleInvoiceAgainst()" style="cursor: pointer;" />
+                                <i class="fa-solid fa-diagram-project me-1 text-primary"></i> Project
+                            </label>
+                            <label class="btn btn-sm flex-fill text-center py-2 px-3 rounded-2 fw-semibold mb-0 invoice-type-label" 
+                                   id="labelTypeClient" for="radioTypeClient" 
+                                   style="cursor: pointer; font-size: 13px; border: 1px solid @(!isProjectBased ? "#6366F1" : "#CBD5E1"); background: @(!isProjectBased ? "#EEF2FF" : "#FFFFFF"); color: @(!isProjectBased ? "#4338CA" : "#475569"); transition: all 0.2s;">
+                                <input class="form-check-input me-1.5" type="radio" name="invoiceAgainst" id="radioTypeClient" value="Client" @(!isProjectBased ? "checked" : "") onchange="toggleInvoiceAgainst()" style="cursor: pointer;" />
+                                <i class="fa-solid fa-user-tie me-1 text-success"></i> Client
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- 1. Project Selection Container (Active when Project radio selected) -->
+                    <div id="projectSelectContainer" class="mb-3 @(!isProjectBased ? "d-none" : "")">
+                        <label class="inv-label">Select Project <span class="text-danger">*</span></label>
+                        <select name="projectId" id="projectSelect" class="form-select inv-input" onchange="onProjectChange(true)">
+                            <option value="">--- Select Project ---</option>
+                            @foreach (var p in projects)
+                            {
+                                var cl = p.Client;
+                                var clientPo = p.PurchaseOrders?.OrderByDescending(x => x.PoDate).FirstOrDefault();
+                                var poNum = clientPo?.ClientPoNumber ?? "";
+                                var poDate = clientPo != null && clientPo.PoDate != default ? clientPo.PoDate.ToString("yyyy-MM-dd") : (p.StartDate != default ? p.StartDate.ToString("yyyy-MM-dd") : "");
+                                var scope = !string.IsNullOrWhiteSpace(clientPo?.ScopeOfWork) ? clientPo.ScopeOfWork : (!string.IsNullOrWhiteSpace(p.Description) ? p.Description : p.ProjectName);
+                                var defaultRate = clientPo != null && clientPo.PoValue > 0 ? clientPo.PoValue : (p.ContractValue > 0 ? p.ContractValue : 0);
+                                var isSelected = Model.ProjectId == p.Id;
+
+                                <option value="@p.Id" 
+                                        selected="@(isSelected ? "selected" : null)"
+                                        data-client-id="@p.ClientId" 
+                                        data-client-name="@(cl?.ClientName ?? "")" 
+                                        data-contact="@(cl?.ContactPerson ?? cl?.ClientName ?? "")" 
+                                        data-state="@(cl?.StateCode ?? "07")"
+                                        data-gstin="@(cl?.Gstin ?? "")"
+                                        data-po-num="@poNum"
+                                        data-po-date="@poDate"
+                                        data-project-name="@p.ProjectName"
+                                        data-project-code="@p.ProjectCode"
+                                        data-scope="@scope"
+                                        data-rate="@defaultRate">
+                                    @p.ProjectCode - @p.ProjectName (@(cl?.ClientName ?? "N/A"))
+                                </option>
+                            }
+                        </select>
+                        <input type="hidden" name="clientId" id="clientIdHidden" value="@Model.ClientId" />
+
+                        <!-- Selected Project & Client Details Preview -->
+                        <div id="projectDetailsBox" class="mt-2 p-2 rounded-2 border @(Model.Project != null ? "" : "d-none")" style="background: #F8FAFC; font-size: 12px; line-height: 1.5;">
+                            <div class="d-flex align-items-center justify-content-between mb-1">
+                                <span class="text-secondary fw-semibold">Linked Client:</span>
+                                <span id="pjClientName" class="fw-bold text-dark">@(Model.Client?.ClientName ?? Model.Project?.Client?.ClientName ?? "")</span>
+                            </div>
+                            <div class="d-flex align-items-center justify-content-between text-muted" style="font-size: 11.5px;">
+                                <span>GSTIN: <strong id="pjGstin" class="text-dark">@(Model.Client?.Gstin ?? Model.Project?.Client?.Gstin ?? "N/A")</strong></span>
+                                <span>State Code: <strong id="pjState" class="text-dark">@(Model.Client?.StateCode ?? Model.Project?.Client?.StateCode ?? "07")</strong></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 2. Client Selection Container (Active when Client radio selected) -->
+                    <div id="clientSelectContainer" class="mb-3 @(isProjectBased ? "d-none" : "")">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <label class="inv-label mb-0">Select Client <span class="text-danger">*</span></label>
+                            <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2 rounded-pill fw-semibold shadow-xs" 
+                                    style="font-size: 11.5px;" 
+                                    data-bs-toggle="modal" data-bs-target="#quickAddClientModal">
+                                <i class="fa-solid fa-plus me-1"></i> Add New Client
+                            </button>
+                        </div>
+                        <select id="clientSelect" class="form-select inv-input" onchange="onClientChange(true)">
+                            <option value="">--- Select Client ---</option>
+                            @foreach (var cl in clients)
+                            {
+                                var isSelected = Model.ClientId == cl.Id;
+                                <option value="@cl.Id"
+                                        selected="@(isSelected ? "selected" : null)"
+                                        data-client-id="@cl.Id"
+                                        data-client-name="@cl.ClientName"
+                                        data-contact="@(cl.ContactPerson ?? cl.ClientName)"
+                                        data-state="@(cl.StateCode ?? "07")"
+                                        data-gstin="@(cl.Gstin ?? "")"
+                                        data-address="@(cl.BillingAddress ?? "")">
+                                    @cl.ClientCode - @cl.ClientName @(!string.IsNullOrEmpty(cl.Gstin) ? $"({cl.Gstin})" : "")
+                                </option>
+                            }
+                        </select>
+
+                        <!-- Selected Client Details Preview -->
+                        <div id="clientDetailsBox" class="mt-2 p-2 rounded-2 border @(!isProjectBased && Model.Client != null ? "" : "d-none")" style="background: #F8FAFC; font-size: 12px; line-height: 1.5;">
+                            <div class="d-flex align-items-center justify-content-between mb-1">
+                                <span class="text-secondary fw-semibold">Client Name:</span>
+                                <span id="clClientName" class="fw-bold text-dark">@(Model.Client?.ClientName ?? "")</span>
+                            </div>
+                            <div class="d-flex align-items-center justify-content-between text-muted" style="font-size: 11.5px;">
+                                <span>GSTIN: <strong id="clGstin" class="text-dark">@(Model.Client?.Gstin ?? "Unregistered")</strong></span>
+                                <span>State Code: <strong id="clState" class="text-dark">@(Model.Client?.StateCode ?? "07")</strong></span>
+                            </div>
+                            <div id="clAddressRow" class="text-muted mt-1 text-truncate @(string.IsNullOrEmpty(Model.Client?.BillingAddress) ? "d-none" : "")" style="font-size: 11px;">
+                                Address: <span id="clAddress">@(Model.Client?.BillingAddress ?? "")</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Billing Attention (Applicable for both Project and Client) -->
+                    <div>
+                        <label class="inv-label">Invoice To (Billing Attention) <span class="text-danger">*</span></label>
+                        <input type="text" name="billingAttention" id="billingAttentionInput" class="form-control inv-input" value="@Model.BillingAttention" placeholder="Enter Invoice To Attention Name" required />
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. Items & Details Table -->
+    <div class="inv-card">
+        <div class="inv-card-header">
+            <h5 class="inv-card-title">
+                <i class="fa-solid fa-list-check text-primary"></i> Items &amp; Details
+            </h5>
+            <button type="button" class="btn btn-sm btn-purple rounded-pill px-3 py-1.5 fw-semibold shadow-sm" style="font-size: 12.5px;" onclick="addRow()">
+                <i class="fa-solid fa-plus me-1"></i> Add New Row
+            </button>
+        </div>
+        <div class="inv-card-body p-0">
+            <div class="table-responsive">
+                <table class="table inv-table align-middle mb-0" id="itemsTable">
+                    <thead>
+                        <tr>
+                            <th style="width: 40px; text-align: center;">#</th>
+                            <th style="min-width: 260px;">ITEM NAME &amp; DESCRIPTION</th>
+                            <th style="width: 105px;">HSN/SAC</th>
+                            <th style="width: 85px;">GST %</th>
+                            <th style="width: 85px;">IGST %</th>
+                            <th style="width: 85px;">CGST %</th>
+                            <th style="width: 85px;">SGST %</th>
+                            <th style="width: 90px;">QTY</th>
+                            <th style="width: 120px; text-align: right;">RATE (&#8377;)</th>
+                            <th style="width: 120px; text-align: right;">AMOUNT (&#8377;)</th>
+                            <th style="width: 60px; text-align: center;">ACTION</th>
+                        </tr>
+                    </thead>
+                    <tbody id="itemsTableBody">
+                        @if (Model.Items != null && Model.Items.Any())
+                        {
+                            int rowIdx = 1;
+                            foreach (var itm in Model.Items)
+                            {
+                                var lineAmt = itm.TaxableValue > 0 ? itm.TaxableValue : (itm.Quantity * itm.UnitRate);
+                                <tr class="item-row" data-row-idx="@rowIdx">
+                                    <td class="text-center fw-semibold text-secondary row-num">@rowIdx</td>
+                                    <td>
+                                        <textarea name="itemDescription[]" class="form-control inv-input item-desc" rows="2" placeholder="Item Name &amp; Description" required>@itm.ItemDescription</textarea>
+                                    </td>
+                                    <td>
+                                        <input type="text" name="itemHsn[]" class="form-control inv-input item-hsn" placeholder="HSN Code" value="@itm.HsnSacCode" />
+                                    </td>
+                                    <td>
+                                        <input type="number" step="0.01" name="itemGst[]" class="form-control inv-input item-gst" placeholder="GST %" value="@itm.GstRate.ToString("0.##")" oninput="onGstChange(this)" />
+                                    </td>
+                                    <td>
+                                        <input type="number" step="0.01" name="itemIgst[]" class="form-control inv-input item-igst" placeholder="IGST %" value="@itm.IgstRate.ToString("0.##")" oninput="recalcRow(this)" />
+                                    </td>
+                                    <td>
+                                        <input type="number" step="0.01" name="itemCgst[]" class="form-control inv-input item-cgst" placeholder="CGST %" value="@itm.CgstRate.ToString("0.##")" oninput="recalcRow(this)" />
+                                    </td>
+                                    <td>
+                                        <input type="number" step="0.01" name="itemSgst[]" class="form-control inv-input item-sgst" placeholder="SGST %" value="@itm.SgstRate.ToString("0.##")" oninput="recalcRow(this)" />
+                                    </td>
+                                    <td>
+                                        <input type="number" step="0.01" name="itemQty[]" class="form-control inv-input item-qty" placeholder="Qty" value="@itm.Quantity.ToString("0.##")" min="0.01" oninput="recalcRow(this)" required />
+                                    </td>
+                                    <td>
+                                        <input type="number" step="0.01" name="itemRate[]" class="form-control inv-input item-rate text-end" placeholder="0.00" value="@itm.UnitRate.ToString("0.00")" min="0" oninput="recalcRow(this)" required />
+                                    </td>
+                                    <td>
+                                        <input type="text" class="form-control inv-input item-amount text-end bg-light fw-semibold" placeholder="0.00" value="@lineAmt.ToString("N2")" readonly />
+                                    </td>
+                                    <td class="text-center">
+                                        <button type="button" class="btn btn-sm text-danger rounded-3" style="background: #FEE2E2; width: 32px; height: 32px; padding: 0;" title="Delete Row" onclick="deleteRow(this)">
+                                            <i class="fa-solid fa-trash-can" style="font-size: 13px;"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                rowIdx++;
+                            }
+                        }
+                        else
+                        {
+                            var defTaxable = Model.TaxableAmount > 0 ? Model.TaxableAmount : 0m;
+                            var defGst = (Model.CgstAmount + Model.SgstAmount + Model.IgstAmount) > 0 && defTaxable > 0 
+                                ? Math.Round(((Model.CgstAmount + Model.SgstAmount + Model.IgstAmount) / defTaxable) * 100m, 2) 
+                                : 18m;
+                            var isInter = Model.IgstAmount > 0;
+                            var defIgst = isInter ? defGst : 0m;
+                            var defCgst = isInter ? 0m : (defGst / 2m);
+                            var defSgst = isInter ? 0m : (defGst / 2m);
+                            var desc = Model.Project != null 
+                                ? $"{Model.Project.ProjectName} - Execution & Milestone Delivery" 
+                                : $"Commercial & Professional Services - {(Model.Client != null ? Model.Client.ClientName : "Client")}";
+
+                            <tr class="item-row" data-row-idx="1">
+                                <td class="text-center fw-semibold text-secondary row-num">1</td>
+                                <td>
+                                    <textarea name="itemDescription[]" class="form-control inv-input item-desc" rows="2" placeholder="Item Name &amp; Description" required>@desc</textarea>
+                                </td>
+                                <td>
+                                    <input type="text" name="itemHsn[]" class="form-control inv-input item-hsn" placeholder="HSN Code" value="998313" />
+                                </td>
+                                <td>
+                                    <input type="number" step="0.01" name="itemGst[]" class="form-control inv-input item-gst" placeholder="GST %" value="@defGst.ToString("0.##")" oninput="onGstChange(this)" />
+                                </td>
+                                <td>
+                                    <input type="number" step="0.01" name="itemIgst[]" class="form-control inv-input item-igst" placeholder="IGST %" value="@defIgst.ToString("0.##")" oninput="recalcRow(this)" />
+                                </td>
+                                <td>
+                                    <input type="number" step="0.01" name="itemCgst[]" class="form-control inv-input item-cgst" placeholder="CGST %" value="@defCgst.ToString("0.##")" oninput="recalcRow(this)" />
+                                </td>
+                                <td>
+                                    <input type="number" step="0.01" name="itemSgst[]" class="form-control inv-input item-sgst" placeholder="SGST %" value="@defSgst.ToString("0.##")" oninput="recalcRow(this)" />
+                                </td>
+                                <td>
+                                    <input type="number" step="0.01" name="itemQty[]" class="form-control inv-input item-qty" placeholder="Qty" value="1" min="0.01" oninput="recalcRow(this)" required />
+                                </td>
+                                <td>
+                                    <input type="number" step="0.01" name="itemRate[]" class="form-control inv-input item-rate text-end" placeholder="0.00" value="@defTaxable.ToString("0.00")" min="0" oninput="recalcRow(this)" required />
+                                </td>
+                                <td>
+                                    <input type="text" class="form-control inv-input item-amount text-end bg-light fw-semibold" placeholder="0.00" value="@defTaxable.ToString("N2")" readonly />
+                                </td>
+                                <td class="text-center">
+                                    <button type="button" class="btn btn-sm text-danger rounded-3" style="background: #FEE2E2; width: 32px; height: 32px; padding: 0;" title="Delete Row" onclick="deleteRow(this)">
+                                        <i class="fa-solid fa-trash-can" style="font-size: 13px;"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. Bottom Section: Terms/Remarks & Summary -->
+    <div class="row g-3">
+        <!-- Terms, Remarks & Deductions -->
+        <div class="col-md-6">
+            <div class="inv-card h-100 mb-0">
+                <div class="inv-card-header">
+                    <h5 class="inv-card-title">
+                        <i class="fa-regular fa-comment-dots text-primary"></i> Terms, Remarks &amp; Deductions
+                    </h5>
+                </div>
+                <div class="inv-card-body">
+                    <div class="mb-3">
+                        <label class="inv-label">General Remarks &amp; Notes <span class="text-danger">*</span></label>
+                        <textarea name="remarks" class="form-control inv-input" rows="3" placeholder="Enter payment terms, delivery notes or bank reference details..." required>@Model.Remarks</textarea>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-md-7">
+                            <label class="inv-label">Advance / Deduction Remarks</label>
+                            <input type="text" name="deductionRemarks" class="form-control inv-input" value="@Model.DeductionRemarks" placeholder="e.g. Less : 10% Advance Received" />
+                        </div>
+                        <div class="col-md-5">
+                            <label class="inv-label">Deduction (&#8377;)</label>
+                            <input type="number" step="0.01" name="deductionAmount" id="deductionAmountInput" class="form-control inv-input text-end" placeholder="0.00" value="@Model.DeductionAmount.ToString("0.00")" oninput="recalcAll()" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Invoice Summary -->
+        <div class="col-md-6">
+            <div class="inv-card h-100 mb-0">
+                <div class="inv-card-header">
+                    <h5 class="inv-card-title">
+                        <i class="fa-solid fa-calculator text-primary"></i> Invoice Summary
+                    </h5>
+                </div>
+                <div class="inv-card-body">
+                    <div class="summary-row">
+                        <span>Net Billing Amount (Subtotal):</span>
+                        <span class="fw-semibold text-dark" id="lblSubtotal">@Model.TaxableAmount.ToString("N2")</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>IGST Amount:</span>
+                        <span class="fw-semibold text-dark" id="lblIgst">@Model.IgstAmount.ToString("N2")</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>CGST Amount:</span>
+                        <span class="fw-semibold text-dark" id="lblCgst">@Model.CgstAmount.ToString("N2")</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>SGST Amount:</span>
+                        <span class="fw-semibold text-dark" id="lblSgst">@Model.SgstAmount.ToString("N2")</span>
+                    </div>
+                    <div class="summary-row bold" style="border-top: 1px dashed #CBD5E1; margin-top: 6px; padding-top: 8px;">
+                        <span>Gross Amount (Incl. Tax):</span>
+                        <span id="lblGross">@((Model.TaxableAmount + Model.IgstAmount + Model.CgstAmount + Model.SgstAmount).ToString("N2"))</span>
+                    </div>
+
+                    <!-- Highlight Net Payable Card -->
+                    <div class="mt-3 p-3 d-flex align-items-center justify-content-between rounded-3" style="background: #E0F2FE; border: 1px solid #BAE6FD;">
+                        <div>
+                            <div class="fw-bold" style="color: #0369A1; font-size: 15px;">Net Payable Amount</div>
+                            <div class="text-muted" style="font-size: 11.5px;">(After advance &amp; deductions)</div>
+                        </div>
+                        <div class="text-end">
+                            <span id="lblNetPayable" class="fw-bold" style="color: #0284C7; font-size: 26px;">@Model.TotalInvoiceValue.ToString("N2")</span>
+                        </div>
+                    </div>
+
+                    <!-- Bottom Action Buttons -->
+                    <div class="d-flex align-items-center justify-content-end gap-2 mt-4">
+                        <a asp-controller="Sales" asp-action="Index" class="btn btn-sm bg-white px-4 py-1.5 rounded-pill fw-semibold text-secondary" style="border: 1px solid #CBD5E1; font-size: 13px;">
+                            Cancel
+                        </a>
+                        <button type="submit" class="btn btn-sm btn-purple-gradient px-4 py-1.5 rounded-pill fw-semibold shadow-sm" style="font-size: 13px;">
+                            <i class="fa-solid fa-check me-1"></i> Update Invoice
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+<!-- Quick Add Client Modal (Saves to Master Catalogs) -->
+<div class="modal fade" id="quickAddClientModal" tabindex="-1" aria-labelledby="quickAddClientModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 14px; overflow: hidden;">
+            <div class="modal-header text-white" style="background: linear-gradient(135deg, #4F46E5 0%, #4338CA 100%); padding: 18px 24px;">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="rounded-circle bg-white text-primary p-2 d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; color: #4F46E5 !important;">
+                        <i class="fa-solid fa-user-tie fs-6"></i>
+                    </div>
+                    <div>
+                        <h5 class="modal-title fw-bold mb-0 text-white" id="quickAddClientModalLabel" style="font-size: 16px;">
+                            Register New Enterprise Client
+                        </h5>
+                        <small class="text-white-50" style="font-size: 11.5px;">Saves permanently to Master Catalogs and automatically selects for this invoice</small>
+                    </div>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="quickClientForm" onsubmit="event.preventDefault(); saveQuickClient();">
+                    @Html.AntiForgeryToken()
+                    <div id="quickClientError" class="alert alert-danger py-2 px-3 d-none mb-3" style="font-size: 13px;"></div>
+
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold text-secondary" style="font-size: 12px;">CLIENT CODE <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="quickClientCode" value="CL-@DateTime.Now.ToString("MMddHHmm")" readonly style="background: #F8FAFC; font-size: 13px; font-weight: 600;" />
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label fw-bold text-secondary" style="font-size: 12px;">CLIENT / COMPANY NAME <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="quickClientName" placeholder="e.g. Acme Tech Solutions Pvt Ltd" required style="font-size: 13px;" />
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-secondary" style="font-size: 12px;">
+                                GSTIN (15 DIGITS)
+                                <small class="text-muted fw-normal ms-1">(Auto fills PAN &amp; State)</small>
+                            </label>
+                            <div class="input-group">
+                                <input type="text" class="form-control text-uppercase" id="quickClientGstin" placeholder="e.g. 07AAAAA0000A1Z5" maxlength="15" style="font-size: 13px; font-family: monospace; letter-spacing: 1px;" />
+                                <button type="button" class="btn btn-outline-primary" style="font-size: 12px;" onclick="quickFetchGstin()" title="Lookup Taxpayer on GST Portal">
+                                    <i class="fa-solid fa-bolt me-1"></i> Auto-Fetch
+                                </button>
+                            </div>
+                            <div id="quickGstinFeedback" class="form-text" style="font-size: 11px; display: none;"></div>
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold text-secondary" style="font-size: 12px;">PAN NUMBER</label>
+                            <input type="text" class="form-control text-uppercase" id="quickClientPan" placeholder="AAAAA0000A" maxlength="10" style="font-size: 13px; font-family: monospace;" />
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold text-secondary" style="font-size: 12px;">STATE <span class="text-danger">*</span></label>
+                            <select class="form-select" id="quickClientState" style="font-size: 13px;">
+                                <option value="07">07 - Delhi</option>
+                                <option value="09">09 - Uttar Pradesh</option>
+                                <option value="06">06 - Haryana</option>
+                                <option value="19">19 - West Bengal</option>
+                                <option value="27">27 - Maharashtra</option>
+                                <option value="29">29 - Karnataka</option>
+                                <option value="33">33 - Tamil Nadu</option>
+                                <option value="36">36 - Telangana</option>
+                                <option value="24">24 - Gujarat</option>
+                                <option value="08">08 - Rajasthan</option>
+                                <option value="10">10 - Bihar</option>
+                                <option value="23">23 - Madhya Pradesh</option>
+                                <option value="21">21 - Odisha</option>
+                                <option value="03">03 - Punjab</option>
+                                <option value="01">01 - Jammu &amp; Kashmir</option>
+                                <option value="02">02 - Himachal Pradesh</option>
+                                <option value="05">05 - Uttarakhand</option>
+                                <option value="32">32 - Kerala</option>
+                                <option value="37">37 - Andhra Pradesh</option>
+                            </select>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label fw-bold text-secondary" style="font-size: 12px;">BILLING ADDRESS <span class="text-danger">*</span></label>
+                            <textarea class="form-control" id="quickClientAddress" rows="2" placeholder="Full registered billing address, City, Pincode" required style="font-size: 13px;"></textarea>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold text-secondary" style="font-size: 12px;">CONTACT PERSON</label>
+                            <input type="text" class="form-control" id="quickClientContact" placeholder="e.g. Rajesh Sharma" style="font-size: 13px;" />
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold text-secondary" style="font-size: 12px;">PHONE / MOBILE</label>
+                            <input type="tel" class="form-control" id="quickClientPhone" placeholder="e.g. +91 98765 43210" style="font-size: 13px;" />
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold text-secondary" style="font-size: 12px;">EMAIL ADDRESS</label>
+                            <input type="email" class="form-control" id="quickClientEmail" placeholder="billing@clientcompany.com" style="font-size: 13px;" />
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-secondary" style="font-size: 12px;">CLIENT CATEGORY</label>
+                            <select class="form-select" id="quickClientCategory" style="font-size: 13px;">
+                                <option value="B2B">B2B (Registered Business)</option>
+                                <option value="GOVERNMENT">Government / PSU Entity</option>
+                                <option value="B2C">B2C (Retail / Individual)</option>
+                                <option value="OVERSEAS">Overseas / Export</option>
+                            </select>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer bg-light px-4 py-3 border-top">
+                <button type="button" class="btn btn-secondary px-3 py-1.5 rounded-pill" data-bs-dismiss="modal" style="font-size: 13px;">
+                    Cancel
+                </button>
+                <button type="button" class="btn btn-primary px-4 py-1.5 rounded-pill fw-semibold shadow-sm" id="btnSaveQuickClient" onclick="saveQuickClient()" style="font-size: 13px; background: #4F46E5; border-color: #4F46E5;">
+                    <i class="fa-solid fa-check me-1"></i> Save &amp; Select Client
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const COMPANY_STATE_CODE = "@companyState";
+
+    function toggleInvoiceAgainst() {
+        const isProject = document.getElementById("radioTypeProject").checked;
+        const projectBox = document.getElementById("projectSelectContainer");
+        const clientBox = document.getElementById("clientSelectContainer");
+        const projectSelect = document.getElementById("projectSelect");
+        const clientSelect = document.getElementById("clientSelect");
+        const labelProject = document.getElementById("labelTypeProject");
+        const labelClient = document.getElementById("labelTypeClient");
+        const badgeCustomer = document.getElementById("billToCustomerBadge");
+
+        if (isProject) {
+            projectBox.classList.remove("d-none");
+            clientBox.classList.add("d-none");
+            projectSelect.required = true;
+            projectSelect.disabled = false;
+            clientSelect.required = false;
+            clientSelect.disabled = true;
+
+            labelProject.style.background = "#EEF2FF";
+            labelProject.style.borderColor = "#6366F1";
+            labelProject.style.color = "#4338CA";
+
+            labelClient.style.background = "#FFFFFF";
+            labelClient.style.borderColor = "#CBD5E1";
+            labelClient.style.color = "#475569";
+
+            if (badgeCustomer) badgeCustomer.innerText = "Project Client";
+        } else {
+            projectBox.classList.add("d-none");
+            clientBox.classList.remove("d-none");
+            projectSelect.required = false;
+            projectSelect.disabled = true;
+            clientSelect.required = true;
+            clientSelect.disabled = false;
+
+            labelClient.style.background = "#EEF2FF";
+            labelClient.style.borderColor = "#6366F1";
+            labelClient.style.color = "#4338CA";
+
+            labelProject.style.background = "#FFFFFF";
+            labelProject.style.borderColor = "#CBD5E1";
+            labelProject.style.color = "#475569";
+
+            if (badgeCustomer) badgeCustomer.innerText = "Direct Client";
+        }
+    }
+
+    function onProjectChange(userTriggered = false) {
+        const select = document.getElementById("projectSelect");
+        const selectedOpt = select.options[select.selectedIndex];
+        const detailsBox = document.getElementById("projectDetailsBox");
+
+        if (!selectedOpt || !selectedOpt.value) {
+            if (detailsBox) detailsBox.classList.add("d-none");
+            return;
+        }
+
+        const clientId = selectedOpt.getAttribute("data-client-id") || "";
+        const clientName = selectedOpt.getAttribute("data-client-name") || "";
+        const contact = selectedOpt.getAttribute("data-contact") || "";
+        const state = selectedOpt.getAttribute("data-state") || "07";
+        const gstin = selectedOpt.getAttribute("data-gstin") || "Unregistered / N/A";
+        const poNum = selectedOpt.getAttribute("data-po-num") || "";
+        const poDate = selectedOpt.getAttribute("data-po-date") || "";
+        const projectName = selectedOpt.getAttribute("data-project-name") || "";
+        const projectCode = selectedOpt.getAttribute("data-project-code") || "";
+        const scope = selectedOpt.getAttribute("data-scope") || "";
+        const rate = parseFloat(selectedOpt.getAttribute("data-rate")) || 0;
+
+        document.getElementById("clientIdHidden").value = clientId;
+        if (userTriggered) {
+            document.getElementById("billingAttentionInput").value = contact || clientName || "";
+        }
+
+        // Preview Details Box
+        if (detailsBox) {
+            document.getElementById("pjClientName").innerText = clientName;
+            document.getElementById("pjGstin").innerText = gstin;
+            document.getElementById("pjState").innerText = state;
+            detailsBox.classList.remove("d-none");
+        }
+
+        // Auto-fill Work Order / PO details only if empty or user triggered
+        const workOrderInput = document.getElementById("workOrderNoInput");
+        if (workOrderInput && userTriggered && !workOrderInput.value.trim()) {
+            workOrderInput.value = poNum ? poNum : `WO-${projectCode}`;
+        }
+
+        const workOrderDateInput = document.getElementById("workOrderDateInput");
+        if (workOrderDateInput && userTriggered && poDate && !workOrderDateInput.value) {
+            workOrderDateInput.value = poDate;
+        }
+
+        // Recheck interstate / intrastate split for existing rows
+        if (userTriggered) {
+            recheckGstTaxes();
+        }
+    }
+
+    function onClientChange(userTriggered = false) {
+        const select = document.getElementById("clientSelect");
+        const selectedOpt = select.options[select.selectedIndex];
+        const detailsBox = document.getElementById("clientDetailsBox");
+
+        if (!selectedOpt || !selectedOpt.value) {
+            if (detailsBox) detailsBox.classList.add("d-none");
+            return;
+        }
+
+        const clientId = selectedOpt.getAttribute("data-client-id") || "";
+        const clientName = selectedOpt.getAttribute("data-client-name") || "";
+        const contact = selectedOpt.getAttribute("data-contact") || "";
+        const state = selectedOpt.getAttribute("data-state") || "07";
+        const gstin = selectedOpt.getAttribute("data-gstin") || "Unregistered / N/A";
+        const address = selectedOpt.getAttribute("data-address") || "";
+
+        document.getElementById("clientIdHidden").value = clientId;
+        if (userTriggered) {
+            document.getElementById("billingAttentionInput").value = contact || clientName || "";
+        }
+
+        // Preview Details Box
+        if (detailsBox) {
+            document.getElementById("clClientName").innerText = clientName;
+            document.getElementById("clGstin").innerText = gstin;
+            document.getElementById("clState").innerText = state;
+            if (address) {
+                document.getElementById("clAddress").innerText = address;
+                document.getElementById("clAddressRow").classList.remove("d-none");
+            } else {
+                document.getElementById("clAddressRow").classList.add("d-none");
+            }
+            detailsBox.classList.remove("d-none");
+        }
+
+        // Recheck interstate / intrastate split for existing rows
+        if (userTriggered) {
+            recheckGstTaxes();
+        }
+    }
+
+    function isInterStateSelected() {
+        const isProjectMode = document.getElementById("radioTypeProject")?.checked ?? true;
+        let state = "";
+        if (isProjectMode) {
+            const select = document.getElementById("projectSelect");
+            if (select && select.selectedIndex > 0) {
+                const opt = select.options[select.selectedIndex];
+                state = opt.getAttribute("data-state") || "";
+            }
+        } else {
+            const select = document.getElementById("clientSelect");
+            if (select && select.selectedIndex > 0) {
+                const opt = select.options[select.selectedIndex];
+                state = opt.getAttribute("data-state") || "";
+            }
+        }
+        return state && COMPANY_STATE_CODE && state !== COMPANY_STATE_CODE;
+    }
+
+    function recheckGstTaxes() {
+        const rows = document.querySelectorAll(".item-row");
+        rows.forEach(row => {
+            const gstInput = row.querySelector(".item-gst");
+            if (gstInput) onGstChange(gstInput);
+        });
+        recalcAll();
+    }
+
+    function onGstChange(gstInput) {
+        const row = gstInput.closest(".item-row");
+        const gstVal = parseFloat(gstInput.value) || 0;
+        const igstInput = row.querySelector(".item-igst");
+        const cgstInput = row.querySelector(".item-cgst");
+        const sgstInput = row.querySelector(".item-sgst");
+
+        if (isInterStateSelected()) {
+            igstInput.value = gstVal.toFixed(2);
+            cgstInput.value = (0).toFixed(2);
+            sgstInput.value = (0).toFixed(2);
+        } else {
+            igstInput.value = (0).toFixed(2);
+            const half = gstVal / 2;
+            cgstInput.value = half.toFixed(2);
+            sgstInput.value = half.toFixed(2);
+        }
+        recalcRow(gstInput);
+    }
+
+    function recalcRow(inputElem) {
+        const row = inputElem.closest(".item-row");
+        const qty = parseFloat(row.querySelector(".item-qty").value) || 0;
+        const rate = parseFloat(row.querySelector(".item-rate").value) || 0;
+        const amount = qty * rate;
+
+        row.querySelector(".item-amount").value = amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        recalcAll();
+    }
+
+    function recalcAll() {
+        let subtotal = 0;
+        let totalIgst = 0;
+        let totalCgst = 0;
+        let totalSgst = 0;
+
+        const rows = document.querySelectorAll(".item-row");
+        rows.forEach(row => {
+            const qty = parseFloat(row.querySelector(".item-qty").value) || 0;
+            const rate = parseFloat(row.querySelector(".item-rate").value) || 0;
+            const lineAmt = qty * rate;
+
+            const igstRate = parseFloat(row.querySelector(".item-igst").value) || 0;
+            const cgstRate = parseFloat(row.querySelector(".item-cgst").value) || 0;
+            const sgstRate = parseFloat(row.querySelector(".item-sgst").value) || 0;
+
+            const lineIgst = lineAmt * (igstRate / 100);
+            const lineCgst = lineAmt * (cgstRate / 100);
+            const lineSgst = lineAmt * (sgstRate / 100);
+
+            subtotal += lineAmt;
+            totalIgst += lineIgst;
+            totalCgst += lineCgst;
+            totalSgst += lineSgst;
+        });
+
+        const gross = subtotal + totalIgst + totalCgst + totalSgst;
+        const deduction = parseFloat(document.getElementById("deductionAmountInput").value) || 0;
+        const netPayable = Math.max(0, gross - deduction);
+
+        const formatInr = num => num.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        document.getElementById("lblSubtotal").innerText = formatInr(subtotal);
+        document.getElementById("lblIgst").innerText = formatInr(totalIgst);
+        document.getElementById("lblCgst").innerText = formatInr(totalCgst);
+        document.getElementById("lblSgst").innerText = formatInr(totalSgst);
+        document.getElementById("lblGross").innerText = formatInr(gross);
+        document.getElementById("lblNetPayable").innerText = formatInr(netPayable);
+    }
+
+    function addRow() {
+        const tbody = document.getElementById("itemsTableBody");
+        const currentCount = tbody.querySelectorAll(".item-row").length + 1;
+
+        const isInter = isInterStateSelected();
+        const defaultGst = 18;
+        const defIgst = isInter ? defaultGst : 0;
+        const defCgst = isInter ? 0 : 9;
+        const defSgst = isInter ? 0 : 9;
+
+        const tr = document.createElement("tr");
+        tr.className = "item-row";
+        tr.dataset.rowIdx = currentCount;
+        tr.innerHTML = `
+            <td class="text-center fw-semibold text-secondary row-num">${currentCount}</td>
+            <td>
+                <textarea name="itemDescription[]" class="form-control inv-input item-desc" rows="2" placeholder="Item Name &amp; Description" required></textarea>
+            </td>
+            <td>
+                <input type="text" name="itemHsn[]" class="form-control inv-input item-hsn" placeholder="HSN Code" value="998313" />
+            </td>
+            <td>
+                <input type="number" step="0.01" name="itemGst[]" class="form-control inv-input item-gst" placeholder="GST %" value="${defaultGst}" oninput="onGstChange(this)" />
+            </td>
+            <td>
+                <input type="number" step="0.01" name="itemIgst[]" class="form-control inv-input item-igst" placeholder="IGST %" value="${defIgst}" oninput="recalcRow(this)" />
+            </td>
+            <td>
+                <input type="number" step="0.01" name="itemCgst[]" class="form-control inv-input item-cgst" placeholder="CGST %" value="${defCgst}" oninput="recalcRow(this)" />
+            </td>
+            <td>
+                <input type="number" step="0.01" name="itemSgst[]" class="form-control inv-input item-sgst" placeholder="SGST %" value="${defSgst}" oninput="recalcRow(this)" />
+            </td>
+            <td>
+                <input type="number" step="0.01" name="itemQty[]" class="form-control inv-input item-qty" placeholder="Qty" value="1" min="0.01" oninput="recalcRow(this)" required />
+            </td>
+            <td>
+                <input type="number" step="0.01" name="itemRate[]" class="form-control inv-input item-rate text-end" placeholder="0.00" value="0.00" min="0" oninput="recalcRow(this)" required />
+            </td>
+            <td>
+                <input type="text" class="form-control inv-input item-amount text-end bg-light fw-semibold" placeholder="0.00" value="0.00" readonly />
+            </td>
+            <td class="text-center">
+                <button type="button" class="btn btn-sm text-danger rounded-3" style="background: #FEE2E2; width: 32px; height: 32px; padding: 0;" title="Delete Row" onclick="deleteRow(this)">
+                    <i class="fa-solid fa-trash-can" style="font-size: 13px;"></i>
+                </button>
+            </td>
+        `;
+
+        tbody.appendChild(tr);
+        reindexRows();
+        recalcAll();
+    }
+
+    function deleteRow(btn) {
+        const tbody = document.getElementById("itemsTableBody");
+        const rows = tbody.querySelectorAll(".item-row");
+        if (rows.length <= 1) {
+            alert("An invoice requires at least one line item.");
+            return;
+        }
+        btn.closest(".item-row").remove();
+        reindexRows();
+        recalcAll();
+    }
+
+    function reindexRows() {
+        const rows = document.querySelectorAll(".item-row");
+        rows.forEach((row, idx) => {
+            const num = idx + 1;
+            row.dataset.rowIdx = num;
+            const numCell = row.querySelector(".row-num");
+            if (numCell) numCell.innerText = num;
+        });
+    }
+
+    // Quick Add Client from Modal -> Persist in Master & Auto-select
+    async function quickFetchGstin() {
+        const input = document.getElementById('quickClientGstin');
+        const feedback = document.getElementById('quickGstinFeedback');
+        const nameEl = document.getElementById('quickClientName');
+        const panEl = document.getElementById('quickClientPan');
+        const stateEl = document.getElementById('quickClientState');
+        const addrEl = document.getElementById('quickClientAddress');
+
+        if (!input) return;
+        const cleanGstin = input.value.trim().toUpperCase();
+
+        if (cleanGstin.length !== 15) {
+            if (feedback) {
+                feedback.style.display = 'block';
+                feedback.innerHTML = '<span class="text-danger"><i class="fa-solid fa-circle-exclamation me-1"></i> GSTIN must be exactly 15 alphanumeric characters.</span>';
+            }
+            return;
+        }
+
+        if (panEl) panEl.value = cleanGstin.substring(2, 12);
+        if (stateEl) stateEl.value = cleanGstin.substring(0, 2);
+
+        if (feedback) {
+            feedback.style.display = 'block';
+            feedback.innerHTML = '<span class="text-primary"><i class="fa-solid fa-spinner fa-spin me-1"></i> Verifying GSTIN &amp; fetching taxpayer details...</span>';
+        }
+
+        try {
+            const resp = await fetch(`/Masters/LookupGstin?gstin=${encodeURIComponent(cleanGstin)}`);
+            if (resp.ok) {
+                const data = await resp.json();
+                if (data && data.success) {
+                    if (nameEl && data.tradeName) nameEl.value = data.tradeName;
+                    if (panEl && data.pan) panEl.value = data.pan;
+                    if (stateEl && data.stateCode) stateEl.value = data.stateCode;
+                    if (addrEl && data.address) addrEl.value = data.address;
+
+                    if (feedback) {
+                        feedback.innerHTML = `<span class="text-success fw-semibold"><i class="fa-solid fa-circle-check me-1"></i> GSTIN Verified: ${data.stateName || ''} (${data.stateCode || ''})</span>`;
+                    }
+                } else if (feedback) {
+                    feedback.innerHTML = `<span class="text-warning"><i class="fa-solid fa-triangle-exclamation me-1"></i> ${data.message || 'Auto-fetch returned no records. Check manually.'}</span>`;
+                }
+            }
+        } catch (e) {
+            if (feedback) {
+                feedback.innerHTML = '<span class="text-muted"><i class="fa-solid fa-info-circle me-1"></i> Offline verification: State and PAN extracted.</span>';
+            }
+        }
+    }
+
+    async function saveQuickClient() {
+        const errEl = document.getElementById('quickClientError');
+        const btnSave = document.getElementById('btnSaveQuickClient');
+        const nameEl = document.getElementById('quickClientName');
+        const codeEl = document.getElementById('quickClientCode');
+        const addrEl = document.getElementById('quickClientAddress');
+        const gstinEl = document.getElementById('quickClientGstin');
+        const panEl = document.getElementById('quickClientPan');
+        const stateEl = document.getElementById('quickClientState');
+        const contactEl = document.getElementById('quickClientContact');
+        const phoneEl = document.getElementById('quickClientPhone');
+        const emailEl = document.getElementById('quickClientEmail');
+
+        if (errEl) errEl.classList.add('d-none');
+
+        const clientName = (nameEl?.value || '').trim();
+        if (!clientName) {
+            if (errEl) {
+                errEl.innerText = 'Please enter the Client / Company Name.';
+                errEl.classList.remove('d-none');
+            }
+            nameEl?.focus();
+            return;
+        }
+
+        const billingAddr = (addrEl?.value || '').trim();
+        if (!billingAddr) {
+            if (errEl) {
+                errEl.innerText = 'Please enter a Billing Address.';
+                errEl.classList.remove('d-none');
+            }
+            addrEl?.focus();
+            return;
+        }
+
+        const originalBtnHtml = btnSave ? btnSave.innerHTML : '';
+        if (btnSave) {
+            btnSave.disabled = true;
+            btnSave.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Saving to Master...';
+        }
+
+        try {
+            const formData = new FormData();
+            formData.append('clientCode', codeEl?.value || '');
+            formData.append('clientName', clientName);
+            formData.append('billingAddress', billingAddr);
+            formData.append('gstin', gstinEl?.value || '');
+            formData.append('pan', panEl?.value || '');
+            formData.append('stateCode', stateEl?.value || '07');
+            const catEl = document.getElementById('quickClientCategory');
+            formData.append('clientCategory', catEl?.value || 'B2B');
+            const stateText = stateEl && stateEl.selectedIndex >= 0 ? stateEl.options[stateEl.selectedIndex].text.replace(/^\d+\s*-\s*/, '') : '';
+            formData.append('stateName', stateText);
+            formData.append('contactPerson', contactEl?.value || '');
+            formData.append('phone', phoneEl?.value || '');
+            formData.append('email', emailEl?.value || '');
+
+            const token = document.querySelector('#quickClientForm input[name="__RequestVerificationToken"]')?.value ||
+                          document.querySelector('form input[name="__RequestVerificationToken"]')?.value;
+            if (token) {
+                formData.append('__RequestVerificationToken', token);
+            }
+
+            const response = await fetch('/Sales/QuickCreateClient', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+
+            if (result && result.success && result.client) {
+                const c = result.client;
+                const clientSelect = document.getElementById('clientSelect');
+
+                if (clientSelect) {
+                    const newOpt = document.createElement('option');
+                    newOpt.value = c.id;
+                    newOpt.text = c.displayText;
+                    newOpt.setAttribute('data-client-id', c.id);
+                    newOpt.setAttribute('data-client-name', c.clientName);
+                    newOpt.setAttribute('data-contact', c.contactPerson || c.clientName);
+                    newOpt.setAttribute('data-state', c.stateCode || '07');
+                    newOpt.setAttribute('data-gstin', c.gstin || '');
+                    newOpt.setAttribute('data-address', c.billingAddress || '');
+                    clientSelect.appendChild(newOpt);
+
+                    const radioClient = document.getElementById('radioTypeClient');
+                    if (radioClient && !radioClient.checked) {
+                        radioClient.checked = true;
+                        toggleInvoiceAgainst();
+                    }
+
+                    clientSelect.value = c.id;
+                    onClientChange(true);
+                }
+
+                const modalEl = document.getElementById('quickAddClientModal');
+                const modalInstance = bootstrap.Modal.getInstance(modalEl);
+                if (modalInstance) {
+                    modalInstance.hide();
+                }
+
+                document.getElementById('quickClientForm')?.reset();
+                if (codeEl) {
+                    const now = new Date();
+                    const mm = String(now.getMonth() + 1).padStart(2, '0');
+                    const dd = String(now.getDate()).padStart(2, '0');
+                    const hh = String(now.getHours()).padStart(2, '0');
+                    const min = String(now.getMinutes()).padStart(2, '0');
+                    codeEl.value = `CL-${mm}${dd}${hh}${min}`;
+                }
+                const feedbackEl = document.getElementById('quickGstinFeedback');
+                if (feedbackEl) feedbackEl.style.display = 'none';
+
+            } else {
+                if (errEl) {
+                    errEl.innerText = result?.message || 'Failed to register client. Please check details.';
+                    errEl.classList.remove('d-none');
+                }
+            }
+        } catch (err) {
+            console.error('Error saving client:', err);
+            if (errEl) {
+                errEl.innerText = 'Network or server error while registering client.';
+                errEl.classList.remove('d-none');
+            }
+        } finally {
+            if (btnSave) {
+                btnSave.disabled = false;
+                btnSave.innerHTML = originalBtnHtml;
+            }
+        }
+    }
+
+    // Initial setup
+    document.addEventListener("DOMContentLoaded", function () {
+        const quickGstin = document.getElementById('quickClientGstin');
+        const quickPan = document.getElementById('quickClientPan');
+        const quickState = document.getElementById('quickClientState');
+
+        if (quickGstin) {
+            quickGstin.addEventListener('input', function() {
+                this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                if (this.value.length >= 2 && quickState) {
+                    const st = this.value.substring(0, 2);
+                    if (quickState.querySelector(`option[value="${st}"]`)) {
+                        quickState.value = st;
+                    }
+                }
+                if (this.value.length >= 12 && quickPan) {
+                    quickPan.value = this.value.substring(2, 12);
+                }
+                if (this.value.length === 15) {
+                    quickFetchGstin();
+                }
+            });
+
+            quickGstin.addEventListener('paste', function() {
+                setTimeout(() => {
+                    this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                    if (this.value.length >= 12 && quickPan) {
+                        quickPan.value = this.value.substring(2, 12);
+                    }
+                    if (this.value.length === 15) {
+                        quickFetchGstin();
+                    }
+                }, 50);
+            });
+        }
+        toggleInvoiceAgainst();
+        recalcAll();
+    });
+</script>

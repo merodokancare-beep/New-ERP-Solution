@@ -341,6 +341,9 @@
     <div class="no-print-bar">
         <h4><i class="fa-solid fa-file-invoice-dollar"></i> Statutory GST Tax Invoice (Tally Format)</h4>
         <div style="display: flex; gap: 10px;">
+            <a asp-action="Edit" asp-route-id="@Model.Id" class="btn-action" style="background: #7C3AED; color: #fff;">
+                <i class="fa-solid fa-pen-to-square"></i> Edit Invoice
+            </a>
             <button class="btn-action btn-print" onclick="window.print()">
                 <i class="fa-solid fa-print"></i> Print / Save as PDF
             </button>

@@ -387,8 +387,9 @@
                             
                             <!-- Invoice No -->
                             <td>
-                                <a asp-controller="Sales" asp-action="PrintInvoice" asp-route-id="@inv.Id" target="_blank" class="fw-bold text-decoration-none" style="color: #2563EB;">
+                                <a asp-controller="Sales" asp-action="Edit" asp-route-id="@inv.Id" class="fw-bold text-decoration-none" style="color: #2563EB;" title="Click to Edit Invoice">
                                     <span style="color: #60A5FA;">#</span> @inv.InvoiceNumber
+                                    <i class="fa-solid fa-pen ms-1 text-primary" style="font-size: 10px; opacity: 0.6;"></i>
                                 </a>
                             </td>
 
@@ -456,6 +457,11 @@
                             <!-- Actions -->
                             <td class="text-center">
                                 <div class="d-inline-flex align-items-center gap-1.5">
+                                    <!-- Edit Invoice -->
+                                    <a asp-controller="Sales" asp-action="Edit" asp-route-id="@inv.Id" class="action-circle-btn" title="Edit Invoice" style="background: #EFF6FF; color: #2563EB;">
+                                        <i class="fa-solid fa-pen-to-square"></i>
+                                    </a>
+
                                     <!-- Print / View -->
                                     <a asp-controller="Sales" asp-action="PrintInvoice" asp-route-id="@inv.Id" target="_blank" class="action-circle-btn" title="View / Print Invoice">
                                         <i class="fa-regular fa-eye"></i>
@@ -472,6 +478,11 @@
                                             <i class="fa-solid fa-circle-info"></i>
                                         </button>
                                         <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0" aria-labelledby="actionMenu_@inv.Id" style="border-radius: 8px; font-size: 13px;">
+                                            <li>
+                                                <a class="dropdown-item py-1.5 text-primary fw-semibold" asp-controller="Sales" asp-action="Edit" asp-route-id="@inv.Id">
+                                                    <i class="fa-solid fa-pen-to-square me-2 text-primary"></i> Edit Invoice
+                                                </a>
+                                            </li>
                                             <li>
                                                 <a class="dropdown-item py-1.5" asp-controller="Sales" asp-action="PrintInvoice" asp-route-id="@inv.Id" target="_blank">
                                                     <i class="fa-solid fa-file-pdf text-danger me-2"></i> Export PDF
