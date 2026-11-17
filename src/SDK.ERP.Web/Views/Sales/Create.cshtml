@@ -191,10 +191,10 @@
         <div class="inv-card-body">
             <div class="row g-3">
                 <div class="col-md-3">
-                    <label class="inv-label">Reference Number / Invoice No</label>
+                    <label class="inv-label">Reference Number / Invoice No <small class="text-muted fw-normal">(Auto-Generated)</small></label>
                     <div class="input-icon-group">
                         <span class="icon-addon"><i class="fa-solid fa-hashtag"></i></span>
-                        <input type="text" name="invoiceNumber" class="form-control inv-input" value="@ViewBag.AutoInvoiceNumber" placeholder="# Auto-generating..." />
+                        <input type="text" name="invoiceNumber" class="form-control inv-input bg-light" value="@ViewBag.AutoInvoiceNumber" placeholder="# Auto-generating..." readonly />
                     </div>
                 </div>
                 <div class="col-md-3">

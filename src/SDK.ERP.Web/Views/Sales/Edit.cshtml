@@ -202,10 +202,10 @@
         <div class="inv-card-body">
             <div class="row g-3">
                 <div class="col-md-3">
-                    <label class="inv-label">Reference Number / Invoice No <span class="text-danger">*</span></label>
+                    <label class="inv-label">Reference Number / Invoice No <small class="text-muted fw-normal">(Auto-Generated)</small></label>
                     <div class="input-icon-group">
                         <span class="icon-addon"><i class="fa-solid fa-hashtag"></i></span>
-                        <input type="text" name="invoiceNumber" class="form-control inv-input" value="@Model.InvoiceNumber" required />
+                        <input type="text" name="invoiceNumber" class="form-control inv-input bg-light" value="@Model.InvoiceNumber" readonly />
                     </div>
                 </div>
                 <div class="col-md-3">
