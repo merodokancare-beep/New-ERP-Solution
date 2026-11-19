@@ -238,11 +238,13 @@
 <div class="proc-card">
     <form id="createPoForm" method="post" asp-controller="Procurement" asp-action="Create">
         @Html.AntiForgeryToken()
-        <input type="hidden" name="poNumber" value="@autoPoNumber" />
-
-        <!-- Row 1: PO Type & Initiator / Raised By Role -->
+        <!-- Row 1: PO Reference Number, PO Type & Initiator / Raised By Role -->
         <div class="row g-3 mb-3">
-            <div class="col-md-6">
+            <div class="col-md-4">
+                <label class="proc-label">PO Reference Number <small class="text-muted fw-normal">(Auto-Generated)</small></label>
+                <input type="text" name="poNumber" class="form-control proc-input bg-light fw-semibold" value="@autoPoNumber" readonly />
+            </div>
+            <div class="col-md-4">
                 <label class="proc-label">PO Type <span class="text-danger">*</span></label>
                 <select name="poType" id="poType" class="form-select proc-input" required>
                     <option value="Standard Purchase Order" selected>Standard Purchase Order</option>
@@ -254,7 +256,7 @@
                     <option value="Rate Contract">Rate Contract</option>
                 </select>
             </div>
-            <div class="col-md-6">
+            <div class="col-md-4">
                 <label class="proc-label">Initiator / Raised By Role <span class="text-danger">*</span></label>
                 <select name="raisedByRole" id="raisedByRole" class="form-select proc-input" required>
                     <option value="ACCOUNTANT" selected>Accounts Department (Accountant)</option>

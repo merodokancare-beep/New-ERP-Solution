@@ -371,7 +371,7 @@
                                                             <div class="col-md-6">
 
                                                                 <label class="form-label fw-semibold" style="font-size: 12.5px;">Client Code <span class="text-danger">*</span></label>
-                                                                <input type="text" name="clientCode" class="form-control fw-semibold" value="@c.ClientCode" required />
+                                                                <input type="text" name="clientCode" class="form-control fw-semibold bg-light text-muted" value="@c.ClientCode" readonly required />
 
                                                             </div>
 
@@ -700,7 +700,7 @@
                                                             <div class="col-md-6">
 
                                                                 <label class="form-label fw-semibold" style="font-size: 12.5px;">Vendor Code <span class="text-danger">*</span></label>
-                                                                <input type="text" name="vendorCode" class="form-control fw-semibold" value="@v.VendorCode" required />
+                                                                <input type="text" name="vendorCode" class="form-control fw-semibold bg-light text-muted" value="@v.VendorCode" readonly required />
 
                                                             </div>
 
@@ -2344,11 +2344,11 @@
 
                                 <span>Client Code <span class="text-danger">*</span></span>
 
-                                <span class="text-primary" style="font-size: 11px;"><i class="fa-solid fa-pen-to-square me-1"></i>Editable</span>
+                                <span class="text-muted" style="font-size: 11px;"><i class="fa-solid fa-lock me-1"></i>Auto-Generated</span>
 
                             </label>
 
-                            <input type="text" name="clientCode" class="form-control fw-semibold" value="CL-@DateTime.Now.ToString("MMddHHmm")" placeholder="e.g. CL-0101 or custom code" required />
+                            <input type="text" name="clientCode" class="form-control fw-semibold bg-light text-muted" value="CL-@DateTime.Now.ToString("MMddHHmm")" readonly required />
 
                         </div>
 
@@ -2520,11 +2520,11 @@
 
                                 <span>Vendor Code <span class="text-danger">*</span></span>
 
-                                <span class="text-primary" style="font-size: 11px;"><i class="fa-solid fa-pen-to-square me-1"></i>Editable</span>
+                                <span class="text-muted" style="font-size: 11px;"><i class="fa-solid fa-lock me-1"></i>Auto-Generated</span>
 
                             </label>
 
-                            <input type="text" name="vendorCode" class="form-control fw-semibold" value="VEN-@DateTime.Now.ToString("MMddHHmm")" placeholder="e.g. VEN-0101 or custom code" required />
+                            <input type="text" name="vendorCode" class="form-control fw-semibold bg-light text-muted" value="VEN-@DateTime.Now.ToString("MMddHHmm")" readonly required />
 
                         </div>
 
