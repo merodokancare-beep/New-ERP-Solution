@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SDK.ERP.Application.Common;
@@ -14,6 +15,7 @@ using SDK.ERP.Infrastructure.Data;
 
 namespace SDK.ERP.Web.Controllers;
 
+[Authorize(Roles = "SUPER_ADMIN,ADMIN,COMPANY_ADMIN,ORG_ADMIN")]
 public class AdminController : Controller
 {
     private readonly ApplicationDbContext _db;

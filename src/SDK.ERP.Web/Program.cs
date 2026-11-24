@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using SDK.ERP.Application.Common;
@@ -26,7 +28,13 @@ builder.Services.AddScoped<ICurrentTenantProvider, CurrentTenantProvider>();
 builder.Services.AddScoped<ICompanyContext, CompanyContext>();
 
 // 3. Configure MVC & Razor Views
-builder.Services.AddControllersWithViews();
+builder.Services.AddControllersWithViews(options =>
+{
+    var policy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+    options.Filters.Add(new AuthorizeFilter(policy));
+});
 
 // 4. Configure Session & Cookie Authentication
 builder.Services.AddDistributedMemoryCache();
@@ -44,10 +52,10 @@ builder.Services.AddAuthentication("ERP_Auth_Cookie")
         options.Cookie.Name = "SDK_ERP_Session";
         options.Cookie.HttpOnly = true;
         options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-        options.Cookie.SameSite = SameSiteMode.Strict;
+        options.Cookie.SameSite = SameSiteMode.Lax;
         options.LoginPath = "/Account/Login";
         options.AccessDeniedPath = "/Account/AccessDenied";
-        options.ExpireTimeSpan = TimeSpan.FromMinutes(30);
+        options.ExpireTimeSpan = TimeSpan.FromHours(12);
         options.SlidingExpiration = true;
     });
 

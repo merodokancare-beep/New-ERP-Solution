@@ -293,6 +293,13 @@ public class ExpensesController : Controller
         }
 
         var user = await _companyContext.GetCurrentUserAsync();
+        var userRole = (user.Role?.RoleName ?? User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "").ToUpperInvariant();
+        bool isApprover = userRole == "SUPER_ADMIN" || userRole == "ADMIN" || userRole == "COMPANY_ADMIN" || userRole == "ORG_ADMIN" || userRole == "ACCOUNTANT" || user.Username.Equals("admin", StringComparison.OrdinalIgnoreCase);
+        if (!isApprover)
+        {
+            TempData["ErrorMessage"] = "You do not have permission to approve expenses. Only Administrators and Accountants can perform approvals.";
+            return RedirectToAction(nameof(Index));
+        }
         expense.Status = "UNSETTLED";
         expense.ApprovedByUserId = user.Id;
         expense.ApprovedByUserName = string.IsNullOrEmpty(user.FullName) ? user.Username : user.FullName;
@@ -322,6 +329,13 @@ public class ExpensesController : Controller
         }
 
         var user = await _companyContext.GetCurrentUserAsync();
+        var userRole = (user.Role?.RoleName ?? User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "").ToUpperInvariant();
+        bool isApprover = userRole == "SUPER_ADMIN" || userRole == "ADMIN" || userRole == "COMPANY_ADMIN" || userRole == "ORG_ADMIN" || userRole == "ACCOUNTANT" || user.Username.Equals("admin", StringComparison.OrdinalIgnoreCase);
+        if (!isApprover)
+        {
+            TempData["ErrorMessage"] = "You do not have permission to decline expenses. Only Administrators and Accountants can perform approvals.";
+            return RedirectToAction(nameof(Index));
+        }
         expense.Status = "DECLINED";
         expense.DeclinedByUserId = user.Id;
         expense.DeclinedByUserName = string.IsNullOrEmpty(user.FullName) ? user.Username : user.FullName;

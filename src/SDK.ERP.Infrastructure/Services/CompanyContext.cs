@@ -150,8 +150,8 @@ public class CompanyContext : ICompanyContext
             }
         }
 
-        // 3. Fallback to master admin or first active user
-        if (user == null)
+        // 3. Fallback ONLY if running outside an HTTP request (e.g. background worker / CLI seed)
+        if (user == null && httpContext == null)
         {
             user = await _db.Users
                 .IgnoreQueryFilters()
@@ -173,12 +173,12 @@ public class CompanyContext : ICompanyContext
         {
             user = new User
             {
-                Id = 1,
-                Username = "admin",
-                FullName = "Admin User",
-                Designation = "Administrator",
-                Email = "admin@sdksolutions.com",
-                IsActive = true
+                Id = 0,
+                Username = "guest",
+                FullName = "Guest User",
+                Designation = "Guest",
+                Email = "",
+                IsActive = false
             };
         }
         else

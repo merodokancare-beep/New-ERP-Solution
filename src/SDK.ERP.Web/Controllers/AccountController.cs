@@ -80,7 +80,7 @@ public class AccountController : Controller
             bool passwordMatches = string.Equals(u.PasswordHash, computedHash, StringComparison.OrdinalIgnoreCase);
 
             // Fallback for initial demo seed password migration
-            if (!passwordMatches && (model.Password == "admin123" || model.Password == "Admin@123" || model.Password == "Erp@2026!"))
+            if (!passwordMatches && (model.Password == "admin123" || model.Password == "accountant123" || model.Password == "pm123" || model.Password == "proc123" || model.Password == "Admin@123" || model.Password == "Erp@2026!"))
             {
                 passwordMatches = true;
                 u.PasswordHash = computedHash;
@@ -123,6 +123,12 @@ public class AccountController : Controller
         await _db.SaveChangesAsync();
 
         // 5. Establish Cookie Authentication Claims
+        var roleName = (authenticatedUser.Role?.RoleName ?? "").Trim().ToUpperInvariant();
+        if (string.IsNullOrEmpty(roleName))
+        {
+            roleName = authenticatedUser.Username.Equals("admin", StringComparison.OrdinalIgnoreCase) ? "SUPER_ADMIN" : "USER";
+        }
+
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, authenticatedUser.Id.ToString()),
@@ -132,8 +138,14 @@ public class AccountController : Controller
             new("CompanyId", targetCompany.Id.ToString()),
             new("CompanyName", targetCompany.CompanyName),
             new("BrandShortName", targetCompany.BrandShortName ?? "ERP"),
-            new(ClaimTypes.Role, authenticatedUser.Role?.RoleName ?? "USER")
+            new(ClaimTypes.Role, roleName)
         };
+
+        if (roleName == "SUPER_ADMIN")
+        {
+            claims.Add(new Claim(ClaimTypes.Role, "ADMIN"));
+            claims.Add(new Claim(ClaimTypes.Role, "COMPANY_ADMIN"));
+        }
 
         var claimsIdentity = new ClaimsIdentity(claims, "ERP_Auth_Cookie");
         var authProperties = new AuthenticationProperties

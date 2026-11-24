@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 using Microsoft.EntityFrameworkCore;
@@ -26,6 +27,7 @@ using SDK.ERP.Infrastructure.Data;
 
 namespace SDK.ERP.Web.Controllers;
 
+[Authorize(Roles = "SUPER_ADMIN,ADMIN,COMPANY_ADMIN,ORG_ADMIN,ACCOUNTANT,PROCUREMENT_OFFICER,PROJECT_MANAGER,STORE_KEEPER")]
 public class MastersController : Controller
 
 {
@@ -1902,6 +1904,7 @@ public class MastersController : Controller
 
 }
 
+[Authorize(Roles = "SUPER_ADMIN,ADMIN,COMPANY_ADMIN,ORG_ADMIN,PROJECT_MANAGER,ACCOUNTANT")]
 public class ProjectsController : Controller
 {
     private readonly ApplicationDbContext _db;
@@ -2913,6 +2916,7 @@ public class ProjectsController : Controller
     };
 }
 
+[Authorize(Roles = "SUPER_ADMIN,ADMIN,COMPANY_ADMIN,ORG_ADMIN,ACCOUNTANT")]
 public class SalesController : Controller
 {
     private readonly ApplicationDbContext _db;
@@ -4906,6 +4910,7 @@ public class SalesController : Controller
     }
 }
 
+[Authorize(Roles = "SUPER_ADMIN,ADMIN,COMPANY_ADMIN,ORG_ADMIN,PROCUREMENT_OFFICER,PROCUREMENT,ACCOUNTANT,STORE_KEEPER")]
 public class ProcurementController : Controller
 {
     private readonly ApplicationDbContext _db;
@@ -6144,6 +6149,7 @@ public class ProcurementController : Controller
 }
 
 
+[Authorize(Roles = "SUPER_ADMIN,ADMIN,COMPANY_ADMIN,ORG_ADMIN,ACCOUNTANT")]
 public class AccountsController : Controller
 {
     private readonly ApplicationDbContext _db;
@@ -6169,6 +6175,7 @@ public class AccountsController : Controller
     public IActionResult JournalEntry() => RedirectToAction(nameof(Index));
 }
 
+[Authorize(Roles = "SUPER_ADMIN,ADMIN,COMPANY_ADMIN,ORG_ADMIN,ACCOUNTANT")]
 public class GstController : Controller
 {
     private readonly ApplicationDbContext _db;
@@ -6184,6 +6191,7 @@ public class GstController : Controller
     public IActionResult Reconciliation() => RedirectToAction(nameof(Index));
 }
 
+[Authorize(Roles = "SUPER_ADMIN,ADMIN,COMPANY_ADMIN,ORG_ADMIN,ACCOUNTANT")]
 public class BankingController : Controller
 {
     private readonly ApplicationDbContext _db;
@@ -6197,6 +6205,7 @@ public class BankingController : Controller
     public IActionResult Reconciliation() => RedirectToAction("Index", "PettyCash", new { tab = "bankaccounts" });
 }
 
+[Authorize(Roles = "SUPER_ADMIN,ADMIN,COMPANY_ADMIN,ORG_ADMIN,ACCOUNTANT")]
 public class PayrollController : Controller
 {
     private readonly ApplicationDbContext _db;
@@ -6210,6 +6219,7 @@ public class PayrollController : Controller
     }
 }
 
+[Authorize(Roles = "SUPER_ADMIN,ADMIN,COMPANY_ADMIN,ORG_ADMIN,PROJECT_MANAGER,ACCOUNTANT,STORE_KEEPER")]
 public class AssetsController : Controller
 {
     private readonly ApplicationDbContext _db;
@@ -6223,6 +6233,7 @@ public class AssetsController : Controller
     }
 }
 
+[Authorize(Roles = "SUPER_ADMIN,ADMIN,COMPANY_ADMIN,ORG_ADMIN,ACCOUNTANT,PROJECT_MANAGER")]
 public class ReportsController : Controller
 {
     public IActionResult Index()

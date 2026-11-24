@@ -84,19 +84,24 @@ public static class SeedData
 
         // 3. Seed System Roles
         var superAdminRole = await context.Roles.FirstOrDefaultAsync(r => r.RoleName == "SUPER_ADMIN");
+        var pmRole = await context.Roles.FirstOrDefaultAsync(r => r.RoleName == "PROJECT_MANAGER");
+        var accountantRole = await context.Roles.FirstOrDefaultAsync(r => r.RoleName == "ACCOUNTANT");
+        var procurementRole = await context.Roles.FirstOrDefaultAsync(r => r.RoleName == "PROCUREMENT_OFFICER");
+        var storeKeeperRole = await context.Roles.FirstOrDefaultAsync(r => r.RoleName == "STORE_KEEPER");
+
         if (superAdminRole == null)
         {
             superAdminRole = new Role { RoleName = "SUPER_ADMIN", Description = "Full Enterprise Administration", IsSystemRole = true };
-            var pmRole = new Role { RoleName = "PROJECT_MANAGER", Description = "Project Management & Delivery", IsSystemRole = true };
-            var accountantRole = new Role { RoleName = "ACCOUNTANT", Description = "Financial Accounting & GST Compliance", IsSystemRole = true };
-            var procurementRole = new Role { RoleName = "PROCUREMENT_OFFICER", Description = "Purchasing & Vendor Management", IsSystemRole = true };
-            var storeKeeperRole = new Role { RoleName = "STORE_KEEPER", Description = "Internal Office Stock Consumables", IsSystemRole = true };
+            pmRole = new Role { RoleName = "PROJECT_MANAGER", Description = "Project Management & Delivery", IsSystemRole = true };
+            accountantRole = new Role { RoleName = "ACCOUNTANT", Description = "Financial Accounting & GST Compliance", IsSystemRole = true };
+            procurementRole = new Role { RoleName = "PROCUREMENT_OFFICER", Description = "Purchasing & Vendor Management", IsSystemRole = true };
+            storeKeeperRole = new Role { RoleName = "STORE_KEEPER", Description = "Internal Office Stock Consumables", IsSystemRole = true };
 
             context.Roles.AddRange(superAdminRole, pmRole, accountantRole, procurementRole, storeKeeperRole);
             await context.SaveChangesAsync();
         }
 
-        // 3.1 Seed Default Admin User
+        // 3.1 Seed Default Admin & Role-Based Users
         var adminUser = await context.Users.FirstOrDefaultAsync(u => u.Username == "admin");
         if (adminUser == null)
         {
@@ -107,7 +112,7 @@ public static class SeedData
                 RoleId = superAdminRole.Id,
                 Username = "admin",
                 FullName = "Admin User",
-                Designation = "Administrator",
+                Designation = "Enterprise Administrator",
                 PhoneNumber = "+91 98765 43210",
                 Email = "admin@sdksolutions.com",
                 PasswordHash = "AQAAAAEAACcQAAAAEHASHEDADMINPASSWORDEXAMPLE==",
@@ -119,7 +124,64 @@ public static class SeedData
         else if (string.IsNullOrEmpty(adminUser.FullName))
         {
             adminUser.FullName = "Admin User";
-            adminUser.Designation = "Administrator";
+            adminUser.Designation = "Enterprise Administrator";
+            await context.SaveChangesAsync();
+        }
+
+        // Seed Accountant User
+        if (accountantRole != null && !await context.Users.AnyAsync(u => u.Username == "accountant"))
+        {
+            context.Users.Add(new User
+            {
+                CompanyId = company.Id,
+                BranchId = branch.Id,
+                RoleId = accountantRole.Id,
+                Username = "accountant",
+                FullName = "Senior Accountant",
+                Designation = "Chief Accountant",
+                PhoneNumber = "+91 98765 43211",
+                Email = "accountant@sdksolutions.com",
+                PasswordHash = "AQAAAAEAACcQAAAAEHASHEDACCOUNTANTPASSWORDEXAMPLE==",
+                IsActive = true
+            });
+            await context.SaveChangesAsync();
+        }
+
+        // Seed Project Manager User
+        if (pmRole != null && !await context.Users.AnyAsync(u => u.Username == "pm"))
+        {
+            context.Users.Add(new User
+            {
+                CompanyId = company.Id,
+                BranchId = branch.Id,
+                RoleId = pmRole.Id,
+                Username = "pm",
+                FullName = "Lead Project Manager",
+                Designation = "Senior Project Manager",
+                PhoneNumber = "+91 98765 43212",
+                Email = "pm@sdksolutions.com",
+                PasswordHash = "AQAAAAEAACcQAAAAEHASHEDPMPASSWORDEXAMPLE==",
+                IsActive = true
+            });
+            await context.SaveChangesAsync();
+        }
+
+        // Seed Procurement Officer User
+        if (procurementRole != null && !await context.Users.AnyAsync(u => u.Username == "procurement"))
+        {
+            context.Users.Add(new User
+            {
+                CompanyId = company.Id,
+                BranchId = branch.Id,
+                RoleId = procurementRole.Id,
+                Username = "procurement",
+                FullName = "Procurement Lead",
+                Designation = "Purchasing Manager",
+                PhoneNumber = "+91 98765 43213",
+                Email = "procurement@sdksolutions.com",
+                PasswordHash = "AQAAAAEAACcQAAAAEHASHEDPROCPASSWORDEXAMPLE==",
+                IsActive = true
+            });
             await context.SaveChangesAsync();
         }
 

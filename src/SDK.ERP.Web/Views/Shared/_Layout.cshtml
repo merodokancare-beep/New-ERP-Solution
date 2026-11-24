@@ -3,6 +3,13 @@
     var activeMenu = ViewData["ActiveMenu"] as string ?? "Dashboard";
     var currentCompany = await CompanyContext.GetCurrentCompanyAsync();
     var currentUser = await CompanyContext.GetCurrentUserAsync();
+
+    var userRole = (currentUser?.Role?.RoleName ?? User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "").ToUpperInvariant();
+    var isSuperAdmin = userRole == "SUPER_ADMIN" || userRole == "ADMIN" || userRole == "COMPANY_ADMIN" || userRole == "ORG_ADMIN" || (currentUser != null && currentUser.Username.Equals("admin", StringComparison.OrdinalIgnoreCase));
+    var isAccountant = isSuperAdmin || userRole == "ACCOUNTANT";
+    var isProjectManager = isSuperAdmin || userRole == "PROJECT_MANAGER";
+    var isProcurement = isSuperAdmin || userRole == "PROCUREMENT_OFFICER" || userRole == "PROCUREMENT";
+    var isStoreKeeper = isSuperAdmin || isProcurement || userRole == "STORE_KEEPER";
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -47,40 +54,55 @@
                 </a>
 
                 <!-- MASTER DATA -->
-                <div class="nav-section-title">MASTER DATA</div>
-                <a class="nav-item-link @(activeMenu == "Masters" ? "active" : "")" asp-controller="Masters" asp-action="Index" title="Master Catalogs" data-bs-toggle="tooltip" data-bs-placement="right">
-                    <span class="nav-icon-badge blue"><i class="fa-solid fa-sliders"></i></span>
-                    <span class="flex-grow-1">Master Catalogs</span>
-                </a>
+                @if (isSuperAdmin || isAccountant || isProcurement || isProjectManager)
+                {
+                    <div class="nav-section-title">MASTER DATA</div>
+                    <a class="nav-item-link @(activeMenu == "Masters" ? "active" : "")" asp-controller="Masters" asp-action="Index" title="Master Catalogs" data-bs-toggle="tooltip" data-bs-placement="right">
+                        <span class="nav-icon-badge blue"><i class="fa-solid fa-sliders"></i></span>
+                        <span class="flex-grow-1">Master Catalogs</span>
+                    </a>
+                }
 
                 <!-- PROJECT MANAGEMENT -->
-                <div class="nav-section-title">OPERATIONS &amp; PROJECTS</div>
-                <a class="nav-item-link @(activeMenu == "Projects" ? "active" : "")" asp-controller="Projects" asp-action="Index" title="Project Management" data-bs-toggle="tooltip" data-bs-placement="right">
-                    <span class="nav-icon-badge orange"><i class="fa-solid fa-diagram-project"></i></span>
-                    <span class="flex-grow-1">Project Management</span>
-                </a>
+                @if (isSuperAdmin || isProjectManager || isAccountant)
+                {
+                    <div class="nav-section-title">OPERATIONS &amp; PROJECTS</div>
+                    <a class="nav-item-link @(activeMenu == "Projects" ? "active" : "")" asp-controller="Projects" asp-action="Index" title="Project Management" data-bs-toggle="tooltip" data-bs-placement="right">
+                        <span class="nav-icon-badge orange"><i class="fa-solid fa-diagram-project"></i></span>
+                        <span class="flex-grow-1">Project Management</span>
+                    </a>
+                }
 
                 <!-- SALES & BILLING -->
-                <div class="nav-section-title">SALES &amp; RECEIVABLES</div>
-                <a class="nav-item-link @(activeMenu == "Sales" ? "active" : "")" asp-controller="Sales" asp-action="Index" title="Sales & Tax Invoices" data-bs-toggle="tooltip" data-bs-placement="right">
-                    <span class="nav-icon-badge purple"><i class="fa-solid fa-file-invoice-dollar"></i></span>
-                    <span class="flex-grow-1">Sales &amp; Tax Invoices</span>
-                </a>
-                <a class="nav-item-link" asp-controller="Sales" asp-action="AllocatePayment" title="Receipts & Allocation" data-bs-toggle="tooltip" data-bs-placement="right">
-                    <span class="nav-icon-badge green"><i class="fa-solid fa-hand-holding-dollar"></i></span>
-                    <span class="flex-grow-1">Receipts &amp; Allocation</span>
-                </a>
+                @if (isSuperAdmin || isAccountant)
+                {
+                    <div class="nav-section-title">SALES &amp; RECEIVABLES</div>
+                    <a class="nav-item-link @(activeMenu == "Sales" ? "active" : "")" asp-controller="Sales" asp-action="Index" title="Sales & Tax Invoices" data-bs-toggle="tooltip" data-bs-placement="right">
+                        <span class="nav-icon-badge purple"><i class="fa-solid fa-file-invoice-dollar"></i></span>
+                        <span class="flex-grow-1">Sales &amp; Tax Invoices</span>
+                    </a>
+                    <a class="nav-item-link" asp-controller="Sales" asp-action="AllocatePayment" title="Receipts & Allocation" data-bs-toggle="tooltip" data-bs-placement="right">
+                        <span class="nav-icon-badge green"><i class="fa-solid fa-hand-holding-dollar"></i></span>
+                        <span class="flex-grow-1">Receipts &amp; Allocation</span>
+                    </a>
+                }
 
                 <!-- PROCUREMENT & PAYABLES -->
-                <div class="nav-section-title">PROCUREMENT &amp; PAYABLES</div>
-                <a class="nav-item-link @(activeMenu == "Procurement" ? "active" : "")" asp-controller="Procurement" asp-action="Index" title="Procurement & POs" data-bs-toggle="tooltip" data-bs-placement="right">
-                    <span class="nav-icon-badge pink"><i class="fa-solid fa-cart-flatbed"></i></span>
-                    <span class="flex-grow-1">Procurement &amp; POs</span>
-                </a>
-                <a class="nav-item-link" asp-controller="Procurement" asp-action="Inventory" title="Office Inventory" data-bs-toggle="tooltip" data-bs-placement="right">
-                    <span class="nav-icon-badge teal"><i class="fa-solid fa-boxes-stacked"></i></span>
-                    <span class="flex-grow-1">Office Inventory</span>
-                </a>
+                @if (isSuperAdmin || isProcurement || isAccountant || isStoreKeeper)
+                {
+                    <div class="nav-section-title">PROCUREMENT &amp; PAYABLES</div>
+                    @if (isSuperAdmin || isProcurement || isAccountant)
+                    {
+                        <a class="nav-item-link @(activeMenu == "Procurement" ? "active" : "")" asp-controller="Procurement" asp-action="Index" title="Procurement & POs" data-bs-toggle="tooltip" data-bs-placement="right">
+                            <span class="nav-icon-badge pink"><i class="fa-solid fa-cart-flatbed"></i></span>
+                            <span class="flex-grow-1">Procurement &amp; POs</span>
+                        </a>
+                    }
+                    <a class="nav-item-link" asp-controller="Procurement" asp-action="Inventory" title="Office Inventory" data-bs-toggle="tooltip" data-bs-placement="right">
+                        <span class="nav-icon-badge teal"><i class="fa-solid fa-boxes-stacked"></i></span>
+                        <span class="flex-grow-1">Office Inventory</span>
+                    </a>
+                }
 
                 <!-- EXPENSES -->
                 <div class="nav-section-title">EXPENSES</div>
@@ -88,51 +110,72 @@
                     <span class="nav-icon-badge amber"><i class="fa-solid fa-money-bill-transfer"></i></span>
                     <span class="flex-grow-1">Direct Payments</span>
                 </a>
-                <a class="nav-item-link @(activeMenu == "ExpensesApproval" ? "active" : "")" asp-controller="Expenses" asp-action="Index" asp-route-tab="pending" title="Direct Payments Approval" data-bs-toggle="tooltip" data-bs-placement="right">
-                    <span class="nav-icon-badge green"><i class="fa-solid fa-clipboard-check"></i></span>
-                    <span class="flex-grow-1">Direct Payments Approval</span>
-                </a>
+                @if (isSuperAdmin || isAccountant)
+                {
+                    <a class="nav-item-link @(activeMenu == "ExpensesApproval" ? "active" : "")" asp-controller="Expenses" asp-action="Index" asp-route-tab="pending" title="Direct Payments Approval" data-bs-toggle="tooltip" data-bs-placement="right">
+                        <span class="nav-icon-badge green"><i class="fa-solid fa-clipboard-check"></i></span>
+                        <span class="flex-grow-1">Direct Payments Approval</span>
+                    </a>
+                }
 
                 <!-- FINANCIALS & TAX -->
-                <div class="nav-section-title">FINANCIALS &amp; TAXATION</div>
-                <a class="nav-item-link @(activeMenu == "Accounts" ? "active" : "")" asp-controller="Accounts" asp-action="Index" title="General Ledger & COA" data-bs-toggle="tooltip" data-bs-placement="right">
-                    <span class="nav-icon-badge teal"><i class="fa-solid fa-scale-unbalanced-flip"></i></span>
-                    <span class="flex-grow-1">General Ledger &amp; COA</span>
-                </a>
-                <a class="nav-item-link @(activeMenu == "Gst" ? "active" : "")" asp-controller="Gst" asp-action="Index" title="GST & Tax Compliance" data-bs-toggle="tooltip" data-bs-placement="right">
-                    <span class="nav-icon-badge blue"><i class="fa-solid fa-file-shield"></i></span>
-                    <span class="flex-grow-1">GST &amp; Tax Compliance</span>
-                </a>
-                <a class="nav-item-link @(activeMenu == "PettyCash" || activeMenu == "Banking" ? "active" : "")" asp-controller="PettyCash" asp-action="Index" title="Petty Cash Management" data-bs-toggle="tooltip" data-bs-placement="right">
-                    <span class="nav-icon-badge amber"><i class="fa-solid fa-wallet"></i></span>
-                    <span class="flex-grow-1">Petty Cash Management</span>
-                </a>
+                @if (isSuperAdmin || isAccountant || isProjectManager)
+                {
+                    <div class="nav-section-title">FINANCIALS &amp; TAXATION</div>
+                    @if (isSuperAdmin || isAccountant)
+                    {
+                        <a class="nav-item-link @(activeMenu == "Accounts" ? "active" : "")" asp-controller="Accounts" asp-action="Index" title="General Ledger & COA" data-bs-toggle="tooltip" data-bs-placement="right">
+                            <span class="nav-icon-badge teal"><i class="fa-solid fa-scale-unbalanced-flip"></i></span>
+                            <span class="flex-grow-1">General Ledger &amp; COA</span>
+                        </a>
+                        <a class="nav-item-link @(activeMenu == "Gst" ? "active" : "")" asp-controller="Gst" asp-action="Index" title="GST & Tax Compliance" data-bs-toggle="tooltip" data-bs-placement="right">
+                            <span class="nav-icon-badge blue"><i class="fa-solid fa-file-shield"></i></span>
+                            <span class="flex-grow-1">GST &amp; Tax Compliance</span>
+                        </a>
+                    }
+                    <a class="nav-item-link @(activeMenu == "PettyCash" || activeMenu == "Banking" ? "active" : "")" asp-controller="PettyCash" asp-action="Index" title="Petty Cash Management" data-bs-toggle="tooltip" data-bs-placement="right">
+                        <span class="nav-icon-badge amber"><i class="fa-solid fa-wallet"></i></span>
+                        <span class="flex-grow-1">Petty Cash Management</span>
+                    </a>
+                }
 
                 <!-- HR & ASSETS -->
-                <div class="nav-section-title">HUMAN RESOURCES &amp; ASSETS</div>
-                <a class="nav-item-link @(activeMenu == "Payroll" ? "active" : "")" asp-controller="Payroll" asp-action="Index" title="Payroll & HR" data-bs-toggle="tooltip" data-bs-placement="right">
-                    <span class="nav-icon-badge purple"><i class="fa-solid fa-users-gear"></i></span>
-                    <span class="flex-grow-1">Payroll &amp; HR</span>
-                </a>
-                <a class="nav-item-link @(activeMenu == "Assets" ? "active" : "")" asp-controller="Assets" asp-action="Index" title="Fixed Assets & Tickets" data-bs-toggle="tooltip" data-bs-placement="right">
-                    <span class="nav-icon-badge orange"><i class="fa-solid fa-laptop-code"></i></span>
-                    <span class="flex-grow-1">Fixed Assets &amp; Tickets</span>
-                </a>
+                @if (isSuperAdmin || isAccountant || isProjectManager || isStoreKeeper)
+                {
+                    <div class="nav-section-title">HUMAN RESOURCES &amp; ASSETS</div>
+                    @if (isSuperAdmin || isAccountant)
+                    {
+                        <a class="nav-item-link @(activeMenu == "Payroll" ? "active" : "")" asp-controller="Payroll" asp-action="Index" title="Payroll & HR" data-bs-toggle="tooltip" data-bs-placement="right">
+                            <span class="nav-icon-badge purple"><i class="fa-solid fa-users-gear"></i></span>
+                            <span class="flex-grow-1">Payroll &amp; HR</span>
+                        </a>
+                    }
+                    <a class="nav-item-link @(activeMenu == "Assets" ? "active" : "")" asp-controller="Assets" asp-action="Index" title="Fixed Assets & Tickets" data-bs-toggle="tooltip" data-bs-placement="right">
+                        <span class="nav-icon-badge orange"><i class="fa-solid fa-laptop-code"></i></span>
+                        <span class="flex-grow-1">Fixed Assets &amp; Tickets</span>
+                    </a>
+                }
 
                 <!-- REPORTS & SYSTEM ADMIN -->
                 <div class="nav-section-title">MIS &amp; GOVERNANCE</div>
-                <a class="nav-item-link @(activeMenu == "Reports" ? "active" : "")" asp-controller="Reports" asp-action="Index" title="Reports & Analytics" data-bs-toggle="tooltip" data-bs-placement="right">
-                    <span class="nav-icon-badge teal"><i class="fa-solid fa-chart-line"></i></span>
-                    <span class="flex-grow-1">Reports &amp; Analytics</span>
-                </a>
+                @if (isSuperAdmin || isAccountant || isProjectManager)
+                {
+                    <a class="nav-item-link @(activeMenu == "Reports" ? "active" : "")" asp-controller="Reports" asp-action="Index" title="Reports & Analytics" data-bs-toggle="tooltip" data-bs-placement="right">
+                        <span class="nav-icon-badge teal"><i class="fa-solid fa-chart-line"></i></span>
+                        <span class="flex-grow-1">Reports &amp; Analytics</span>
+                    </a>
+                }
                 <a class="nav-item-link @(activeMenu == "Profile" ? "active" : "")" asp-controller="Profile" asp-action="Index" title="Organization &amp; Profile" data-bs-toggle="tooltip" data-bs-placement="right">
                     <span class="nav-icon-badge blue"><i class="fa-solid fa-building-gear"></i></span>
                     <span class="flex-grow-1">Organization Profile</span>
                 </a>
-                <a class="nav-item-link @(activeMenu == "Admin" ? "active" : "")" asp-controller="Admin" asp-action="Index" title="Admin, Audit & RBAC" data-bs-toggle="tooltip" data-bs-placement="right">
-                    <span class="nav-icon-badge pink"><i class="fa-solid fa-shield-halved"></i></span>
-                    <span class="flex-grow-1">Admin, Audit &amp; RBAC</span>
-                </a>
+                @if (isSuperAdmin)
+                {
+                    <a class="nav-item-link @(activeMenu == "Admin" ? "active" : "")" asp-controller="Admin" asp-action="Index" title="Admin, Audit & RBAC" data-bs-toggle="tooltip" data-bs-placement="right">
+                        <span class="nav-icon-badge pink"><i class="fa-solid fa-shield-halved"></i></span>
+                        <span class="flex-grow-1">Admin, Audit &amp; RBAC</span>
+                    </a>
+                }
             </div>
         </aside>
 
@@ -414,19 +457,22 @@
                                     </div>
                                 </a>
                             </li>
-                            <li><hr class="dropdown-divider my-2"></li>
-                            <li>
-                                <a class="dropdown-item py-2 rounded d-flex align-items-center gap-2 text-secondary" asp-controller="Admin" asp-action="Index">
-                                    <i class="fa-solid fa-shield-halved text-secondary"></i>
-                                    <span class="fw-semibold" style="font-size: 13px;">Security &amp; Audit Logs</span>
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item py-2 rounded d-flex align-items-center gap-2 text-danger" href="/Admin?tab=reset">
-                                    <i class="fa-solid fa-triangle-exclamation text-danger"></i>
-                                    <span class="fw-semibold" style="font-size: 13px;">Testing &amp; Data Reset</span>
-                                </a>
-                            </li>
+@if (isSuperAdmin)
+                            {
+                                <li><hr class="dropdown-divider my-2"></li>
+                                <li>
+                                    <a class="dropdown-item py-2 rounded d-flex align-items-center gap-2 text-secondary" asp-controller="Admin" asp-action="Index">
+                                        <i class="fa-solid fa-shield-halved text-secondary"></i>
+                                        <span class="fw-semibold" style="font-size: 13px;">Security &amp; Audit Logs</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item py-2 rounded d-flex align-items-center gap-2 text-danger" href="/Admin?tab=reset">
+                                        <i class="fa-solid fa-triangle-exclamation text-danger"></i>
+                                        <span class="fw-semibold" style="font-size: 13px;">Testing &amp; Data Reset</span>
+                                    </a>
+                                </li>
+                            }
                             <li><hr class="dropdown-divider my-2"></li>
                             <li>
                                 <form asp-controller="Account" asp-action="Logout" method="post" class="d-inline w-100">

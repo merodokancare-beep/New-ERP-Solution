@@ -208,10 +208,26 @@
                 <i class="fa-solid fa-arrow-right-to-bracket me-2"></i> Log In to Workspace
             </button>
 
-            <!-- Quick Demo Helper -->
-            <div class="p-2 rounded-3 bg-light border text-center text-muted" style="font-size: 11.5px;">
-                <i class="fa-solid fa-info-circle me-1 text-primary"></i> Initial Default Admin: 
-                <strong class="text-dark">admin</strong> / Password: <strong class="text-dark">admin123</strong>
+            <!-- Quick Role-Based User Credentials -->
+            <div class="p-3 rounded-3 bg-light border mb-3" style="font-size: 12px;">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="fw-bold text-dark"><i class="fa-solid fa-user-shield me-1 text-primary"></i> Role-Based Demo Accounts</span>
+                    <span class="text-muted" style="font-size: 10.5px;">Click to auto-fill</span>
+                </div>
+                <div class="d-flex flex-wrap gap-1">
+                    <button type="button" class="btn btn-sm btn-outline-primary py-1 px-2 rounded-pill fill-cred" data-user="admin" data-pwd="admin123" style="font-size: 11px;">
+                        <i class="fa-solid fa-crown me-1"></i> Admin
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-success py-1 px-2 rounded-pill fill-cred" data-user="accountant" data-pwd="accountant123" style="font-size: 11px;">
+                        <i class="fa-solid fa-calculator me-1"></i> Accountant
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-warning py-1 px-2 rounded-pill fill-cred text-dark" data-user="pm" data-pwd="pm123" style="font-size: 11px;">
+                        <i class="fa-solid fa-diagram-project me-1"></i> Project Mgr
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2 rounded-pill fill-cred" data-user="procurement" data-pwd="proc123" style="font-size: 11px;">
+                        <i class="fa-solid fa-cart-shopping me-1"></i> Procurement
+                    </button>
+                </div>
             </div>
 
             <!-- Onboard Sister / New Company Link -->
@@ -237,6 +253,14 @@
             togglePasswordIcon.className = isPassword ? 'fa-regular fa-eye-slash' : 'fa-regular fa-eye';
         });
     }
+
+    document.querySelectorAll('.fill-cred').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const usernameInput = document.querySelector('input[name="Username"]');
+            if (usernameInput) usernameInput.value = this.getAttribute('data-user');
+            if (loginPassword) loginPassword.value = this.getAttribute('data-pwd');
+        });
+    });
 </script>
 
 </body>
