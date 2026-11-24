@@ -2961,72 +2961,107 @@ public class SalesController : Controller
 
     private async Task EnsureSalesInvoiceColumnsAsync()
     {
-        try
+        var scripts = new[]
         {
-            await _db.Database.ExecuteSqlRawAsync(@"
-                IF OBJECT_ID('[sales].[sales_invoices]') IS NOT NULL
-                BEGIN
-                    IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoices]') AND name = 'ProjectId' AND is_nullable = 0)
-                        ALTER TABLE [sales].[sales_invoices] ALTER COLUMN [ProjectId] BIGINT NULL;
-                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoices]') AND name = 'WorkOrderNo')
-                        ALTER TABLE [sales].[sales_invoices] ADD [WorkOrderNo] NVARCHAR(100) NULL;
-                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoices]') AND name = 'WorkOrderDate')
-                        ALTER TABLE [sales].[sales_invoices] ADD [WorkOrderDate] DATETIME2 NULL;
-                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoices]') AND name = 'BillingAttention')
-                        ALTER TABLE [sales].[sales_invoices] ADD [BillingAttention] NVARCHAR(250) NULL;
-                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoices]') AND name = 'Remarks')
-                        ALTER TABLE [sales].[sales_invoices] ADD [Remarks] NVARCHAR(MAX) NULL;
-                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoices]') AND name = 'DeductionRemarks')
-                        ALTER TABLE [sales].[sales_invoices] ADD [DeductionRemarks] NVARCHAR(250) NULL;
-                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoices]') AND name = 'DeductionAmount')
-                        ALTER TABLE [sales].[sales_invoices] ADD [DeductionAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;
-                END
+            @"IF OBJECT_ID('[sales].[sales_invoices]') IS NOT NULL
+              BEGIN
+                  IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoices]') AND name = 'WorkOrderNo')
+                      ALTER TABLE [sales].[sales_invoices] ADD [WorkOrderNo] NVARCHAR(100) NULL;
+                  IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoices]') AND name = 'WorkOrderDate')
+                      ALTER TABLE [sales].[sales_invoices] ADD [WorkOrderDate] DATETIME2 NULL;
+                  IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoices]') AND name = 'BillingAttention')
+                      ALTER TABLE [sales].[sales_invoices] ADD [BillingAttention] NVARCHAR(250) NULL;
+                  IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoices]') AND name = 'Remarks')
+                      ALTER TABLE [sales].[sales_invoices] ADD [Remarks] NVARCHAR(MAX) NULL;
+                  IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoices]') AND name = 'DeductionRemarks')
+                      ALTER TABLE [sales].[sales_invoices] ADD [DeductionRemarks] NVARCHAR(250) NULL;
+                  IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoices]') AND name = 'DeductionAmount')
+                      ALTER TABLE [sales].[sales_invoices] ADD [DeductionAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                  IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoices]') AND name = 'PlaceOfSupply')
+                      ALTER TABLE [sales].[sales_invoices] ADD [PlaceOfSupply] NVARCHAR(50) NULL;
+              END",
 
-                IF OBJECT_ID('[SalesInvoices]') IS NOT NULL OR OBJECT_ID('[dbo].[SalesInvoices]') IS NOT NULL
-                BEGIN
-                    IF EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoices]') OR object_id = OBJECT_ID('[dbo].[SalesInvoices]')) AND name = 'ProjectId' AND is_nullable = 0)
-                        ALTER TABLE [SalesInvoices] ALTER COLUMN [ProjectId] BIGINT NULL;
-                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoices]') OR object_id = OBJECT_ID('[dbo].[SalesInvoices]')) AND name = 'WorkOrderNo')
-                        ALTER TABLE [SalesInvoices] ADD [WorkOrderNo] NVARCHAR(100) NULL;
-                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoices]') OR object_id = OBJECT_ID('[dbo].[SalesInvoices]')) AND name = 'WorkOrderDate')
-                        ALTER TABLE [SalesInvoices] ADD [WorkOrderDate] DATETIME2 NULL;
-                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoices]') OR object_id = OBJECT_ID('[dbo].[SalesInvoices]')) AND name = 'BillingAttention')
-                        ALTER TABLE [SalesInvoices] ADD [BillingAttention] NVARCHAR(250) NULL;
-                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoices]') OR object_id = OBJECT_ID('[dbo].[SalesInvoices]')) AND name = 'Remarks')
-                        ALTER TABLE [SalesInvoices] ADD [Remarks] NVARCHAR(MAX) NULL;
-                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoices]') OR object_id = OBJECT_ID('[dbo].[SalesInvoices]')) AND name = 'DeductionRemarks')
-                        ALTER TABLE [SalesInvoices] ADD [DeductionRemarks] NVARCHAR(250) NULL;
-                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoices]') OR object_id = OBJECT_ID('[dbo].[SalesInvoices]')) AND name = 'DeductionAmount')
-                        ALTER TABLE [SalesInvoices] ADD [DeductionAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;
-                END
+            @"IF OBJECT_ID('[SalesInvoices]') IS NOT NULL OR OBJECT_ID('[dbo].[SalesInvoices]') IS NOT NULL
+              BEGIN
+                  IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoices]') OR object_id = OBJECT_ID('[dbo].[SalesInvoices]')) AND name = 'WorkOrderNo')
+                      ALTER TABLE [SalesInvoices] ADD [WorkOrderNo] NVARCHAR(100) NULL;
+                  IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoices]') OR object_id = OBJECT_ID('[dbo].[SalesInvoices]')) AND name = 'WorkOrderDate')
+                      ALTER TABLE [SalesInvoices] ADD [WorkOrderDate] DATETIME2 NULL;
+                  IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoices]') OR object_id = OBJECT_ID('[dbo].[SalesInvoices]')) AND name = 'BillingAttention')
+                      ALTER TABLE [SalesInvoices] ADD [BillingAttention] NVARCHAR(250) NULL;
+                  IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoices]') OR object_id = OBJECT_ID('[dbo].[SalesInvoices]')) AND name = 'Remarks')
+                      ALTER TABLE [SalesInvoices] ADD [Remarks] NVARCHAR(MAX) NULL;
+                  IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoices]') OR object_id = OBJECT_ID('[dbo].[SalesInvoices]')) AND name = 'DeductionRemarks')
+                      ALTER TABLE [SalesInvoices] ADD [DeductionRemarks] NVARCHAR(250) NULL;
+                  IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoices]') OR object_id = OBJECT_ID('[dbo].[SalesInvoices]')) AND name = 'DeductionAmount')
+                      ALTER TABLE [SalesInvoices] ADD [DeductionAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                  IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoices]') OR object_id = OBJECT_ID('[dbo].[SalesInvoices]')) AND name = 'PlaceOfSupply')
+                      ALTER TABLE [SalesInvoices] ADD [PlaceOfSupply] NVARCHAR(50) NULL;
+              END",
 
-                IF OBJECT_ID('[sales].[sales_invoice_items]') IS NOT NULL
-                BEGIN
-                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoice_items]') AND name = 'GstRate')
-                        ALTER TABLE [sales].[sales_invoice_items] ADD [GstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
-                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoice_items]') AND name = 'IgstRate')
-                        ALTER TABLE [sales].[sales_invoice_items] ADD [IgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
-                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoice_items]') AND name = 'CgstRate')
-                        ALTER TABLE [sales].[sales_invoice_items] ADD [CgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
-                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoice_items]') AND name = 'SgstRate')
-                        ALTER TABLE [sales].[sales_invoice_items] ADD [SgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
-                END
+            @"IF OBJECT_ID('[SalesInvoiceItems]') IS NULL AND OBJECT_ID('[dbo].[SalesInvoiceItems]') IS NULL AND OBJECT_ID('[sales].[sales_invoice_items]') IS NULL
+              BEGIN
+                  CREATE TABLE [dbo].[SalesInvoiceItems] (
+                      [Id] BIGINT NOT NULL IDENTITY(1,1) PRIMARY KEY,
+                      [InvoiceId] BIGINT NOT NULL,
+                      [ItemDescription] NVARCHAR(MAX) NOT NULL DEFAULT '',
+                      [HsnSacCode] NVARCHAR(50) NOT NULL DEFAULT '',
+                      [Quantity] DECIMAL(18,2) NOT NULL DEFAULT 1.00,
+                      [UnitId] INT NULL,
+                      [UnitRate] DECIMAL(18,2) NOT NULL DEFAULT 0.00,
+                      [DiscountPercent] DECIMAL(18,2) NOT NULL DEFAULT 0.00,
+                      [TaxableValue] DECIMAL(18,2) NOT NULL DEFAULT 0.00,
+                      [GstRate] DECIMAL(18,2) NOT NULL DEFAULT 0.00,
+                      [IgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0.00,
+                      [CgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0.00,
+                      [SgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0.00,
+                      [TaxRateId] INT NULL,
+                      [CgstAmount] DECIMAL(18,2) NOT NULL DEFAULT 0.00,
+                      [SgstAmount] DECIMAL(18,2) NOT NULL DEFAULT 0.00,
+                      [IgstAmount] DECIMAL(18,2) NOT NULL DEFAULT 0.00,
+                      [LineTotal] DECIMAL(18,2) NOT NULL DEFAULT 0.00
+                  );
+              END",
 
-                IF OBJECT_ID('[SalesInvoiceItems]') IS NOT NULL OR OBJECT_ID('[dbo].[SalesInvoiceItems]') IS NOT NULL
-                BEGIN
-                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoiceItems]') OR object_id = OBJECT_ID('[dbo].[SalesInvoiceItems]')) AND name = 'GstRate')
-                        ALTER TABLE [SalesInvoiceItems] ADD [GstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
-                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoiceItems]') OR object_id = OBJECT_ID('[dbo].[SalesInvoiceItems]')) AND name = 'IgstRate')
-                        ALTER TABLE [SalesInvoiceItems] ADD [IgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
-                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoiceItems]') OR object_id = OBJECT_ID('[dbo].[SalesInvoiceItems]')) AND name = 'CgstRate')
-                        ALTER TABLE [SalesInvoiceItems] ADD [CgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
-                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoiceItems]') OR object_id = OBJECT_ID('[dbo].[SalesInvoiceItems]')) AND name = 'SgstRate')
-                        ALTER TABLE [SalesInvoiceItems] ADD [SgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
-                END
-            ");
-            await EnsureCustomerReceiptColumnsAsync();
+            @"IF OBJECT_ID('[sales].[sales_invoice_items]') IS NOT NULL
+              BEGIN
+                  IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoice_items]') AND name = 'GstRate')
+                      ALTER TABLE [sales].[sales_invoice_items] ADD [GstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                  IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoice_items]') AND name = 'IgstRate')
+                      ALTER TABLE [sales].[sales_invoice_items] ADD [IgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                  IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoice_items]') AND name = 'CgstRate')
+                      ALTER TABLE [sales].[sales_invoice_items] ADD [CgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                  IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoice_items]') AND name = 'SgstRate')
+                      ALTER TABLE [sales].[sales_invoice_items] ADD [SgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                  IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoice_items]') AND name = 'TaxRateId' AND is_nullable = 0)
+                      ALTER TABLE [sales].[sales_invoice_items] ALTER COLUMN [TaxRateId] INT NULL;
+              END",
+
+            @"IF OBJECT_ID('[SalesInvoiceItems]') IS NOT NULL OR OBJECT_ID('[dbo].[SalesInvoiceItems]') IS NOT NULL
+              BEGIN
+                  IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoiceItems]') OR object_id = OBJECT_ID('[dbo].[SalesInvoiceItems]')) AND name = 'GstRate')
+                      ALTER TABLE [SalesInvoiceItems] ADD [GstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                  IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoiceItems]') OR object_id = OBJECT_ID('[dbo].[SalesInvoiceItems]')) AND name = 'IgstRate')
+                      ALTER TABLE [SalesInvoiceItems] ADD [IgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                  IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoiceItems]') OR object_id = OBJECT_ID('[dbo].[SalesInvoiceItems]')) AND name = 'CgstRate')
+                      ALTER TABLE [SalesInvoiceItems] ADD [CgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                  IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoiceItems]') OR object_id = OBJECT_ID('[dbo].[SalesInvoiceItems]')) AND name = 'SgstRate')
+                      ALTER TABLE [SalesInvoiceItems] ADD [SgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                  IF EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoiceItems]') OR object_id = OBJECT_ID('[dbo].[SalesInvoiceItems]')) AND name = 'TaxRateId' AND is_nullable = 0)
+                      ALTER TABLE [SalesInvoiceItems] ALTER COLUMN [TaxRateId] INT NULL;
+              END"
+        };
+
+        foreach (var sql in scripts)
+        {
+            try
+            {
+                await _db.Database.ExecuteSqlRawAsync(sql);
+            }
+            catch { }
         }
-        catch { }
+
+        await EnsureCustomerReceiptColumnsAsync();
     }
 
     private async Task EnsureCustomerReceiptColumnsAsync()
@@ -4452,11 +4487,35 @@ public class SalesController : Controller
         ViewData["ActiveMenu"] = "Sales";
         await EnsureSalesInvoiceColumnsAsync();
 
-        var invoice = await _db.SalesInvoices
-            .Include(i => i.Client)
-            .Include(i => i.Project)
-            .Include(i => i.Items)
-            .FirstOrDefaultAsync(i => i.Id == id);
+        SalesInvoice? invoice = null;
+        try
+        {
+            invoice = await _db.SalesInvoices
+                .Include(i => i.Client)
+                .Include(i => i.Project)
+                .Include(i => i.Company)
+                .Include(i => i.Items)
+                .FirstOrDefaultAsync(i => i.Id == id);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SalesController] Error loading invoice {id} with Items: {ex.Message}");
+            await EnsureSalesInvoiceColumnsAsync();
+            try
+            {
+                invoice = await _db.SalesInvoices
+                    .Include(i => i.Client)
+                    .Include(i => i.Project)
+                    .Include(i => i.Company)
+                    .FirstOrDefaultAsync(i => i.Id == id);
+            }
+            catch (Exception ex2)
+            {
+                Console.WriteLine($"[SalesController] Error loading invoice {id}: {ex2.Message}");
+                TempData["ErrorMessage"] = $"Unable to load invoice: {ex2.Message}";
+                return RedirectToAction(nameof(Index));
+            }
+        }
 
         if (invoice == null)
         {
@@ -4464,7 +4523,7 @@ public class SalesController : Controller
             return RedirectToAction(nameof(Index));
         }
 
-        var company = await _companyContext.GetCurrentCompanyAsync() ?? invoice.Company;
+        var company = await _companyContext.GetCurrentCompanyAsync() ?? invoice.Company ?? await _db.Companies.FirstOrDefaultAsync();
         ViewBag.Company = company;
 
         var fy = await _db.FinancialYears.FirstOrDefaultAsync(f => !f.IsClosed);
@@ -4485,11 +4544,21 @@ public class SalesController : Controller
         catch
         {
             await EnsurePurchaseOrderColumnsAsync();
-            projects = await _db.Projects
-                .Include(p => p.Client)
-                .Include(p => p.PurchaseOrders)
-                .AsNoTracking()
-                .ToListAsync();
+            try
+            {
+                projects = await _db.Projects
+                    .Include(p => p.Client)
+                    .Include(p => p.PurchaseOrders)
+                    .AsNoTracking()
+                    .ToListAsync();
+            }
+            catch
+            {
+                projects = await _db.Projects
+                    .Include(p => p.Client)
+                    .AsNoTracking()
+                    .ToListAsync();
+            }
         }
         ViewBag.Projects = projects;
         ViewBag.Clients = await _db.Clients.AsNoTracking().ToListAsync();
@@ -4516,251 +4585,276 @@ public class SalesController : Controller
         decimal? gstRate,
         IFormCollection form)
     {
-        await EnsureSalesInvoiceColumnsAsync();
-        var inv = await _db.SalesInvoices
-            .Include(i => i.Items)
-            .FirstOrDefaultAsync(i => i.Id == id);
-
-        if (inv == null)
+        try
         {
-            TempData["ErrorMessage"] = "Invoice not found.";
-            return RedirectToAction(nameof(Index));
-        }
+            await EnsureSalesInvoiceColumnsAsync();
+            var inv = await _db.SalesInvoices
+                .Include(i => i.Items)
+                .FirstOrDefaultAsync(i => i.Id == id);
 
-        var company = await _companyContext.GetCurrentCompanyAsync();
-
-        Project? project = null;
-        Client? client = null;
-
-        var invoiceAgainst = form["invoiceAgainst"].ToString()?.Trim();
-        if (string.IsNullOrEmpty(invoiceAgainst))
-        {
-            invoiceAgainst = (projectId.HasValue && projectId.Value > 0) ? "Project" : "Client";
-        }
-
-        if (invoiceAgainst == "Project" && projectId.HasValue && projectId.Value > 0)
-        {
-            project = await _db.Projects.Include(p => p.Client).FirstOrDefaultAsync(p => p.Id == projectId.Value);
-            if (project != null)
+            if (inv == null)
             {
-                client = project.Client ?? await _db.Clients.FindAsync(project.ClientId);
-                clientId = project.ClientId;
+                TempData["ErrorMessage"] = "Invoice not found.";
+                return RedirectToAction(nameof(Index));
             }
-        }
-        else if (invoiceAgainst == "Client" || (clientId.HasValue && clientId.Value > 0 && (!projectId.HasValue || projectId.Value == 0)))
-        {
-            if (clientId.HasValue && clientId.Value > 0)
+
+            var company = await _companyContext.GetCurrentCompanyAsync();
+
+            Project? project = null;
+            Client? client = null;
+
+            var invoiceAgainst = form["invoiceAgainst"].ToString()?.Trim();
+            if (string.IsNullOrEmpty(invoiceAgainst))
+            {
+                invoiceAgainst = (projectId.HasValue && projectId.Value > 0) ? "Project" : "Client";
+            }
+
+            if (invoiceAgainst == "Project" && projectId.HasValue && projectId.Value > 0)
+            {
+                project = await _db.Projects.Include(p => p.Client).FirstOrDefaultAsync(p => p.Id == projectId.Value);
+                if (project != null)
+                {
+                    client = project.Client ?? await _db.Clients.FindAsync(project.ClientId);
+                    clientId = project.ClientId;
+                }
+            }
+            else if (invoiceAgainst == "Client" || (clientId.HasValue && clientId.Value > 0 && (!projectId.HasValue || projectId.Value == 0)))
+            {
+                if (clientId.HasValue && clientId.Value > 0)
+                {
+                    client = await _db.Clients.FindAsync(clientId.Value);
+                }
+                project = null;
+                projectId = null;
+            }
+
+            if (client == null && clientId.HasValue && clientId.Value > 0)
             {
                 client = await _db.Clients.FindAsync(clientId.Value);
             }
-            project = null;
-            projectId = null;
-        }
 
-        if (client == null && clientId.HasValue && clientId.Value > 0)
-        {
-            client = await _db.Clients.FindAsync(clientId.Value);
-        }
-
-        if (client == null)
-        {
-            client = await _db.Clients.FirstOrDefaultAsync();
-        }
-
-        // Parse line items from form collections
-        var descriptions = form["itemDescription[]"].Count > 0 ? form["itemDescription[]"].ToList() : form["itemDescription"].ToList();
-        var hsnCodes = form["itemHsn[]"].Count > 0 ? form["itemHsn[]"].ToList() : form["itemHsn"].ToList();
-        var itemGsts = form["itemGst[]"].Count > 0 ? form["itemGst[]"].ToList() : form["itemGst"].ToList();
-        var itemIgsts = form["itemIgst[]"].Count > 0 ? form["itemIgst[]"].ToList() : form["itemIgst"].ToList();
-        var itemCgsts = form["itemCgst[]"].Count > 0 ? form["itemCgst[]"].ToList() : form["itemCgst"].ToList();
-        var itemSgsts = form["itemSgst[]"].Count > 0 ? form["itemSgst[]"].ToList() : form["itemSgst"].ToList();
-        var qtys = form["itemQty[]"].Count > 0 ? form["itemQty[]"].ToList() : form["itemQty"].ToList();
-        var rates = form["itemRate[]"].Count > 0 ? form["itemRate[]"].ToList() : form["itemRate"].ToList();
-
-        var invoiceItems = new List<SalesInvoiceItem>();
-        decimal calculatedTaxable = 0;
-        decimal calculatedCgst = 0;
-        decimal calculatedSgst = 0;
-        decimal calculatedIgst = 0;
-
-        int rowCount = descriptions.Count;
-        for (int i = 0; i < rowCount; i++)
-        {
-            var desc = descriptions[i]?.Trim();
-            if (string.IsNullOrWhiteSpace(desc)) continue;
-
-            decimal qty = 1.0m;
-            if (i < qtys.Count && decimal.TryParse(qtys[i], out var parsedQty) && parsedQty > 0)
-                qty = parsedQty;
-
-            decimal rate = 0;
-            if (i < rates.Count && decimal.TryParse(rates[i], out var parsedRate) && parsedRate >= 0)
-                rate = parsedRate;
-
-            var hsn = (i < hsnCodes.Count && !string.IsNullOrWhiteSpace(hsnCodes[i])) ? hsnCodes[i]!.Trim() : "998313";
-
-            decimal gRate = 18m;
-            if (i < itemGsts.Count && decimal.TryParse(itemGsts[i], out var pGst)) gRate = pGst;
-
-            decimal igstR = 0m, cgstR = 0m, sgstR = 0m;
-            if (i < itemIgsts.Count && decimal.TryParse(itemIgsts[i], out var pIgst)) igstR = pIgst;
-            if (i < itemCgsts.Count && decimal.TryParse(itemCgsts[i], out var pCgst)) cgstR = pCgst;
-            if (i < itemSgsts.Count && decimal.TryParse(itemSgsts[i], out var pSgst)) sgstR = pSgst;
-
-            if (igstR == 0 && cgstR == 0 && sgstR == 0 && gRate > 0)
+            if (client == null)
             {
-                var isInterState = client != null && !string.IsNullOrEmpty(client.StateCode) && !string.IsNullOrEmpty(company.StateCode) && client.StateCode != company.StateCode;
-                if (isInterState)
+                client = await _db.Clients.FirstOrDefaultAsync();
+            }
+
+            // Parse line items from form collections
+            var descriptions = form["itemDescription[]"].Count > 0 ? form["itemDescription[]"].ToList() : form["itemDescription"].ToList();
+            var hsnCodes = form["itemHsn[]"].Count > 0 ? form["itemHsn[]"].ToList() : form["itemHsn"].ToList();
+            var itemGsts = form["itemGst[]"].Count > 0 ? form["itemGst[]"].ToList() : form["itemGst"].ToList();
+            var itemIgsts = form["itemIgst[]"].Count > 0 ? form["itemIgst[]"].ToList() : form["itemIgst"].ToList();
+            var itemCgsts = form["itemCgst[]"].Count > 0 ? form["itemCgst[]"].ToList() : form["itemCgst"].ToList();
+            var itemSgsts = form["itemSgst[]"].Count > 0 ? form["itemSgst[]"].ToList() : form["itemSgst"].ToList();
+            var itemQtys = form["itemQty[]"].Count > 0 ? form["itemQty[]"].ToList() : form["itemQty"].ToList();
+            var itemRates = form["itemRate[]"].Count > 0 ? form["itemRate[]"].ToList() : form["itemRate"].ToList();
+
+            var invoiceItems = new List<SalesInvoiceItem>();
+            decimal calculatedTaxable = 0;
+            decimal calculatedCgst = 0;
+            decimal calculatedSgst = 0;
+            decimal calculatedIgst = 0;
+
+            var companyState = company?.StateCode ?? "07";
+            var clientState = client?.StateCode ?? "07";
+            bool isInterState = !string.IsNullOrEmpty(clientState) && clientState != companyState;
+
+            int count = descriptions.Count;
+            for (int i = 0; i < count; i++)
+            {
+                var desc = descriptions[i]?.Trim();
+                if (string.IsNullOrWhiteSpace(desc)) continue;
+
+                var hsn = (i < hsnCodes.Count && !string.IsNullOrWhiteSpace(hsnCodes[i])) ? hsnCodes[i].Trim() : "998313";
+                decimal.TryParse(i < itemQtys.Count ? itemQtys[i] : "1", out decimal qty);
+                if (qty <= 0) qty = 1;
+
+                decimal.TryParse(i < itemRates.Count ? itemRates[i] : "0", out decimal rate);
+                decimal.TryParse(i < itemGsts.Count ? itemGsts[i] : "18", out decimal gRate);
+
+                decimal igstR = 0, cgstR = 0, sgstR = 0;
+                if (i < itemIgsts.Count && decimal.TryParse(itemIgsts[i], out decimal parsedIgst) && parsedIgst > 0)
                 {
-                    igstR = gRate;
+                    igstR = parsedIgst;
+                }
+                else if (i < itemCgsts.Count && decimal.TryParse(itemCgsts[i], out decimal parsedCgst) && parsedCgst > 0)
+                {
+                    cgstR = parsedCgst;
+                    decimal.TryParse(i < itemSgsts.Count ? itemSgsts[i] : parsedCgst.ToString(), out sgstR);
                 }
                 else
                 {
-                    cgstR = Math.Round(gRate / 2m, 2);
-                    sgstR = Math.Round(gRate / 2m, 2);
+                    if (isInterState)
+                    {
+                        igstR = gRate;
+                    }
+                    else
+                    {
+                        cgstR = Math.Round(gRate / 2m, 2);
+                        sgstR = Math.Round(gRate / 2m, 2);
+                    }
+                }
+
+                var lineTaxable = Math.Round(qty * rate, 2);
+                var lineCgst = Math.Round(lineTaxable * (cgstR / 100m), 2);
+                var lineSgst = Math.Round(lineTaxable * (sgstR / 100m), 2);
+                var lineIgst = Math.Round(lineTaxable * (igstR / 100m), 2);
+                var lineTotal = lineTaxable + lineCgst + lineSgst + lineIgst;
+
+                calculatedTaxable += lineTaxable;
+                calculatedCgst += lineCgst;
+                calculatedSgst += lineSgst;
+                calculatedIgst += lineIgst;
+
+                invoiceItems.Add(new SalesInvoiceItem
+                {
+                    InvoiceId = inv.Id,
+                    ItemDescription = desc,
+                    HsnSacCode = hsn,
+                    Quantity = qty,
+                    UnitRate = rate,
+                    TaxableValue = lineTaxable,
+                    GstRate = gRate,
+                    IgstRate = igstR,
+                    CgstRate = cgstR,
+                    SgstRate = sgstR,
+                    CgstAmount = lineCgst,
+                    SgstAmount = lineSgst,
+                    IgstAmount = lineIgst,
+                    LineTotal = lineTotal
+                });
+            }
+
+            if (!invoiceItems.Any())
+            {
+                var fallbackTaxable = taxableAmount ?? 0m;
+                var fallbackGst = gstRate ?? 18m;
+                var fallbackCgst = Math.Round(fallbackTaxable * (fallbackGst / 200m), 2);
+                var fallbackSgst = Math.Round(fallbackTaxable * (fallbackGst / 200m), 2);
+                var fallbackTotal = fallbackTaxable + fallbackCgst + fallbackSgst;
+
+                calculatedTaxable = fallbackTaxable;
+                calculatedCgst = fallbackCgst;
+                calculatedSgst = fallbackSgst;
+                calculatedIgst = 0;
+
+                var fallbackDesc = project != null 
+                    ? $"{project.ProjectName} - Execution & Milestone Delivery" 
+                    : $"Commercial & Professional Services - {(client != null ? client.ClientName : "Client")}";
+
+                invoiceItems.Add(new SalesInvoiceItem
+                {
+                    InvoiceId = inv.Id,
+                    ItemDescription = fallbackDesc,
+                    HsnSacCode = "998313",
+                    Quantity = 1.00m,
+                    UnitRate = fallbackTaxable,
+                    TaxableValue = fallbackTaxable,
+                    GstRate = fallbackGst,
+                    CgstRate = fallbackGst / 2m,
+                    SgstRate = fallbackGst / 2m,
+                    CgstAmount = fallbackCgst,
+                    SgstAmount = fallbackSgst,
+                    IgstAmount = 0,
+                    LineTotal = fallbackTotal
+                });
+            }
+
+            decimal grossTotal = calculatedTaxable + calculatedCgst + calculatedSgst + calculatedIgst;
+            decimal deduction = deductionAmount ?? 0m;
+            decimal netPayable = Math.Max(0, grossTotal - deduction);
+
+            if (!string.IsNullOrWhiteSpace(invoiceNumber))
+            {
+                inv.InvoiceNumber = invoiceNumber.Trim();
+            }
+
+            inv.ClientId = client != null ? client.Id : inv.ClientId;
+            inv.ProjectId = project?.Id;
+            inv.InvoiceDate = invoiceDate ?? inv.InvoiceDate;
+            inv.DueDate = dueDate ?? inv.DueDate;
+            inv.WorkOrderNo = workOrderNo;
+            inv.WorkOrderDate = workOrderDate;
+            inv.BillingAttention = billingAttention ?? (client != null ? (client.ContactPerson ?? client.ClientName) : inv.BillingAttention);
+            inv.Remarks = remarks;
+            inv.DeductionRemarks = deductionRemarks;
+            inv.DeductionAmount = deduction;
+            inv.TaxableAmount = calculatedTaxable;
+            inv.CgstAmount = calculatedCgst;
+            inv.SgstAmount = calculatedSgst;
+            inv.IgstAmount = calculatedIgst;
+            inv.TotalInvoiceValue = netPayable;
+            inv.OutstandingBalance = Math.Max(0, netPayable - inv.PaidAmount);
+            if (inv.OutstandingBalance == 0 && inv.PaidAmount > 0)
+            {
+                inv.Status = "PAID";
+            }
+            else if (inv.PaidAmount > 0)
+            {
+                inv.Status = "PARTIALLY_PAID";
+            }
+            else if (inv.Status != "CANCELLED")
+            {
+                inv.Status = "SENT";
+            }
+            inv.PlaceOfSupply = client?.StateCode ?? inv.PlaceOfSupply;
+
+            // Replace line items safely
+            try
+            {
+                if (inv.Items != null && inv.Items.Any())
+                {
+                    _db.SalesInvoiceItems.RemoveRange(inv.Items);
+                }
+                foreach (var item in invoiceItems)
+                {
+                    _db.SalesInvoiceItems.Add(item);
                 }
             }
-
-            var lineTaxable = Math.Round(qty * rate, 2);
-            var lineCgst = Math.Round(lineTaxable * (cgstR / 100m), 2);
-            var lineSgst = Math.Round(lineTaxable * (sgstR / 100m), 2);
-            var lineIgst = Math.Round(lineTaxable * (igstR / 100m), 2);
-            var lineTotal = lineTaxable + lineCgst + lineSgst + lineIgst;
-
-            calculatedTaxable += lineTaxable;
-            calculatedCgst += lineCgst;
-            calculatedSgst += lineSgst;
-            calculatedIgst += lineIgst;
-
-            invoiceItems.Add(new SalesInvoiceItem
+            catch (Exception itmEx)
             {
-                InvoiceId = inv.Id,
-                ItemDescription = desc,
-                HsnSacCode = hsn,
-                Quantity = qty,
-                UnitRate = rate,
-                TaxableValue = lineTaxable,
-                GstRate = gRate,
-                IgstRate = igstR,
-                CgstRate = cgstR,
-                SgstRate = sgstR,
-                CgstAmount = lineCgst,
-                SgstAmount = lineSgst,
-                IgstAmount = lineIgst,
-                LineTotal = lineTotal
-            });
-        }
-
-        if (!invoiceItems.Any())
-        {
-            var fallbackTaxable = taxableAmount ?? 0m;
-            var fallbackGst = gstRate ?? 18m;
-            var fallbackCgst = Math.Round(fallbackTaxable * (fallbackGst / 200m), 2);
-            var fallbackSgst = Math.Round(fallbackTaxable * (fallbackGst / 200m), 2);
-            var fallbackTotal = fallbackTaxable + fallbackCgst + fallbackSgst;
-
-            calculatedTaxable = fallbackTaxable;
-            calculatedCgst = fallbackCgst;
-            calculatedSgst = fallbackSgst;
-            calculatedIgst = 0;
-
-            var fallbackDesc = project != null 
-                ? $"{project.ProjectName} - Execution & Milestone Delivery" 
-                : $"Commercial & Professional Services - {(client != null ? client.ClientName : "Client")}";
-
-            invoiceItems.Add(new SalesInvoiceItem
-            {
-                InvoiceId = inv.Id,
-                ItemDescription = fallbackDesc,
-                HsnSacCode = "998313",
-                Quantity = 1.00m,
-                UnitRate = fallbackTaxable,
-                TaxableValue = fallbackTaxable,
-                GstRate = fallbackGst,
-                CgstRate = fallbackGst / 2m,
-                SgstRate = fallbackGst / 2m,
-                CgstAmount = fallbackCgst,
-                SgstAmount = fallbackSgst,
-                IgstAmount = 0,
-                LineTotal = fallbackTotal
-            });
-        }
-
-        decimal grossTotal = calculatedTaxable + calculatedCgst + calculatedSgst + calculatedIgst;
-        decimal deduction = deductionAmount ?? 0m;
-        decimal netPayable = Math.Max(0, grossTotal - deduction);
-
-        if (!string.IsNullOrWhiteSpace(invoiceNumber))
-        {
-            inv.InvoiceNumber = invoiceNumber.Trim();
-        }
-
-        inv.ClientId = client != null ? client.Id : inv.ClientId;
-        inv.ProjectId = project?.Id;
-        inv.InvoiceDate = invoiceDate ?? inv.InvoiceDate;
-        inv.DueDate = dueDate ?? inv.DueDate;
-        inv.WorkOrderNo = workOrderNo;
-        inv.WorkOrderDate = workOrderDate;
-        inv.BillingAttention = billingAttention ?? (client != null ? (client.ContactPerson ?? client.ClientName) : inv.BillingAttention);
-        inv.Remarks = remarks;
-        inv.DeductionRemarks = deductionRemarks;
-        inv.DeductionAmount = deduction;
-        inv.TaxableAmount = calculatedTaxable;
-        inv.CgstAmount = calculatedCgst;
-        inv.SgstAmount = calculatedSgst;
-        inv.IgstAmount = calculatedIgst;
-        inv.TotalInvoiceValue = netPayable;
-        inv.OutstandingBalance = Math.Max(0, netPayable - inv.PaidAmount);
-        if (inv.OutstandingBalance == 0 && inv.PaidAmount > 0)
-        {
-            inv.Status = "PAID";
-        }
-        else if (inv.PaidAmount > 0)
-        {
-            inv.Status = "PARTIALLY_PAID";
-        }
-        else if (inv.Status != "CANCELLED")
-        {
-            inv.Status = "SENT";
-        }
-        inv.PlaceOfSupply = client?.StateCode ?? inv.PlaceOfSupply;
-
-        // Replace line items
-        _db.SalesInvoiceItems.RemoveRange(inv.Items);
-        foreach (var item in invoiceItems)
-        {
-            _db.SalesInvoiceItems.Add(item);
-        }
-
-        // Update JournalEntry narration or amount if exists
-        var jv = await _db.JournalEntries.FirstOrDefaultAsync(j => j.SourceEntityType == "SalesInvoice" && j.SourceEntityId == inv.Id);
-        if (jv != null)
-        {
-            jv.TotalDebit = netPayable;
-            jv.TotalCredit = netPayable;
-            jv.VoucherDate = inv.InvoiceDate;
-            jv.ProjectId = project?.Id;
-            jv.Narration = $"Tax Invoice {inv.InvoiceNumber} updated and re-posted to General Ledger";
-        }
-
-        // Update GST transaction if exists
-        if (jv != null)
-        {
-            var gst = await _db.GstTransactions.FirstOrDefaultAsync(g => g.VoucherId == jv.Id);
-            if (gst != null)
-            {
-                gst.TaxableValue = calculatedTaxable;
-                gst.CgstAmount = calculatedCgst;
-                gst.SgstAmount = calculatedSgst;
-                gst.IgstAmount = calculatedIgst;
-                gst.PlaceOfSupply = inv.PlaceOfSupply;
+                Console.WriteLine($"[SalesController] Failed updating items for invoice {inv.Id}: {itmEx.Message}");
             }
+
+            // Update JournalEntry narration or amount if exists
+            try
+            {
+                var jv = await _db.JournalEntries.FirstOrDefaultAsync(j => j.SourceEntityType == "SalesInvoice" && j.SourceEntityId == inv.Id);
+                if (jv != null)
+                {
+                    jv.TotalDebit = netPayable;
+                    jv.TotalCredit = netPayable;
+                    jv.VoucherDate = inv.InvoiceDate;
+                    jv.ProjectId = project?.Id;
+                    jv.Narration = $"Tax Invoice {inv.InvoiceNumber} updated and re-posted to General Ledger";
+                }
+
+                // Update GST transaction if exists
+                if (jv != null)
+                {
+                    var gst = await _db.GstTransactions.FirstOrDefaultAsync(g => g.VoucherId == jv.Id);
+                    if (gst != null)
+                    {
+                        gst.TaxableValue = calculatedTaxable;
+                        gst.CgstAmount = calculatedCgst;
+                        gst.SgstAmount = calculatedSgst;
+                        gst.IgstAmount = calculatedIgst;
+                        gst.PlaceOfSupply = inv.PlaceOfSupply;
+                    }
+                }
+            }
+            catch { }
+
+            await _db.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = $"Tax Invoice <strong>{inv.InvoiceNumber}</strong> has been updated successfully!";
+            return RedirectToAction(nameof(Index));
         }
-
-        await _db.SaveChangesAsync();
-
-        TempData["SuccessMessage"] = $"Tax Invoice <strong>{inv.InvoiceNumber}</strong> has been updated successfully!";
-        return RedirectToAction(nameof(Index));
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SalesController] Error updating invoice {id}: {ex.Message}");
+            TempData["ErrorMessage"] = $"Failed to update invoice: {ex.Message}";
+            return RedirectToAction(nameof(Index));
+        }
     }
 
     public async Task<IActionResult> PrintInvoice(long id)

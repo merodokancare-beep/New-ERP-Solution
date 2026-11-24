@@ -2,7 +2,7 @@
 @{
     ViewData["Title"] = $"Edit Invoice #{Model.InvoiceNumber}";
     ViewData["ActiveMenu"] = "Sales";
-    var company = ViewBag.Company as SDK.ERP.Domain.Entities.Admin.Company;
+    var company = ViewBag.Company as SDK.ERP.Domain.Entities.Admin.Company ?? Model.Company;
     var projects = ViewBag.Projects as IEnumerable<SDK.ERP.Domain.Entities.Projects.Project> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Projects.Project>();
     var clients = ViewBag.Clients as IEnumerable<SDK.ERP.Domain.Entities.MasterData.Client> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.MasterData.Client>();
     var companyState = company?.StateCode ?? "07";

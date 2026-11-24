@@ -443,8 +443,6 @@ using (var scope = app.Services.CreateScope())
                 -- Ensure SalesInvoice Reference, Work Order, Terms & Deductions Columns
                 IF OBJECT_ID('[sales].[sales_invoices]') IS NOT NULL
                 BEGIN
-                    IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoices]') AND name = 'ProjectId' AND is_nullable = 0)
-                        ALTER TABLE [sales].[sales_invoices] ALTER COLUMN [ProjectId] BIGINT NULL;
                     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoices]') AND name = 'WorkOrderNo')
                         ALTER TABLE [sales].[sales_invoices] ADD [WorkOrderNo] NVARCHAR(100) NULL;
                     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoices]') AND name = 'WorkOrderDate')
@@ -457,26 +455,52 @@ using (var scope = app.Services.CreateScope())
                         ALTER TABLE [sales].[sales_invoices] ADD [DeductionRemarks] NVARCHAR(250) NULL;
                     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoices]') AND name = 'DeductionAmount')
                         ALTER TABLE [sales].[sales_invoices] ADD [DeductionAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoices]') AND name = 'PlaceOfSupply')
+                        ALTER TABLE [sales].[sales_invoices] ADD [PlaceOfSupply] NVARCHAR(50) NULL;
                 END
-                IF OBJECT_ID('[SalesInvoices]') IS NOT NULL
+                IF OBJECT_ID('[SalesInvoices]') IS NOT NULL OR OBJECT_ID('[dbo].[SalesInvoices]') IS NOT NULL
                 BEGIN
-                    IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[SalesInvoices]') AND name = 'ProjectId' AND is_nullable = 0)
-                        ALTER TABLE [SalesInvoices] ALTER COLUMN [ProjectId] BIGINT NULL;
-                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[SalesInvoices]') AND name = 'WorkOrderNo')
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoices]') OR object_id = OBJECT_ID('[dbo].[SalesInvoices]')) AND name = 'WorkOrderNo')
                         ALTER TABLE [SalesInvoices] ADD [WorkOrderNo] NVARCHAR(100) NULL;
-                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[SalesInvoices]') AND name = 'WorkOrderDate')
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoices]') OR object_id = OBJECT_ID('[dbo].[SalesInvoices]')) AND name = 'WorkOrderDate')
                         ALTER TABLE [SalesInvoices] ADD [WorkOrderDate] DATETIME2 NULL;
-                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[SalesInvoices]') AND name = 'BillingAttention')
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoices]') OR object_id = OBJECT_ID('[dbo].[SalesInvoices]')) AND name = 'BillingAttention')
                         ALTER TABLE [SalesInvoices] ADD [BillingAttention] NVARCHAR(250) NULL;
-                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[SalesInvoices]') AND name = 'Remarks')
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoices]') OR object_id = OBJECT_ID('[dbo].[SalesInvoices]')) AND name = 'Remarks')
                         ALTER TABLE [SalesInvoices] ADD [Remarks] NVARCHAR(MAX) NULL;
-                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[SalesInvoices]') AND name = 'DeductionRemarks')
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoices]') OR object_id = OBJECT_ID('[dbo].[SalesInvoices]')) AND name = 'DeductionRemarks')
                         ALTER TABLE [SalesInvoices] ADD [DeductionRemarks] NVARCHAR(250) NULL;
-                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[SalesInvoices]') AND name = 'DeductionAmount')
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoices]') OR object_id = OBJECT_ID('[dbo].[SalesInvoices]')) AND name = 'DeductionAmount')
                         ALTER TABLE [SalesInvoices] ADD [DeductionAmount] DECIMAL(18,2) NOT NULL DEFAULT 0;
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoices]') OR object_id = OBJECT_ID('[dbo].[SalesInvoices]')) AND name = 'PlaceOfSupply')
+                        ALTER TABLE [SalesInvoices] ADD [PlaceOfSupply] NVARCHAR(50) NULL;
                 END
 
-                -- Ensure SalesInvoiceItem Tax Columns
+                -- Ensure SalesInvoiceItems Table and Columns
+                IF OBJECT_ID('[SalesInvoiceItems]') IS NULL AND OBJECT_ID('[dbo].[SalesInvoiceItems]') IS NULL AND OBJECT_ID('[sales].[sales_invoice_items]') IS NULL
+                BEGIN
+                    CREATE TABLE [dbo].[SalesInvoiceItems] (
+                        [Id] BIGINT NOT NULL IDENTITY(1,1) PRIMARY KEY,
+                        [InvoiceId] BIGINT NOT NULL,
+                        [ItemDescription] NVARCHAR(MAX) NOT NULL DEFAULT '',
+                        [HsnSacCode] NVARCHAR(50) NOT NULL DEFAULT '',
+                        [Quantity] DECIMAL(18,2) NOT NULL DEFAULT 1.00,
+                        [UnitId] INT NULL,
+                        [UnitRate] DECIMAL(18,2) NOT NULL DEFAULT 0.00,
+                        [DiscountPercent] DECIMAL(18,2) NOT NULL DEFAULT 0.00,
+                        [TaxableValue] DECIMAL(18,2) NOT NULL DEFAULT 0.00,
+                        [GstRate] DECIMAL(18,2) NOT NULL DEFAULT 0.00,
+                        [IgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0.00,
+                        [CgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0.00,
+                        [SgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0.00,
+                        [TaxRateId] INT NULL,
+                        [CgstAmount] DECIMAL(18,2) NOT NULL DEFAULT 0.00,
+                        [SgstAmount] DECIMAL(18,2) NOT NULL DEFAULT 0.00,
+                        [IgstAmount] DECIMAL(18,2) NOT NULL DEFAULT 0.00,
+                        [LineTotal] DECIMAL(18,2) NOT NULL DEFAULT 0.00
+                    );
+                END
+
                 IF OBJECT_ID('[sales].[sales_invoice_items]') IS NOT NULL
                 BEGIN
                     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoice_items]') AND name = 'GstRate')
@@ -490,17 +514,17 @@ using (var scope = app.Services.CreateScope())
                     IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[sales].[sales_invoice_items]') AND name = 'TaxRateId' AND is_nullable = 0)
                         ALTER TABLE [sales].[sales_invoice_items] ALTER COLUMN [TaxRateId] INT NULL;
                 END
-                IF OBJECT_ID('[SalesInvoiceItems]') IS NOT NULL
+                IF OBJECT_ID('[SalesInvoiceItems]') IS NOT NULL OR OBJECT_ID('[dbo].[SalesInvoiceItems]') IS NOT NULL
                 BEGIN
-                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[SalesInvoiceItems]') AND name = 'GstRate')
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoiceItems]') OR object_id = OBJECT_ID('[dbo].[SalesInvoiceItems]')) AND name = 'GstRate')
                         ALTER TABLE [SalesInvoiceItems] ADD [GstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
-                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[SalesInvoiceItems]') AND name = 'IgstRate')
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoiceItems]') OR object_id = OBJECT_ID('[dbo].[SalesInvoiceItems]')) AND name = 'IgstRate')
                         ALTER TABLE [SalesInvoiceItems] ADD [IgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
-                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[SalesInvoiceItems]') AND name = 'CgstRate')
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoiceItems]') OR object_id = OBJECT_ID('[dbo].[SalesInvoiceItems]')) AND name = 'CgstRate')
                         ALTER TABLE [SalesInvoiceItems] ADD [CgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
-                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[SalesInvoiceItems]') AND name = 'SgstRate')
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoiceItems]') OR object_id = OBJECT_ID('[dbo].[SalesInvoiceItems]')) AND name = 'SgstRate')
                         ALTER TABLE [SalesInvoiceItems] ADD [SgstRate] DECIMAL(18,2) NOT NULL DEFAULT 0;
-                    IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[SalesInvoiceItems]') AND name = 'TaxRateId' AND is_nullable = 0)
+                    IF EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[SalesInvoiceItems]') OR object_id = OBJECT_ID('[dbo].[SalesInvoiceItems]')) AND name = 'TaxRateId' AND is_nullable = 0)
                         ALTER TABLE [SalesInvoiceItems] ALTER COLUMN [TaxRateId] INT NULL;
                 END
 
