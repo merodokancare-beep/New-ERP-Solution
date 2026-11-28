@@ -14,6 +14,7 @@ public class Vendor : ITenantEntity
     public string? StateName { get; set; }
     public string? Gstin { get; set; }
     public string? Pan { get; set; } = string.Empty;
+    public string? Address { get; set; }
     public string? MsmeType { get; set; }
     public string? BankName { get; set; }
     public string? BankAccountNo { get; set; }

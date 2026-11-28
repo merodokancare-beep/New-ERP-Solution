@@ -38,6 +38,27 @@ public class DirectExpense : ITenantEntity
     public decimal Amount { get; set; }
 
     /// <summary>
+    /// Mode of Payment requested/selected (e.g. NetBanking, UPI, Cheque, Cash, Card)
+    /// </summary>
+    public string PaymentMode { get; set; } = "NetBanking";
+
+    /// <summary>
+    /// Company Bank Account paying/settling or receiving instrument (for non-cash payments)
+    /// </summary>
+    public long? BankAccountId { get; set; }
+    public string? BankName { get; set; }
+
+    /// <summary>
+    /// Instrument / Transaction Reference (UTR / Cheque No / UPI Ref ID / Card Txn Ref)
+    /// </summary>
+    public string? TransactionReference { get; set; }
+
+    /// <summary>
+    /// Cheque Date (applicable when PaymentMode is Cheque)
+    /// </summary>
+    public DateTime? ChequeDate { get; set; }
+
+    /// <summary>
     /// Indicates if related to an active pipeline project
     /// </summary>
     public bool IsPipelineProject { get; set; }

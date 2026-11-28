@@ -35,6 +35,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<User> Users => Set<User>();
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
+    public DbSet<UserPrivilege> UserPrivileges => Set<UserPrivilege>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<ApprovalRule> ApprovalRules => Set<ApprovalRule>();
     public DbSet<ApprovalRequest> ApprovalRequests => Set<ApprovalRequest>();

@@ -20,11 +20,13 @@ public class AdminController : Controller
 {
     private readonly ApplicationDbContext _db;
     private readonly ICompanyContext _companyContext;
+    private readonly IPrivilegeService _privilegeService;
 
-    public AdminController(ApplicationDbContext db, ICompanyContext companyContext)
+    public AdminController(ApplicationDbContext db, ICompanyContext companyContext, IPrivilegeService privilegeService)
     {
         _db = db;
         _companyContext = companyContext;
+        _privilegeService = privilegeService;
     }
 
     private async Task<bool> CheckIsSuperAdminAsync(User currentUser)
@@ -114,7 +116,7 @@ public class AdminController : Controller
         return vm;
     }
 
-    public async Task<IActionResult> Index(string tab = "rbac")
+    public async Task<IActionResult> Index(string tab = "rbac", long? selectedUserId = null)
     {
         ViewData["ActiveMenu"] = "Admin";
         ViewBag.ActiveTab = tab;
@@ -123,12 +125,44 @@ public class AdminController : Controller
         var currentCompany = await _companyContext.GetCurrentCompanyAsync();
 
         ViewBag.Roles = await _db.Roles.Include(r => r.Users).AsNoTracking().ToListAsync();
+        ViewBag.Users = await _db.Users.Include(u => u.Role).Where(u => u.IsActive).OrderBy(u => u.Username).AsNoTracking().ToListAsync();
         var auditLogs = await _db.AuditLogs.OrderByDescending(a => a.CreatedAt).Take(50).AsNoTracking().ToListAsync();
 
         var resetVm = await BuildResetViewModelAsync(currentUser, currentCompany);
         ViewBag.ResetViewModel = resetVm;
 
+        // User Privileges Matrix Data
+        ViewBag.PrivilegeGroups = ErpPrivilegeCatalog.AllGroups;
+        var usersList = (IEnumerable<User>)ViewBag.Users;
+        var activeSelectedUserId = selectedUserId ?? usersList.FirstOrDefault(u => u.Id != currentUser.Id)?.Id ?? currentUser.Id;
+        ViewBag.SelectedUserId = activeSelectedUserId;
+        ViewBag.UserPrivilegeSet = await _privilegeService.GetUserPrivilegesAsync(activeSelectedUserId);
+
         return View(auditLogs);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveUserPrivileges(long targetUserId, List<string> selectedPrivileges)
+    {
+        var currentUser = await _companyContext.GetCurrentUserAsync();
+        if (targetUserId <= 0)
+        {
+            TempData["ErrorMessage"] = "Invalid user specified for privilege assignment.";
+            return RedirectToAction(nameof(Index), new { tab = "privileges" });
+        }
+
+        var targetUser = await _db.Users.FindAsync(targetUserId);
+        if (targetUser == null)
+        {
+            TempData["ErrorMessage"] = "User could not be found.";
+            return RedirectToAction(nameof(Index), new { tab = "privileges" });
+        }
+
+        await _privilegeService.SaveUserPrivilegesAsync(targetUserId, selectedPrivileges ?? new List<string>(), currentUser.Id);
+
+        TempData["SuccessMessage"] = $"<i class='fa-solid fa-circle-check me-1'></i> Privileges for user <strong>{targetUser.Username}</strong> ({targetUser.FullName ?? targetUser.Designation ?? "User"}) have been successfully updated and are active immediately.";
+        return RedirectToAction(nameof(Index), new { tab = "privileges", selectedUserId = targetUserId });
     }
 
     [HttpGet]

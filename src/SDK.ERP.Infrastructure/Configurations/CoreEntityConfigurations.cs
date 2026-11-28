@@ -208,6 +208,8 @@ public class VendorConfiguration : IEntityTypeConfiguration<Vendor>
 
         builder.Property(e => e.Pan).HasMaxLength(30);
 
+        builder.Property(e => e.Address).HasMaxLength(500);
+
         builder.Property(e => e.MsmeType).HasMaxLength(50);
 
         builder.Property(e => e.IfscCode).HasMaxLength(30);

@@ -1,3 +1,5 @@
+using System.Globalization;
+using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -26,6 +28,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentTenantProvider, CurrentTenantProvider>();
 builder.Services.AddScoped<ICompanyContext, CompanyContext>();
+builder.Services.AddScoped<IPrivilegeService, PrivilegeService>();
 
 // 3. Configure MVC & Razor Views
 builder.Services.AddControllersWithViews(options =>
@@ -60,6 +63,19 @@ builder.Services.AddAuthentication("ERP_Auth_Cookie")
     });
 
 var app = builder.Build();
+
+// Configure Indian Standard Culture (en-IN) globally for numbers, currency (Lakhs & Crores), and dates
+var indianCulture = new CultureInfo("en-IN");
+CultureInfo.DefaultThreadCurrentCulture = indianCulture;
+CultureInfo.DefaultThreadCurrentUICulture = indianCulture;
+
+var localizationOptions = new RequestLocalizationOptions
+{
+    DefaultRequestCulture = new RequestCulture(indianCulture),
+    SupportedCultures = new List<CultureInfo> { indianCulture },
+    SupportedUICultures = new List<CultureInfo> { indianCulture }
+};
+app.UseRequestLocalization(localizationOptions);
 
 app.UseForwardedHeaders(new ForwardedHeadersOptions
 {
@@ -278,6 +294,21 @@ using (var scope = app.Services.CreateScope())
         await RunPatchAsync("IF OBJECT_ID('[Projects]') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[Projects]') AND name = 'ClosureReason') ALTER TABLE [Projects] ADD [ClosureReason] NVARCHAR(250) NULL;");
         await RunPatchAsync("IF OBJECT_ID('[Projects]') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[Projects]') AND name = 'ClosureDocumentPath') ALTER TABLE [Projects] ADD [ClosureDocumentPath] NVARCHAR(500) NULL;");
         await RunPatchAsync("IF OBJECT_ID('[Projects]') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[Projects]') AND name = 'ClosureDocumentName') ALTER TABLE [Projects] ADD [ClosureDocumentName] NVARCHAR(250) NULL;");
+
+        // 7. Ensure UserPrivileges table exists for Centralized Dynamic Permission Management
+        await RunPatchAsync(@"IF OBJECT_ID('[UserPrivileges]') IS NULL AND OBJECT_ID('[dbo].[UserPrivileges]') IS NULL
+        BEGIN
+            CREATE TABLE [dbo].[UserPrivileges] (
+                [Id] BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                [UserId] BIGINT NOT NULL,
+                [ModuleCode] NVARCHAR(100) NOT NULL,
+                [PrivilegeCode] NVARCHAR(100) NOT NULL,
+                [IsGranted] BIT NOT NULL DEFAULT 1,
+                [GrantedAt] DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+                [GrantedByUserId] BIGINT NULL
+            );
+            CREATE INDEX [IX_UserPrivileges_UserId_PrivilegeCode] ON [dbo].[UserPrivileges] ([UserId], [PrivilegeCode]);
+        END");
 
         // Ensure PAN, GSTIN, Company & User columns accommodate flexible inputs
         try

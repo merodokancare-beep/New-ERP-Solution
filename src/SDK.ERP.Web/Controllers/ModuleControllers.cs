@@ -120,6 +120,10 @@ public class MastersController : Controller
 
                         ALTER TABLE [master].[vendors] ADD [StateName] NVARCHAR(100) NULL;
 
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[master].[vendors]') AND name = 'Address')
+
+                        ALTER TABLE [master].[vendors] ADD [Address] NVARCHAR(MAX) NULL;
+
                     UPDATE [master].[vendors] SET [VendorCategory] = 'GENERAL' WHERE [VendorCategory] IS NULL;
 
                     UPDATE [master].[vendors] SET [Pan] = '' WHERE [Pan] IS NULL;
@@ -137,6 +141,10 @@ public class MastersController : Controller
                     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[dbo].[Vendors]') AND name = 'StateName')
 
                         ALTER TABLE [dbo].[Vendors] ADD [StateName] NVARCHAR(100) NULL;
+
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[dbo].[Vendors]') AND name = 'Address')
+
+                        ALTER TABLE [dbo].[Vendors] ADD [Address] NVARCHAR(MAX) NULL;
 
                 END
 
@@ -750,6 +758,8 @@ public class MastersController : Controller
 
                 tradeName = existingVendor.VendorName,
 
+                address = existingVendor.Address,
+
                 stateCode = stateCode,
 
                 stateName = stateName,
@@ -1212,7 +1222,9 @@ public class MastersController : Controller
 
         string? stateCode,
 
-        string? stateName)
+        string? stateName,
+
+        string? address = null)
 
     {
 
@@ -1257,6 +1269,8 @@ public class MastersController : Controller
             Gstin = gstin,
 
             Pan = string.IsNullOrWhiteSpace(pan) ? (company.Pan ?? string.Empty) : pan,
+
+            Address = string.IsNullOrWhiteSpace(address) ? null : address.Trim(),
 
             MsmeType = msmeType,
 
@@ -1563,7 +1577,7 @@ public class MastersController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> EditVendor(long id, string vendorName, string? gstin, string? pan, string? msmeType, string? vendorCategory, int paymentTermsDays, string? stateCode = null, string? stateName = null, string? vendorCode = null)
+    public async Task<IActionResult> EditVendor(long id, string vendorName, string? gstin, string? pan, string? msmeType, string? vendorCategory, int paymentTermsDays, string? stateCode = null, string? stateName = null, string? vendorCode = null, string? address = null)
     {
         var vendor = await _db.Vendors.FindAsync(id);
         if (vendor == null) return NotFound();
@@ -1575,6 +1589,8 @@ public class MastersController : Controller
         vendor.Gstin = string.IsNullOrWhiteSpace(gstin) ? null : gstin.Trim().ToUpper();
 
         vendor.Pan = string.IsNullOrWhiteSpace(pan) ? vendor.Pan : pan.Trim().ToUpper();
+
+        vendor.Address = string.IsNullOrWhiteSpace(address) ? null : address.Trim();
 
         vendor.MsmeType = msmeType;
 
@@ -1938,6 +1954,7 @@ public class ProjectsController : Controller
         }
         ViewBag.ProjectTypes = projectTypes;
         ViewBag.Users = await _db.Users.Where(u => u.IsActive).OrderBy(u => u.FullName).AsNoTracking().ToListAsync();
+        ViewBag.BankAccounts = await _db.BankAccounts.Where(b => b.IsActive).OrderBy(b => b.BankName).AsNoTracking().ToListAsync();
 
         var projects = await _db.Projects
             .Include(p => p.Client)
@@ -1947,6 +1964,28 @@ public class ProjectsController : Controller
             .OrderByDescending(p => p.Id)
             .AsNoTracking()
             .ToListAsync();
+
+        // Project Advance & Total Received Financial Totals
+        try
+        {
+            var projectIds = projects.Select(p => p.Id).ToList();
+            var receipts = await _db.CustomerReceipts
+                .Where(r => r.ProjectId.HasValue && projectIds.Contains(r.ProjectId.Value))
+                .GroupBy(r => r.ProjectId!.Value)
+                .Select(g => new
+                {
+                    ProjectId = g.Key,
+                    TotalReceived = g.Sum(x => x.TotalAmountReceived > 0 ? x.TotalAmountReceived : x.AmountReceived),
+                    AdvanceReceived = g.Where(x => x.IsAdvance).Sum(x => x.TotalAmountReceived > 0 ? x.TotalAmountReceived : x.AmountReceived)
+                })
+                .ToDictionaryAsync(x => x.ProjectId, x => new { x.TotalReceived, x.AdvanceReceived });
+
+            ViewBag.ProjectFinancials = receipts;
+        }
+        catch
+        {
+            ViewBag.ProjectFinancials = new Dictionary<long, dynamic>();
+        }
 
         try
         {
@@ -2112,6 +2151,23 @@ public class ProjectsController : Controller
             ViewBag.Milestones = await _db.ProjectMilestones.Where(m => m.ProjectId == project.Id).AsNoTracking().ToListAsync();
             ViewBag.Documents = await _db.DocumentAttachments.Where(d => (d.EntityType == "Project" || d.EntityType == "ProjectClosure" || d.EntityType == "ProjectExpense" || d.EntityType == "DeliveryChallan") && d.EntityId == project.Id).OrderByDescending(d => d.UploadedAt).AsNoTracking().ToListAsync();
             ViewBag.Users = await _db.Users.Where(u => u.IsActive).OrderBy(u => u.FullName).AsNoTracking().ToListAsync();
+            ViewBag.BankAccounts = await _db.BankAccounts.Where(b => b.IsActive).OrderBy(b => b.BankName).AsNoTracking().ToListAsync();
+
+            // All Client Advances & Payment Receipts for this project
+            try
+            {
+                ViewBag.CustomerReceipts = await _db.CustomerReceipts
+                    .Include(r => r.Client)
+                    .Where(r => r.ProjectId == project.Id)
+                    .OrderByDescending(r => r.ReceiptDate)
+                    .ThenByDescending(r => r.Id)
+                    .AsNoTracking()
+                    .ToListAsync();
+            }
+            catch
+            {
+                ViewBag.CustomerReceipts = new List<CustomerReceipt>();
+            }
         }
         else
         {
@@ -2127,6 +2183,112 @@ public class ProjectsController : Controller
         }
 
         return View(project);
+    }
+
+    /// <summary>
+    /// Records an advance or partial client payment directly against a project (before or without an invoice).
+    /// Automatically calculates and deducts from total project value, updating remaining balance and audit history.
+    /// </summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RecordProjectAdvance(
+        long projectId,
+        decimal amountReceived,
+        DateTime? receiptDate,
+        string paymentMode,
+        long? bankAccountId,
+        string? transactionRefNo,
+        string? remarks,
+        IFormFile? receiptDoc)
+    {
+        var project = await _db.Projects.Include(p => p.Client).FirstOrDefaultAsync(p => p.Id == projectId);
+        if (project == null)
+        {
+            TempData["ErrorMessage"] = "Project not found.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        if (amountReceived <= 0)
+        {
+            TempData["ErrorMessage"] = "Advance amount received must be greater than zero.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var company = await _companyContext.GetCurrentCompanyAsync();
+        var selectedBankId = bankAccountId ?? await _db.BankAccounts.Where(b => b.IsActive).Select(b => b.Id).FirstOrDefaultAsync();
+
+        // Upload attachment if provided
+        long? docId = null;
+        if (receiptDoc != null && receiptDoc.Length > 0)
+        {
+            try
+            {
+                var uploadsFolder = Path.Combine(_env.WebRootPath, "uploads", "receipts");
+                Directory.CreateDirectory(uploadsFolder);
+                var ext = Path.GetExtension(receiptDoc.FileName);
+                var uniqueFileName = $"RCPT_ADV_{projectId}_{Guid.NewGuid():N}{ext}";
+                var filePath = Path.Combine(uploadsFolder, uniqueFileName);
+
+                using (var stream = new FileStream(filePath, FileMode.Create))
+                {
+                    await receiptDoc.CopyToAsync(stream);
+                }
+
+                var attachment = new DocumentAttachment
+                {
+                    EntityType = "ProjectAdvanceReceipt",
+                    EntityId = projectId,
+                    FileName = receiptDoc.FileName,
+                    FilePath = $"/uploads/receipts/{uniqueFileName}",
+                    MimeType = receiptDoc.ContentType ?? "application/octet-stream",
+                    FileSizeBytes = receiptDoc.Length,
+                    UploadedBy = 1,
+                    UploadedAt = DateTime.UtcNow,
+                    VersionNumber = 1
+                };
+                _db.DocumentAttachments.Add(attachment);
+                await _db.SaveChangesAsync();
+                docId = attachment.Id;
+            }
+            catch { }
+        }
+
+        var count = await _db.CustomerReceipts.CountAsync() + 1;
+        var rcptNo = $"RCPT-ADV-{DateTime.Today:yyMM}-{count:D4}";
+
+        var receipt = new CustomerReceipt
+        {
+            CompanyId = company.Id,
+            ClientId = project.ClientId,
+            BankAccountId = selectedBankId,
+            ReceiptNumber = rcptNo,
+            ReceiptDate = receiptDate ?? DateTime.Today,
+            AmountReceived = amountReceived,
+            NetAmountReceived = amountReceived,
+            TotalAmountReceived = amountReceived,
+            UnallocatedAmount = 0,
+            PaymentMode = string.IsNullOrWhiteSpace(paymentMode) ? "NEFT/RTGS" : paymentMode,
+            TransactionRefNo = transactionRefNo,
+            Status = "POSTED",
+            ProjectId = project.Id,
+            IsAdvance = true,
+            ExpenseHead = "Mobilization / Project Advance",
+            Remarks = string.IsNullOrWhiteSpace(remarks) ? $"Advance payment recorded against project {project.ProjectCode}" : remarks,
+            ReceiptDocId = docId
+        };
+
+        _db.CustomerReceipts.Add(receipt);
+        await _db.SaveChangesAsync();
+
+        TempData["SuccessMessage"] = $"Advance of <strong>&#8377; {amountReceived:N2}</strong> recorded successfully for Project <strong>{project.ProjectCode}</strong>! (Receipt: {rcptNo}). Remaining balance updated.";
+        
+        // Return to where user was
+        var referer = Request.Headers["Referer"].ToString();
+        if (!string.IsNullOrEmpty(referer) && referer.Contains("/Detail"))
+        {
+            return RedirectToAction(nameof(Detail), new { id = projectId });
+        }
+        return RedirectToAction(nameof(Index));
     }
 
     [HttpPost]
@@ -4915,11 +5077,13 @@ public class ProcurementController : Controller
 {
     private readonly ApplicationDbContext _db;
     private readonly ICompanyContext _companyContext;
+    private readonly IPrivilegeService _privilegeService;
 
-    public ProcurementController(ApplicationDbContext db, ICompanyContext companyContext)
+    public ProcurementController(ApplicationDbContext db, ICompanyContext companyContext, IPrivilegeService privilegeService)
     {
         _db = db;
         _companyContext = companyContext;
+        _privilegeService = privilegeService;
     }
 
     public async Task<IActionResult> Index()
@@ -5917,11 +6081,12 @@ public class ProcurementController : Controller
         if (po == null) return NotFound();
 
         var currentUser = await _companyContext.GetCurrentUserAsync();
-        if (!CanUserDownloadPo(currentUser, po))
+        bool hasDownloadPrivilege = currentUser != null && await _privilegeService.HasPrivilegeAsync(currentUser.Id, "PROCUREMENT_DOWNLOAD");
+        if (!hasDownloadPrivilege && !CanUserDownloadPo(currentUser, po))
         {
             if (po.TotalPoValue > 100000m)
             {
-                TempData["ErrorMessage"] = $"Access Restricted: Purchase Order <strong>{po.PoNumber}</strong> value is &#8377; {po.TotalPoValue:N2} (exceeds &#8377;1 Lakh limit). Standard users are only permitted to download and release POs below &#8377;1 Lakh. Management / Director authorization required.";
+                TempData["ErrorMessage"] = $"Access Restricted: Purchase Order <strong>{po.PoNumber}</strong> value is &#8377; {po.TotalPoValue:N2} (exceeds &#8377;1 Lakh limit). Standard users are only permitted to download and release POs below &#8377;1 Lakh. Management / Director authorization or 'Download & Print PO' privilege required.";
             }
             else
             {

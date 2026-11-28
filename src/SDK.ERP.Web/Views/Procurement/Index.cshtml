@@ -1,4 +1,5 @@
 @model IEnumerable<SDK.ERP.Domain.Entities.Procurement.PurchaseOrder>
+@inject SDK.ERP.Application.Common.IPrivilegeService PrivilegeService
 @{
     ViewData["Title"] = "Procurement With Purchase Order";
     ViewData["ActiveMenu"] = "Procurement";
@@ -10,28 +11,22 @@
     var poLogs = ViewBag.PoLogs as IEnumerable<SDK.ERP.Domain.Entities.Procurement.PurchaseOrderLog> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Procurement.PurchaseOrderLog>();
     var expenseTypes = ViewBag.ExpenseTypes as IEnumerable<SDK.ERP.Domain.Entities.MasterData.ExpenseType> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.MasterData.ExpenseType>();
     var currentUser = ViewBag.CurrentUser as SDK.ERP.Domain.Entities.Admin.User;
-    var userRole = (currentUser?.Role?.RoleName ?? "").ToUpperInvariant();
-    var userDesignation = (currentUser?.Designation ?? "").ToUpperInvariant();
-    var username = (currentUser?.Username ?? "").ToUpperInvariant();
+    var currentUserId = currentUser?.Id ?? 0L;
 
-    bool isSystemAdmin = userRole == "SUPER_ADMIN" || 
-                         userRole == "COMPANY_ADMIN" || 
-                         userRole == "ADMIN" || 
-                         userRole == "ORG_ADMIN" ||
-                         username == "ADMIN" || 
-                         username == "SABIR" ||
-                         userDesignation.Contains("DIRECTOR") || 
-                         userDesignation.Contains("OWNER") || 
-                         userDesignation.Contains("CEO");
+    // Dynamic, Centralized User Privileges (Zero Hardcoding)
+    bool canViewPo = await PrivilegeService.HasPrivilegeAsync(currentUserId, "PROCUREMENT_VIEW");
+    bool canCreatePo = await PrivilegeService.HasPrivilegeAsync(currentUserId, "PROCUREMENT_CREATE");
+    bool canEditPo = await PrivilegeService.HasPrivilegeAsync(currentUserId, "PROCUREMENT_EDIT");
+    bool canDownloadGeneral = await PrivilegeService.HasPrivilegeAsync(currentUserId, "PROCUREMENT_DOWNLOAD");
+    bool canViewHistory = await PrivilegeService.HasPrivilegeAsync(currentUserId, "PROCUREMENT_VIEW_LOGS");
+    bool canMarkPayment = await PrivilegeService.HasPrivilegeAsync(currentUserId, "PROCUREMENT_MARK_PAYMENT");
+    bool canApprovePayment = await PrivilegeService.HasPrivilegeAsync(currentUserId, "PROCUREMENT_APPROVE_PAYMENT");
+    bool canMakePayment = await PrivilegeService.HasPrivilegeAsync(currentUserId, "PROCUREMENT_EXECUTE_PAYMENT");
+    bool canUndo = await PrivilegeService.HasPrivilegeAsync(currentUserId, "PROCUREMENT_UNDO");
 
-    bool isManager = isSystemAdmin || 
-                     userRole == "PROJECT_MANAGER" || 
-                     userRole == "MANAGER" || 
-                     userDesignation.Contains("MANAGER");
-
-    bool isAccountant = userRole == "ACCOUNTANT" || 
-                        userRole == "ACCOUNTS" || 
-                        userDesignation.Contains("ACCOUNT");
+    bool isSystemAdmin = canApprovePayment && canUndo;
+    bool isManager = canApprovePayment;
+    bool isAccountant = canMakePayment;
 
     var totalCount = poList.Count();
     var pendingCount = poList.Count(p => p.ApprovalStatus == "PENDING" || p.ApprovalStatus == "PENDING_APPROVAL");
@@ -228,7 +223,7 @@
                 <option value="ALL">All Orders (@totalCount)</option>
                 <option value="PENDING">Pending Approval (@pendingCount)</option>
                 <option value="APPROVED">Approved (@approvedCount)</option>
-                <option value="MARKED_FOR_PAYMENT">Payment Approval Pending (@markedPaymentCount)</option>
+                <option value="MARKED_FOR_PAYMENT">Payment Request (@markedPaymentCount)</option>
                 <option value="PAYMENT_APPROVED">Approved for Payment (@paymentApprovedCount)</option>
                 <option value="PARTIALLY_PAID">Partially Paid (@partiallyPaidCount)</option>
                 <option value="PAID">Paid (@paidCount)</option>
@@ -252,7 +247,7 @@
         <i class="fa-solid fa-circle-check text-success"></i> Approved <span class="badge bg-success">@approvedCount</span>
     </button>
     <button type="button" class="po-filter-btn" data-filter="MARKED_FOR_PAYMENT">
-        <i class="fa-solid fa-clock-rotate-left text-warning"></i> Payment Req <span class="badge bg-warning text-dark">@markedPaymentCount</span>
+        <i class="fa-solid fa-clock-rotate-left text-warning"></i> Payment Request <span class="badge bg-warning text-dark">@markedPaymentCount</span>
     </button>
     <button type="button" class="po-filter-btn" data-filter="PAYMENT_APPROVED">
         <i class="fa-solid fa-circle-check text-primary"></i> Approved for Payment <span class="badge bg-primary">@paymentApprovedCount</span>
@@ -288,7 +283,8 @@
             var projectName = po.Project?.ProjectName ?? po.Project?.ProjectCode;
             var expenseHead = po.ExpenseHead ?? (po.ProjectId.HasValue ? "Project (Ledger - Project Ledger)" : "Office Asset (Ledger - Computer & Accessories (Asset))");
             bool isApproved = normalizedStatus != "PENDING" && normalizedStatus != "PENDING_APPROVAL" && normalizedStatus != "REJECTED";
-            bool canDownloadPo = isSystemAdmin || isManager || (po.TotalPoValue <= 100000m && isApproved);
+            // Privilege-based download check: user has Download privilege OR is Manager/Admin OR standard approved PO
+            bool canDownloadPo = canDownloadGeneral || isSystemAdmin || isManager || (po.TotalPoValue <= 100000m && isApproved);
 
             var poPayments = vendorPayments.Where(vp => vp.PoId == po.Id).OrderByDescending(vp => vp.PaymentDate).ToList();
             var thisPoLogs = poLogs.Where(l => l.PoId == po.Id || l.PurchaseOrderId == po.Id).OrderByDescending(l => l.CreatedAt).ToList();
@@ -524,7 +520,7 @@
                     <div class="col-lg-2 col-md-3 text-end pt-3 pt-md-0 border-start ps-md-3">
                         @if (normalizedStatus == "MARKED_FOR_PAYMENT")
                         {
-                            @if (isSystemAdmin || isManager)
+                            @if (canApprovePayment)
                             {
                                 <!-- Management Quick Action: Approve Payment Release -->
                                 <button type="button" class="btn btn-sm btn-primary w-100 mb-2 shadow-sm d-inline-flex align-items-center justify-content-center gap-1" data-bs-toggle="modal" data-bs-target="#approvePaymentModal_@po.Id" style="font-size: 12px; font-weight: 600;">
@@ -541,10 +537,13 @@
                         }
                         else if (normalizedStatus == "PAYMENT_APPROVED")
                         {
-                            <!-- Approved for Payment: Accounts / Management can Make Payment -->
-                            <button type="button" class="btn btn-sm btn-success w-100 mb-2 shadow-sm d-inline-flex align-items-center justify-content-center gap-1" data-bs-toggle="modal" data-bs-target="#processPaymentModal_@po.Id" style="font-size: 12px; font-weight: 600;">
-                                <i class="fa-solid fa-money-bill-wave"></i> Make Payment
-                            </button>
+                            @if (canMakePayment)
+                            {
+                                <!-- Approved for Payment: Accounts / Management can Make Payment -->
+                                <button type="button" class="btn btn-sm btn-success w-100 mb-2 shadow-sm d-inline-flex align-items-center justify-content-center gap-1" data-bs-toggle="modal" data-bs-target="#processPaymentModal_@po.Id" style="font-size: 12px; font-weight: 600;">
+                                    <i class="fa-solid fa-money-bill-wave"></i> Make Payment
+                                </button>
+                            }
                         }
 
                         <!-- "Manage PO" Dropdown Button (Exactly matching reference Image 5) -->
@@ -571,7 +570,7 @@
 
                                 <!-- 2. Edit -->
                                 <li>
-                                    @if (normalizedStatus != "PAID")
+                                    @if (normalizedStatus != "PAID" && canEditPo)
                                     {
                                         <a class="dropdown-item py-2" asp-action="PrintPo" asp-route-id="@po.Id">
                                             <i class="fa-solid fa-pen text-info me-2"></i> Edit
@@ -587,22 +586,31 @@
 
                                 <!-- 3. PO Trans History -->
                                 <li>
-                                    <button type="button" class="dropdown-item py-2" data-bs-toggle="modal" data-bs-target="#poHistoryModal_@po.Id">
-                                        <i class="fa-solid fa-table-list text-secondary me-2"></i> PO Trans History
-                                        @if (thisPoLogs.Any())
-                                        {
-                                            <span class="badge bg-primary-subtle text-primary ms-1">@thisPoLogs.Count</span>
-                                        }
-                                        else if (poPayments.Any())
-                                        {
-                                            <span class="badge bg-primary-subtle text-primary ms-1">@poPayments.Count</span>
-                                        }
-                                    </button>
+                                    @if (canViewHistory)
+                                    {
+                                        <button type="button" class="dropdown-item py-2" data-bs-toggle="modal" data-bs-target="#poHistoryModal_@po.Id">
+                                            <i class="fa-solid fa-table-list text-secondary me-2"></i> PO Trans History
+                                            @if (thisPoLogs.Any())
+                                            {
+                                                <span class="badge bg-primary-subtle text-primary ms-1">@thisPoLogs.Count</span>
+                                            }
+                                            else if (poPayments.Any())
+                                            {
+                                                <span class="badge bg-primary-subtle text-primary ms-1">@poPayments.Count</span>
+                                            }
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <span class="dropdown-item py-2 text-muted disabled">
+                                            <i class="fa-solid fa-table-list text-muted me-2"></i> PO Trans History (Locked)
+                                        </span>
+                                    }
                                 </li>
 
                                 <!-- 4. Undo Operation (For Marked for Payment or Payment Approved) -->
                                 <li>
-                                    @if (normalizedStatus == "MARKED_FOR_PAYMENT" || normalizedStatus == "PAYMENT_APPROVED")
+                                    @if ((normalizedStatus == "MARKED_FOR_PAYMENT" || normalizedStatus == "PAYMENT_APPROVED") && canUndo)
                                     {
                                         <form asp-action="UndoMarkForPayment" asp-route-id="@po.Id" method="post" class="m-0 p-0">
                                             @Html.AntiForgeryToken()
@@ -613,7 +621,7 @@
                                     }
                                     else
                                     {
-                                        <span class="dropdown-item py-2 text-muted disabled" title="Undo is only available when PO is Pending Payment">
+                                        <span class="dropdown-item py-2 text-muted disabled" title="Undo is only available when PO is Pending Payment and user has Undo privilege">
                                             <i class="fa-solid fa-rotate-left me-2"></i> Undo Operation
                                         </span>
                                     }
@@ -621,7 +629,7 @@
 
                                 <!-- 5. Mark For Payment / Settlement -->
                                 <li>
-                                    @if ((normalizedStatus == "APPROVED" || normalizedStatus == "PARTIALLY_PAID") && balanceDue > 0)
+                                    @if ((normalizedStatus == "APPROVED" || normalizedStatus == "PARTIALLY_PAID") && balanceDue > 0 && canMarkPayment)
                                     {
                                         <button type="button" class="dropdown-item py-2 text-primary fw-semibold" data-bs-toggle="modal" data-bs-target="#markPaymentModal_@po.Id">
                                             <i class="fa-solid fa-credit-card me-2"></i> Mark For Settlement...
@@ -647,14 +655,14 @@
                                     }
                                     else
                                     {
-                                        <span class="dropdown-item py-2 text-muted disabled" title="PO must be approved first before marking for payment">
+                                        <span class="dropdown-item py-2 text-muted disabled" title="PO must be approved first and user must have Mark for Settlement privilege">
                                             <i class="fa-solid fa-lock me-2"></i> Mark For Settlement...
                                         </span>
                                     }
                                 </li>
 
                                 <!-- 6. Payment Approval Actions (Management / Admin) -->
-                                @if (normalizedStatus == "MARKED_FOR_PAYMENT" && (isSystemAdmin || isManager))
+                                @if (normalizedStatus == "MARKED_FOR_PAYMENT" && canApprovePayment)
                                 {
                                     <li><hr class="dropdown-divider my-1"></li>
                                     <li>
@@ -670,7 +678,7 @@
                                 }
 
                                 <!-- 7. Make Payment (Accounts / Admin) -->
-                                @if (normalizedStatus == "PAYMENT_APPROVED" || (normalizedStatus == "MARKED_FOR_PAYMENT" && isSystemAdmin))
+                                @if (normalizedStatus == "PAYMENT_APPROVED" && canMakePayment)
                                 {
                                     <li><hr class="dropdown-divider my-1"></li>
                                     <li>
@@ -679,7 +687,7 @@
                                         </button>
                                     </li>
                                 }
-                                @if (normalizedStatus == "PAYMENT_APPROVED" && (isSystemAdmin || isManager))
+                                @if (normalizedStatus == "PAYMENT_APPROVED" && canUndo)
                                 {
                                     <li>
                                         <form asp-action="UndoPaymentApproval" asp-route-id="@po.Id" method="post" class="m-0 p-0">

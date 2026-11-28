@@ -1,4 +1,6 @@
 @model IEnumerable<SDK.ERP.Domain.Entities.Accounting.DirectExpense>
+@inject SDK.ERP.Application.Common.ICompanyContext CompanyContext
+@inject SDK.ERP.Application.Common.IPrivilegeService PrivilegeService
 @{
     ViewData["Title"] = "Payments > Direct Payments";
     ViewData["ActiveMenu"] = ViewBag.ActiveTab == "pending" ? "ExpensesApproval" : "Expenses";
@@ -9,6 +11,16 @@
     var settledCount = ViewBag.SettledCount as int? ?? 0;
     var pendingCount = ViewBag.PendingCount as int? ?? 0;
     var declinedCount = ViewBag.DeclinedCount as int? ?? 0;
+
+    var currentUser = await CompanyContext.GetCurrentUserAsync();
+    var currentUserId = currentUser?.Id ?? 0L;
+
+    bool canCreateExpense = await PrivilegeService.HasPrivilegeAsync(currentUserId, "EXPENSES_CREATE");
+    bool canEditExpense = await PrivilegeService.HasPrivilegeAsync(currentUserId, "EXPENSES_EDIT");
+    bool canApproveExpense = await PrivilegeService.HasPrivilegeAsync(currentUserId, "EXPENSES_APPROVE");
+    bool canDeclineExpense = await PrivilegeService.HasPrivilegeAsync(currentUserId, "EXPENSES_DECLINE");
+    bool canSettleExpense = await PrivilegeService.HasPrivilegeAsync(currentUserId, "EXPENSES_SETTLE");
+    bool canPrintExpense = await PrivilegeService.HasPrivilegeAsync(currentUserId, "EXPENSES_PRINT");
 
     var pageNum = ViewBag.Page as int? ?? 1;
     var pageSize = ViewBag.PageSize as int? ?? 10;
@@ -457,6 +469,20 @@
                                 <!-- Date -->
                                 <td style="white-space: nowrap;">
                                     <span class="fw-semibold text-dark">@item.PaymentDate.ToString("dd MMM yyyy")</span>
+                                    @if (!string.IsNullOrWhiteSpace(item.PaymentMode))
+                                    {
+                                        <div>
+                                            <span class="badge bg-light text-secondary border mt-1" style="font-size: 10.5px; font-weight: 500;">
+                                                <i class="fa-solid fa-credit-card me-1 text-primary"></i>@item.PaymentMode
+                                            </span>
+                                        </div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(item.TransactionReference))
+                                    {
+                                        <div class="small text-muted mt-1" style="font-size: 10.5px;" title="@item.BankName">
+                                            <i class="fa-solid fa-hashtag text-secondary me-1"></i>@item.TransactionReference
+                                        </div>
+                                    }
                                 </td>
 
                                 <!-- Expense Head with Ledger Subtitle -->
@@ -520,48 +546,78 @@
                                     <div class="action-links">
                                         @if (activeTab == "unsettled")
                                         {
-                                            <a href="javascript:void(0)" class="action-link-settle" onclick="openSettleModal(@item.Id, '@item.ExpenseHead', '@item.Amount.ToString("N2")')">
-                                                <i class="fa-solid fa-check"></i> Settle
-                                            </a>
-                                            <a asp-action="Edit" asp-route-id="@item.Id" class="action-link-edit">
-                                                <i class="fa-solid fa-pencil"></i> Edit
-                                            </a>
-                                            <a asp-action="PrintVoucher" asp-route-id="@item.Id" target="_blank" class="action-link-print">
-                                                <i class="fa-solid fa-print"></i> Print
-                                            </a>
+                                            @if (canSettleExpense)
+                                            {
+                                                <a href="javascript:void(0)" class="action-link-settle" onclick="openSettleModal(@item.Id, '@item.ExpenseHead', '@item.Amount.ToString("N2")', '@item.PaymentMode')">
+                                                    <i class="fa-solid fa-check"></i> Settle
+                                                </a>
+                                            }
+                                            @if (canEditExpense)
+                                            {
+                                                <a asp-action="Edit" asp-route-id="@item.Id" class="action-link-edit">
+                                                    <i class="fa-solid fa-pencil"></i> Edit
+                                                </a>
+                                            }
+                                            @if (canPrintExpense)
+                                            {
+                                                <a asp-action="PrintVoucher" asp-route-id="@item.Id" target="_blank" class="action-link-print">
+                                                    <i class="fa-solid fa-print"></i> Print
+                                                </a>
+                                            }
                                         }
                                         else if (activeTab == "pending")
                                         {
-                                            <a href="javascript:void(0)" class="action-link-approve" onclick="openApproveModal(@item.Id, '@item.ExpenseHead', '@item.Amount.ToString("N2")')">
-                                                <i class="fa-solid fa-check-double"></i> Approve
-                                            </a>
-                                            <a href="javascript:void(0)" class="action-link-decline" onclick="openDeclineModal(@item.Id, '@item.ExpenseHead')">
-                                                <i class="fa-solid fa-xmark"></i> Decline
-                                            </a>
-                                            <a asp-action="Edit" asp-route-id="@item.Id" class="action-link-edit">
-                                                <i class="fa-solid fa-pencil"></i> Edit
-                                            </a>
-                                            <a asp-action="PrintVoucher" asp-route-id="@item.Id" target="_blank" class="action-link-print">
-                                                <i class="fa-solid fa-print"></i> Print
-                                            </a>
+                                            @if (canApproveExpense)
+                                            {
+                                                <a href="javascript:void(0)" class="action-link-approve" onclick="openApproveModal(@item.Id, '@item.ExpenseHead', '@item.Amount.ToString("N2")')">
+                                                    <i class="fa-solid fa-check-double"></i> Approve
+                                                </a>
+                                            }
+                                            @if (canDeclineExpense)
+                                            {
+                                                <a href="javascript:void(0)" class="action-link-decline" onclick="openDeclineModal(@item.Id, '@item.ExpenseHead')">
+                                                    <i class="fa-solid fa-xmark"></i> Decline
+                                                </a>
+                                            }
+                                            @if (canEditExpense)
+                                            {
+                                                <a asp-action="Edit" asp-route-id="@item.Id" class="action-link-edit">
+                                                    <i class="fa-solid fa-pencil"></i> Edit
+                                                </a>
+                                            }
+                                            @if (canPrintExpense)
+                                            {
+                                                <a asp-action="PrintVoucher" asp-route-id="@item.Id" target="_blank" class="action-link-print">
+                                                    <i class="fa-solid fa-print"></i> Print
+                                                </a>
+                                            }
                                         }
                                         else if (activeTab == "settled")
                                         {
-                                            <a asp-action="PrintVoucher" asp-route-id="@item.Id" target="_blank" class="action-link-print">
-                                                <i class="fa-solid fa-print"></i> Print
-                                            </a>
+                                            @if (canPrintExpense)
+                                            {
+                                                <a asp-action="PrintVoucher" asp-route-id="@item.Id" target="_blank" class="action-link-print">
+                                                    <i class="fa-solid fa-print"></i> Print
+                                                </a>
+                                            }
                                             <a href="javascript:void(0)" class="action-link-edit" onclick="openViewModal(@item.Id, '@item.ExpenseHead', '@item.Amount.ToString("N2")', '@item.SettlementPaymentMode', '@(item.SettlementReference ?? "N/A")', '@(item.SettledAt?.ToString("dd MMM yyyy") ?? "N/A")', '@(item.SettledByUserName ?? "Finance")')">
                                                 <i class="fa-solid fa-eye"></i> View
                                             </a>
                                         }
                                         else if (activeTab == "declined")
                                         {
-                                            <a asp-action="Edit" asp-route-id="@item.Id" class="action-link-edit" title="Edit and resubmit for approval">
-                                                <i class="fa-solid fa-arrow-rotate-left"></i> Resubmit
-                                            </a>
-                                            <a asp-action="PrintVoucher" asp-route-id="@item.Id" target="_blank" class="action-link-print">
-                                                <i class="fa-solid fa-print"></i> Print
-                                            </a>
+                                            @if (canEditExpense)
+                                            {
+                                                <a asp-action="Edit" asp-route-id="@item.Id" class="action-link-edit" title="Edit and resubmit for approval">
+                                                    <i class="fa-solid fa-arrow-rotate-left"></i> Resubmit
+                                                </a>
+                                            }
+                                            @if (canPrintExpense)
+                                            {
+                                                <a asp-action="PrintVoucher" asp-route-id="@item.Id" target="_blank" class="action-link-print">
+                                                    <i class="fa-solid fa-print"></i> Print
+                                                </a>
+                                            }
                                         }
                                     </div>
                                 </td>
@@ -812,10 +868,13 @@
 
 @section Scripts {
     <script>
-        function openSettleModal(id, head, amount) {
+        function openSettleModal(id, head, amount, mode) {
             document.getElementById('settleExpenseId').value = id;
             document.getElementById('settleExpenseHead').textContent = head;
             document.getElementById('settleAmount').innerHTML = '&#8377; ' + amount;
+            if (mode && document.getElementById('settlementPaymentMode')) {
+                document.getElementById('settlementPaymentMode').value = mode;
+            }
             new bootstrap.Modal(document.getElementById('settleModal')).show();
         }
 

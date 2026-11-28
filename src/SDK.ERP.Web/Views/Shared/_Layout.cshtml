@@ -1,15 +1,24 @@
 @inject SDK.ERP.Application.Common.ICompanyContext CompanyContext
+@inject SDK.ERP.Application.Common.IPrivilegeService PrivilegeService
 @{
     var activeMenu = ViewData["ActiveMenu"] as string ?? "Dashboard";
     var currentCompany = await CompanyContext.GetCurrentCompanyAsync();
     var currentUser = await CompanyContext.GetCurrentUserAsync();
+    var currentUserId = currentUser?.Id ?? 0L;
 
-    var userRole = (currentUser?.Role?.RoleName ?? User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "").ToUpperInvariant();
-    var isSuperAdmin = userRole == "SUPER_ADMIN" || userRole == "ADMIN" || userRole == "COMPANY_ADMIN" || userRole == "ORG_ADMIN" || (currentUser != null && currentUser.Username.Equals("admin", StringComparison.OrdinalIgnoreCase));
-    var isAccountant = isSuperAdmin || userRole == "ACCOUNTANT";
-    var isProjectManager = isSuperAdmin || userRole == "PROJECT_MANAGER";
-    var isProcurement = isSuperAdmin || userRole == "PROCUREMENT_OFFICER" || userRole == "PROCUREMENT";
-    var isStoreKeeper = isSuperAdmin || isProcurement || userRole == "STORE_KEEPER";
+    // Dynamic, Centralized Privileges (No hardcoding)
+    var canMasters = await PrivilegeService.HasPrivilegeAsync(currentUserId, "MASTERS_VIEW");
+    var canProjects = await PrivilegeService.HasPrivilegeAsync(currentUserId, "PROJECTS_VIEW");
+    var canSales = await PrivilegeService.HasPrivilegeAsync(currentUserId, "SALES_VIEW");
+    var canProcurement = await PrivilegeService.HasPrivilegeAsync(currentUserId, "PROCUREMENT_VIEW");
+    var canInventory = await PrivilegeService.HasPrivilegeAsync(currentUserId, "INVENTORY_MANAGE");
+    var canExpenses = await PrivilegeService.HasPrivilegeAsync(currentUserId, "EXPENSES_VIEW");
+    var canExpensesApproval = await PrivilegeService.HasPrivilegeAsync(currentUserId, "EXPENSES_APPROVE");
+    var canFinance = await PrivilegeService.HasPrivilegeAsync(currentUserId, "ACCOUNTS_VIEW");
+    var canGst = await PrivilegeService.HasPrivilegeAsync(currentUserId, "GST_COMPLIANCE");
+    var canPettyCash = await PrivilegeService.HasPrivilegeAsync(currentUserId, "PETTYCASH_MANAGE");
+    var canPayroll = await PrivilegeService.HasPrivilegeAsync(currentUserId, "PAYROLL_MANAGE");
+    var canAdmin = await PrivilegeService.HasPrivilegeAsync(currentUserId, "ADMIN_ASSIGN_PRIVILEGES");
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -54,7 +63,7 @@
                 </a>
 
                 <!-- MASTER DATA -->
-                @if (isSuperAdmin || isAccountant || isProcurement || isProjectManager)
+                @if (canMasters)
                 {
                     <div class="nav-section-title">MASTER DATA</div>
                     <a class="nav-item-link @(activeMenu == "Masters" ? "active" : "")" asp-controller="Masters" asp-action="Index" title="Master Catalogs" data-bs-toggle="tooltip" data-bs-placement="right">
@@ -64,7 +73,7 @@
                 }
 
                 <!-- PROJECT MANAGEMENT -->
-                @if (isSuperAdmin || isProjectManager || isAccountant)
+                @if (canProjects)
                 {
                     <div class="nav-section-title">OPERATIONS &amp; PROJECTS</div>
                     <a class="nav-item-link @(activeMenu == "Projects" ? "active" : "")" asp-controller="Projects" asp-action="Index" title="Project Management" data-bs-toggle="tooltip" data-bs-placement="right">
@@ -74,7 +83,7 @@
                 }
 
                 <!-- SALES & BILLING -->
-                @if (isSuperAdmin || isAccountant)
+                @if (canSales)
                 {
                     <div class="nav-section-title">SALES &amp; RECEIVABLES</div>
                     <a class="nav-item-link @(activeMenu == "Sales" ? "active" : "")" asp-controller="Sales" asp-action="Index" title="Sales & Tax Invoices" data-bs-toggle="tooltip" data-bs-placement="right">
@@ -88,62 +97,74 @@
                 }
 
                 <!-- PROCUREMENT & PAYABLES -->
-                @if (isSuperAdmin || isProcurement || isAccountant || isStoreKeeper)
+                @if (canProcurement || canInventory)
                 {
                     <div class="nav-section-title">PROCUREMENT &amp; PAYABLES</div>
-                    @if (isSuperAdmin || isProcurement || isAccountant)
+                    @if (canProcurement)
                     {
                         <a class="nav-item-link @(activeMenu == "Procurement" ? "active" : "")" asp-controller="Procurement" asp-action="Index" title="Procurement & POs" data-bs-toggle="tooltip" data-bs-placement="right">
                             <span class="nav-icon-badge pink"><i class="fa-solid fa-cart-flatbed"></i></span>
                             <span class="flex-grow-1">Procurement &amp; POs</span>
                         </a>
                     }
-                    <a class="nav-item-link" asp-controller="Procurement" asp-action="Inventory" title="Office Inventory" data-bs-toggle="tooltip" data-bs-placement="right">
-                        <span class="nav-icon-badge teal"><i class="fa-solid fa-boxes-stacked"></i></span>
-                        <span class="flex-grow-1">Office Inventory</span>
-                    </a>
+                    @if (canInventory)
+                    {
+                        <a class="nav-item-link" asp-controller="Procurement" asp-action="Inventory" title="Office Inventory" data-bs-toggle="tooltip" data-bs-placement="right">
+                            <span class="nav-icon-badge teal"><i class="fa-solid fa-boxes-stacked"></i></span>
+                            <span class="flex-grow-1">Office Inventory</span>
+                        </a>
+                    }
                 }
 
                 <!-- EXPENSES -->
-                <div class="nav-section-title">EXPENSES</div>
-                <a class="nav-item-link @(activeMenu == "Expenses" ? "active" : "")" asp-controller="Expenses" asp-action="Index" title="Direct Payments" data-bs-toggle="tooltip" data-bs-placement="right">
-                    <span class="nav-icon-badge amber"><i class="fa-solid fa-money-bill-transfer"></i></span>
-                    <span class="flex-grow-1">Direct Payments</span>
-                </a>
-                @if (isSuperAdmin || isAccountant)
+                @if (canExpenses)
                 {
-                    <a class="nav-item-link @(activeMenu == "ExpensesApproval" ? "active" : "")" asp-controller="Expenses" asp-action="Index" asp-route-tab="pending" title="Direct Payments Approval" data-bs-toggle="tooltip" data-bs-placement="right">
-                        <span class="nav-icon-badge green"><i class="fa-solid fa-clipboard-check"></i></span>
-                        <span class="flex-grow-1">Direct Payments Approval</span>
+                    <div class="nav-section-title">EXPENSES</div>
+                    <a class="nav-item-link @(activeMenu == "Expenses" ? "active" : "")" asp-controller="Expenses" asp-action="Index" title="Direct Payments" data-bs-toggle="tooltip" data-bs-placement="right">
+                        <span class="nav-icon-badge amber"><i class="fa-solid fa-money-bill-transfer"></i></span>
+                        <span class="flex-grow-1">Direct Payments</span>
                     </a>
+                    @if (canExpensesApproval)
+                    {
+                        <a class="nav-item-link @(activeMenu == "ExpensesApproval" ? "active" : "")" asp-controller="Expenses" asp-action="Index" asp-route-tab="pending" title="Direct Payments Approval" data-bs-toggle="tooltip" data-bs-placement="right">
+                            <span class="nav-icon-badge green"><i class="fa-solid fa-clipboard-check"></i></span>
+                            <span class="flex-grow-1">Direct Payments Approval</span>
+                        </a>
+                    }
                 }
 
                 <!-- FINANCIALS & TAX -->
-                @if (isSuperAdmin || isAccountant || isProjectManager)
+                @if (canFinance || canGst || canPettyCash)
                 {
                     <div class="nav-section-title">FINANCIALS &amp; TAXATION</div>
-                    @if (isSuperAdmin || isAccountant)
+                    @if (canFinance)
                     {
                         <a class="nav-item-link @(activeMenu == "Accounts" ? "active" : "")" asp-controller="Accounts" asp-action="Index" title="General Ledger & COA" data-bs-toggle="tooltip" data-bs-placement="right">
                             <span class="nav-icon-badge teal"><i class="fa-solid fa-scale-unbalanced-flip"></i></span>
                             <span class="flex-grow-1">General Ledger &amp; COA</span>
                         </a>
+                    }
+                    @if (canGst)
+                    {
                         <a class="nav-item-link @(activeMenu == "Gst" ? "active" : "")" asp-controller="Gst" asp-action="Index" title="GST & Tax Compliance" data-bs-toggle="tooltip" data-bs-placement="right">
                             <span class="nav-icon-badge blue"><i class="fa-solid fa-file-shield"></i></span>
                             <span class="flex-grow-1">GST &amp; Tax Compliance</span>
                         </a>
                     }
-                    <a class="nav-item-link @(activeMenu == "PettyCash" || activeMenu == "Banking" ? "active" : "")" asp-controller="PettyCash" asp-action="Index" title="Petty Cash Management" data-bs-toggle="tooltip" data-bs-placement="right">
-                        <span class="nav-icon-badge amber"><i class="fa-solid fa-wallet"></i></span>
-                        <span class="flex-grow-1">Petty Cash Management</span>
-                    </a>
+                    @if (canPettyCash)
+                    {
+                        <a class="nav-item-link @(activeMenu == "PettyCash" || activeMenu == "Banking" ? "active" : "")" asp-controller="PettyCash" asp-action="Index" title="Petty Cash Management" data-bs-toggle="tooltip" data-bs-placement="right">
+                            <span class="nav-icon-badge amber"><i class="fa-solid fa-wallet"></i></span>
+                            <span class="flex-grow-1">Petty Cash Management</span>
+                        </a>
+                    }
                 }
 
                 <!-- HR & ASSETS -->
-                @if (isSuperAdmin || isAccountant || isProjectManager || isStoreKeeper)
+                @if (canPayroll || canProjects || canAdmin)
                 {
                     <div class="nav-section-title">HUMAN RESOURCES &amp; ASSETS</div>
-                    @if (isSuperAdmin || isAccountant)
+                    @if (canPayroll || canAdmin)
                     {
                         <a class="nav-item-link @(activeMenu == "Payroll" ? "active" : "")" asp-controller="Payroll" asp-action="Index" title="Payroll & HR" data-bs-toggle="tooltip" data-bs-placement="right">
                             <span class="nav-icon-badge purple"><i class="fa-solid fa-users-gear"></i></span>
@@ -158,7 +179,7 @@
 
                 <!-- REPORTS & SYSTEM ADMIN -->
                 <div class="nav-section-title">MIS &amp; GOVERNANCE</div>
-                @if (isSuperAdmin || isAccountant || isProjectManager)
+                @if (canFinance || canProjects || canAdmin)
                 {
                     <a class="nav-item-link @(activeMenu == "Reports" ? "active" : "")" asp-controller="Reports" asp-action="Index" title="Reports & Analytics" data-bs-toggle="tooltip" data-bs-placement="right">
                         <span class="nav-icon-badge teal"><i class="fa-solid fa-chart-line"></i></span>
@@ -169,7 +190,7 @@
                     <span class="nav-icon-badge blue"><i class="fa-solid fa-building-gear"></i></span>
                     <span class="flex-grow-1">Organization Profile</span>
                 </a>
-                @if (isSuperAdmin)
+                @if (canAdmin)
                 {
                     <a class="nav-item-link @(activeMenu == "Admin" ? "active" : "")" asp-controller="Admin" asp-action="Index" title="Admin, Audit & RBAC" data-bs-toggle="tooltip" data-bs-placement="right">
                         <span class="nav-icon-badge pink"><i class="fa-solid fa-shield-halved"></i></span>
@@ -457,7 +478,7 @@
                                     </div>
                                 </a>
                             </li>
-@if (isSuperAdmin)
+@if (canAdmin)
                             {
                                 <li><hr class="dropdown-divider my-2"></li>
                                 <li>

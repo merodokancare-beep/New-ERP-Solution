@@ -7,6 +7,7 @@
     var vendors = ViewBag.Vendors as IEnumerable<SDK.ERP.Domain.Entities.MasterData.Vendor> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.MasterData.Vendor>();
     var ledgers = ViewBag.Ledgers as IEnumerable<string> ?? Enumerable.Empty<string>();
     var projects = ViewBag.Projects as IEnumerable<SDK.ERP.Domain.Entities.Projects.Project> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Projects.Project>();
+    var bankAccounts = ViewBag.BankAccounts as IEnumerable<SDK.ERP.Domain.Entities.Banking.BankAccount> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Banking.BankAccount>();
 }
 
 <style>
@@ -268,6 +269,61 @@
                 </div>
             </div>
 
+            <!-- ROW: Mode of Payment & Dynamic Bank/Instrument Details -->
+            <div class="row g-4 mb-3">
+                <div class="col-md-4">
+                    <label class="form-field-label" for="PaymentMode">
+                        Mode of Payment <span class="text-danger">*</span>
+                    </label>
+                    <select asp-for="PaymentMode" class="form-field-input form-select" id="PaymentMode" required onchange="handlePaymentModeChange()">
+                        <option value="">-- Select Mode of Payment --</option>
+                        <option value="NetBanking" selected="@(Model?.PaymentMode == "NetBanking" || Model?.PaymentMode == null)">Net Banking (NEFT / RTGS / IMPS)</option>
+                        <option value="UPI" selected="@(Model?.PaymentMode == "UPI")">UPI / QR Code</option>
+                        <option value="Cheque" selected="@(Model?.PaymentMode == "Cheque")">Cheque</option>
+                        <option value="Cash" selected="@(Model?.PaymentMode == "Cash")">Cash</option>
+                        <option value="Card" selected="@(Model?.PaymentMode == "Card")">Debit / Credit Card</option>
+                        <option value="Demand Draft" selected="@(Model?.PaymentMode == "Demand Draft")">Demand Draft (DD)</option>
+                    </select>
+                    <span asp-validation-for="PaymentMode" class="text-danger small"></span>
+                </div>
+
+                <!-- Non-Cash Dynamic Field 1: Bank Account -->
+                <div class="col-md-4" id="grpBankAccount">
+                    <label class="form-field-label" for="BankAccountId" id="lblBankAccount">
+                        Bank Account <span class="text-danger" id="reqBankAccount">*</span>
+                    </label>
+                    <select asp-for="BankAccountId" class="form-field-input form-select" id="BankAccountId">
+                        <option value="">-- Select Bank Account --</option>
+                        @foreach (var b in bankAccounts)
+                        {
+                            <option value="@b.Id" selected="@(b.Id == Model?.BankAccountId)">@b.BankName - @b.AccountNumber (@b.AccountType)</option>
+                        }
+                    </select>
+                    <span asp-validation-for="BankAccountId" class="text-danger small"></span>
+                </div>
+
+                <!-- Non-Cash Dynamic Field 2: Reference / Instrument No. -->
+                <div class="col-md-4" id="grpReference">
+                    <label class="form-field-label" for="TransactionReference" id="lblTransactionReference">
+                        UTR / Ref No. <span class="text-danger" id="reqReference">*</span>
+                    </label>
+                    <input type="text" asp-for="TransactionReference" class="form-field-input form-control" id="TransactionReference" placeholder="Enter UTR / Reference No." />
+                    <span asp-validation-for="TransactionReference" class="text-danger small"></span>
+                </div>
+            </div>
+
+            <!-- Dynamic Cheque Date Row (only for Cheque payment mode) -->
+            <div class="row g-4 mb-3" id="grpChequeDateRow" style="display: none;">
+                <div class="col-md-4 offset-md-4">
+                    <label class="form-field-label" for="ChequeDate">
+                        Cheque Date <span class="text-danger">*</span>
+                    </label>
+                    <input type="date" asp-for="ChequeDate" class="form-field-input form-control" id="ChequeDate"
+                           value="@(Model?.ChequeDate?.ToString("yyyy-MM-dd") ?? DateTime.Today.ToString("yyyy-MM-dd"))" />
+                    <span asp-validation-for="ChequeDate" class="text-danger small"></span>
+                </div>
+            </div>
+
             <!-- ROW 4: Purpose -->
             <div class="row g-4 mb-3">
                 <div class="col-12">
@@ -338,6 +394,77 @@
 
             vendorCheckbox.addEventListener('change', toggleVendor);
             projectCheckbox.addEventListener('change', toggleProject);
+
+            // Mode of Payment dynamic toggle
+            const paymentModeSelect = document.getElementById('PaymentMode');
+            const grpBankAccount = document.getElementById('grpBankAccount');
+            const grpReference = document.getElementById('grpReference');
+            const grpChequeDateRow = document.getElementById('grpChequeDateRow');
+            const bankAccountSelect = document.getElementById('BankAccountId');
+            const transactionRefInput = document.getElementById('TransactionReference');
+            const chequeDateInput = document.getElementById('ChequeDate');
+            const lblReference = document.getElementById('lblTransactionReference');
+            const reqReference = document.getElementById('reqReference');
+            const reqBankAccount = document.getElementById('reqBankAccount');
+
+            window.handlePaymentModeChange = function () {
+                const mode = (paymentModeSelect.value || '').trim();
+
+                if (mode === 'Cash') {
+                    // Hide Bank Account & Reference fields
+                    grpBankAccount.style.display = 'none';
+                    grpReference.style.display = 'none';
+                    grpChequeDateRow.style.display = 'none';
+
+                    bankAccountSelect.removeAttribute('required');
+                    transactionRefInput.removeAttribute('required');
+                    chequeDateInput.removeAttribute('required');
+
+                    bankAccountSelect.value = '';
+                    transactionRefInput.value = '';
+                } else {
+                    // Show dynamic banking/instrument fields
+                    grpBankAccount.style.display = 'block';
+                    grpReference.style.display = 'block';
+                    bankAccountSelect.setAttribute('required', 'required');
+                    transactionRefInput.setAttribute('required', 'required');
+
+                    if (mode === 'NetBanking') {
+                        lblReference.innerHTML = 'UTR / Transfer Ref No. <span class="text-danger">*</span>';
+                        transactionRefInput.placeholder = 'e.g. UTR / NEFT / RTGS Ref No.';
+                        grpChequeDateRow.style.display = 'none';
+                        chequeDateInput.removeAttribute('required');
+                    } else if (mode === 'UPI') {
+                        lblReference.innerHTML = 'UPI / Transaction Ref ID <span class="text-danger">*</span>';
+                        transactionRefInput.placeholder = 'e.g. 12-digit UPI Ref ID / Txn ID';
+                        grpChequeDateRow.style.display = 'none';
+                        chequeDateInput.removeAttribute('required');
+                    } else if (mode === 'Cheque') {
+                        lblReference.innerHTML = 'Cheque No. <span class="text-danger">*</span>';
+                        transactionRefInput.placeholder = 'e.g. 6-digit Cheque No.';
+                        grpChequeDateRow.style.display = 'flex';
+                        chequeDateInput.setAttribute('required', 'required');
+                    } else if (mode === 'Card') {
+                        lblReference.innerHTML = 'Auth / Reference No. <span class="text-danger">*</span>';
+                        transactionRefInput.placeholder = 'e.g. Card Approval / Ref No.';
+                        grpChequeDateRow.style.display = 'none';
+                        chequeDateInput.removeAttribute('required');
+                    } else if (mode === 'Demand Draft') {
+                        lblReference.innerHTML = 'DD No. <span class="text-danger">*</span>';
+                        transactionRefInput.placeholder = 'e.g. Demand Draft Number';
+                        grpChequeDateRow.style.display = 'none';
+                        chequeDateInput.removeAttribute('required');
+                    } else {
+                        lblReference.innerHTML = 'Reference / Instrument No. <span class="text-danger">*</span>';
+                        transactionRefInput.placeholder = 'Reference / Instrument No.';
+                        grpChequeDateRow.style.display = 'none';
+                        chequeDateInput.removeAttribute('required');
+                    }
+                }
+            };
+
+            // Run on initial load
+            handlePaymentModeChange();
 
             // Auto-check project checkbox if ExpenseHead is "Project"
             const expenseHeadSelect = document.getElementById('ExpenseHead');

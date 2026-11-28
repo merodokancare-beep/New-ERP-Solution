@@ -16,6 +16,9 @@
     var users = ViewBag.Users as IEnumerable<SDK.ERP.Domain.Entities.Admin.User> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Admin.User>();
     var divisions = ViewBag.Divisions as IEnumerable<string> ?? new List<string> { "HARDWARE DIVISION", "GENERAL SUPPLY", "SOFTWARE & IT", "NETWORKING", "CIVIL & INFRA" };
     var docCounts = ViewBag.ProjectDocCounts as Dictionary<long, int> ?? new Dictionary<long, int>();
+    var projectReceivedMap = ViewBag.ProjectReceived as Dictionary<long, decimal> ?? new Dictionary<long, decimal>();
+    var projectAdvanceMap = ViewBag.ProjectAdvance as Dictionary<long, decimal> ?? new Dictionary<long, decimal>();
+    var bankAccounts = ViewBag.BankAccounts as IEnumerable<SDK.ERP.Domain.Entities.Banking.BankAccount> ?? Enumerable.Empty<SDK.ERP.Domain.Entities.Banking.BankAccount>();
 }
 
 <!-- Custom Scoped Styling for Attractive & Responsive Project Register -->
@@ -449,6 +452,12 @@
         border-color: #BBF7D0;
     }
 
+    .btn-action-icon.payment:hover {
+        color: #16A34A;
+        background: #DCFCE7;
+        border-color: #86EFAC;
+    }
+
     .btn-action-icon.delete:hover {
         color: #DC2626;
         background: #FEE2E2;
@@ -456,7 +465,7 @@
     }
 
     /* Responsive Breakpoints */
-    @@media (max-width: 992px) {
+    @("@media") (max-width: 992px) {
         .project-details-grid {
             grid-template-columns: 1fr;
             gap: 12px;
@@ -615,6 +624,11 @@
                     var rawStatus = (p.Status ?? "OPEN").Trim().ToUpperInvariant();
                     var desc = !string.IsNullOrWhiteSpace(p.Description) ? p.Description : (!string.IsNullOrWhiteSpace(p.ClosureNotes) ? p.ClosureNotes : "N/A");
                     
+                    // Financials: Total received and advance received
+                    var totalRec = projectReceivedMap.TryGetValue(p.Id, out var tr) ? tr : 0m;
+                    var advRec = projectAdvanceMap.TryGetValue(p.Id, out var ar) ? ar : 0m;
+                    var balDue = Math.Max(0, p.ContractValue - totalRec);
+
                     // Physical file status logic
                     var hasDocs = (docCounts.ContainsKey(p.Id) && docCounts[p.Id] > 0) || p.PurchaseOrders.Any(po => po.AttachmentDocId != null);
                     var physicalStatus = !string.IsNullOrWhiteSpace(p.PhysicalFileStatus) ? p.PhysicalFileStatus : (hasDocs ? "Created" : "Not Create");
@@ -691,10 +705,22 @@
                                     </div>
                                 </div>
 
-                                <div class="project-field-row">
+                                <div class="project-field-row flex-wrap">
                                     <div>
                                         <span class="field-key">Total Value:</span>
                                         <span class="field-val-money">&#8377; @p.ContractValue.ToString("N2")</span>
+                                    </div>
+                                    <div>
+                                        <span class="field-key">Advance / Received:</span>
+                                        <span class="fw-bold @(totalRec > 0 ? "text-success" : "text-muted")">&#8377; @totalRec.ToString("N2")</span>
+                                        @if (advRec > 0 && advRec != totalRec)
+                                        {
+                                            <small class="text-muted ms-1">(Adv: &#8377; @advRec.ToString("N2"))</small>
+                                        }
+                                    </div>
+                                    <div>
+                                        <span class="field-key">Balance:</span>
+                                        <span class="fw-bold @(balDue > 0 ? "text-danger" : "text-success")">&#8377; @balDue.ToString("N2")</span>
                                     </div>
                                     <div>
                                         <span class="field-key">Project Division:</span>
@@ -782,6 +808,10 @@
 
                         <!-- Action Icons Column -->
                         <div class="project-actions-cell">
+                            <!-- Record Advance / Client Payment -->
+                            <button type="button" class="btn-action-icon payment text-success" title="Record Advance / Client Payment" onclick="openAdvanceModal(@p.Id, '@p.ProjectCode', '@p.ProjectName.Replace("'", "\\'")')">
+                                <i class="fa-solid fa-hand-holding-dollar"></i>
+                            </button>
                             <!-- Edit -->
                             <button type="button" class="btn-action-icon edit" title="Edit Project Details" onclick="openEditModal(@p.Id)">
                                 <i class="fa-solid fa-pencil"></i>
@@ -1216,6 +1246,123 @@
 </div>
 
 <!-- ========================================================================= -->
+<!-- 5. RECORD ADVANCE / CLIENT PAYMENT MODAL -->
+<!-- ========================================================================= -->
+<div class="modal fade" id="recordAdvanceModal" tabindex="-1" aria-labelledby="recordAdvanceModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow">
+            <form method="post" asp-controller="Projects" asp-action="RecordProjectAdvance" enctype="multipart/form-data">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="projectId" id="advanceProjectId" value="" />
+                
+                <div class="modal-header bg-success-subtle py-3 border-bottom border-success-subtle">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-success text-white p-2 rounded-circle fs-6">
+                            <i class="fa-solid fa-hand-holding-dollar"></i>
+                        </span>
+                        <div>
+                            <h6 class="modal-title fw-bold text-dark mb-0" id="recordAdvanceModalLabel">
+                                Record Client Advance / Payment Receipt
+                            </h6>
+                            <small class="text-muted" id="advanceProjectSubtitle">Project Code - Name</small>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+
+                <div class="modal-body p-4" style="font-size: 13px;">
+                    <div class="alert alert-info py-2 px-3 mb-3 d-flex align-items-center gap-2 shadow-sm" style="font-size: 12px;">
+                        <i class="fa-solid fa-info-circle fs-5 text-primary flex-shrink-0"></i>
+                        <div>
+                            <strong>Automatic Balance Deduction:</strong> Recording this client payment will automatically deduct the received amount from the total project contract value and update the remaining payable balance and transaction history.
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold" style="font-size: 12px;">
+                                Amount Received (&#8377;) <span class="text-danger">*</span>
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white fw-bold">&#8377;</span>
+                                <input type="number" step="0.01" min="1" name="amountReceived" id="advanceAmountInput" class="form-control form-control-sm fw-bold text-success" placeholder="e.g. 500000.00" required />
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold" style="font-size: 12px;">
+                                Receipt Date <span class="text-danger">*</span>
+                            </label>
+                            <input type="date" name="receiptDate" class="form-control form-control-sm" value="@DateTime.Today.ToString("yyyy-MM-dd")" required />
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold" style="font-size: 12px;">
+                                Payment Mode <span class="text-danger">*</span>
+                            </label>
+                            <select name="paymentMode" class="form-select form-select-sm">
+                                <option value="NEFT/RTGS" selected>NEFT / RTGS / IMPS</option>
+                                <option value="UPI">UPI / QR Transfer</option>
+                                <option value="Cheque / DD">Cheque / Demand Draft</option>
+                                <option value="Net Banking">Internet Banking</option>
+                                <option value="Cash">Cash Deposit</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold" style="font-size: 12px;">
+                                Deposited In Bank Account <span class="text-danger">*</span>
+                            </label>
+                            <select name="bankAccountId" class="form-select form-select-sm" required>
+                                @if (bankAccounts.Any())
+                                {
+                                    @foreach (var b in bankAccounts)
+                                    {
+                                        <option value="@b.Id">@b.BankName - @b.AccountNumber (@b.AccountType)</option>
+                                    }
+                                }
+                                else
+                                {
+                                    <option value="1">Primary Company Bank Account</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold" style="font-size: 12px;">
+                                Transaction / UTR / Cheque Ref No.
+                            </label>
+                            <input type="text" name="transactionRefNo" class="form-control form-control-sm" placeholder="e.g. UTR123456789 or CHQ-001234" />
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold" style="font-size: 12px;">
+                                Upload Receipt / Bank Slip (Optional)
+                            </label>
+                            <input type="file" name="receiptDoc" class="form-control form-control-sm" accept=".pdf,.png,.jpg,.jpeg,.zip" />
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label fw-bold" style="font-size: 12px;">
+                                Remarks / Notes
+                            </label>
+                            <textarea name="remarks" class="form-control form-control-sm" rows="2" placeholder="e.g. 20% mobilization advance received against PO..."></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer bg-light py-2 border-top">
+                    <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success btn-sm px-4 fw-bold">
+                        <i class="fa-solid fa-check me-1"></i> Record Advance Payment
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
 <!-- JAVASCRIPT: INSTANT LIVE FILTERING, TAB LOGIC, AND MODAL DATA BINDING -->
 <!-- ========================================================================= -->
 @section Scripts {
@@ -1471,6 +1618,15 @@
             btnSubmit.innerHTML = `<i class="fa-solid fa-check me-1"></i> Update Status to ${status}`;
             btnSubmit.className = "btn btn-primary btn-sm px-4 fw-semibold";
         }
+    }
+
+    // Modal Handlers: Open Advance / Payment Modal
+    function openAdvanceModal(projectId, projectCode, projectName) {
+        document.getElementById("advanceProjectId").value = projectId;
+        document.getElementById("advanceProjectSubtitle").textContent = `${projectCode} - ${projectName}`;
+        document.getElementById("advanceAmountInput").value = "";
+        const modal = new bootstrap.Modal(document.getElementById("recordAdvanceModal"));
+        modal.show();
     }
 
     // Modal Handlers: Open Delete Modal

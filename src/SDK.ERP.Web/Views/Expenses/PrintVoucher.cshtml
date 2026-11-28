@@ -176,6 +176,10 @@
                         &#8377; @Model.Amount.ToString("N2")
                     </td>
                 </tr>
+                <tr>
+                    <th>Mode of Payment</th>
+                    <td><strong>@(Model.PaymentMode ?? Model.SettlementPaymentMode ?? "NetBanking")</strong></td>
+                </tr>
                 @if (!string.IsNullOrWhiteSpace(Model.Remarks))
                 {
                     <tr>

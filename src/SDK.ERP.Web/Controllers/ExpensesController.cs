@@ -167,9 +167,27 @@ public class ExpensesController : Controller
 
         model.CompanyId = company.Id;
         model.Status = "PENDING";
+        model.PaymentMode = string.IsNullOrWhiteSpace(model.PaymentMode) ? "NetBanking" : model.PaymentMode;
         model.CreatedByUserId = user.Id;
         model.CreatedByUserName = string.IsNullOrEmpty(user.FullName) ? user.Username : user.FullName;
         model.CreatedAt = DateTime.UtcNow;
+
+        // Resolve Bank Name if BankAccountId is provided
+        if (model.BankAccountId.HasValue)
+        {
+            var bank = await _db.BankAccounts.FindAsync(model.BankAccountId.Value);
+            if (bank != null)
+            {
+                model.BankName = $"{bank.BankName} - {bank.AccountNumber}";
+            }
+        }
+        else if (model.PaymentMode == "Cash")
+        {
+            model.BankAccountId = null;
+            model.BankName = null;
+            model.TransactionReference = null;
+            model.ChequeDate = null;
+        }
 
         // Resolve LedgerName if not provided
         if (string.IsNullOrWhiteSpace(model.LedgerName) && model.LedgerId.HasValue)
@@ -255,6 +273,34 @@ public class ExpensesController : Controller
         expense.LedgerName = model.LedgerName;
         expense.PaymentDate = model.PaymentDate;
         expense.Amount = model.Amount;
+        expense.PaymentMode = string.IsNullOrWhiteSpace(model.PaymentMode) ? "NetBanking" : model.PaymentMode;
+
+        if (expense.PaymentMode != "Cash")
+        {
+            expense.BankAccountId = model.BankAccountId;
+            if (model.BankAccountId.HasValue)
+            {
+                var bank = await _db.BankAccounts.FindAsync(model.BankAccountId.Value);
+                if (bank != null)
+                {
+                    expense.BankName = $"{bank.BankName} - {bank.AccountNumber}";
+                }
+            }
+            else
+            {
+                expense.BankName = model.BankName;
+            }
+            expense.TransactionReference = model.TransactionReference;
+            expense.ChequeDate = (expense.PaymentMode == "Cheque") ? model.ChequeDate : null;
+        }
+        else
+        {
+            expense.BankAccountId = null;
+            expense.BankName = null;
+            expense.TransactionReference = null;
+            expense.ChequeDate = null;
+        }
+
         expense.IsPipelineProject = model.IsPipelineProject;
         expense.ProjectId = model.IsPipelineProject ? model.ProjectId : null;
         expense.Purpose = model.Purpose;
@@ -567,6 +613,20 @@ public class ExpensesController : Controller
         {
             ViewBag.Projects = new List<Project>();
         }
+
+        // 5. Bank Accounts (for NetBanking, UPI, Cheque, Card, DD)
+        try
+        {
+            ViewBag.BankAccounts = await _db.BankAccounts
+                .Where(b => b.IsActive)
+                .OrderBy(b => b.BankName)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+        catch
+        {
+            ViewBag.BankAccounts = new List<SDK.ERP.Domain.Entities.Banking.BankAccount>();
+        }
     }
 
     private async Task EnsureDirectExpensesTableAsync()
@@ -587,6 +647,11 @@ public class ExpensesController : Controller
                         [LedgerName] NVARCHAR(250) NOT NULL DEFAULT '',
                         [PaymentDate] DATETIME2 NOT NULL,
                         [Amount] DECIMAL(18,2) NOT NULL DEFAULT 0,
+                        [PaymentMode] NVARCHAR(100) NOT NULL DEFAULT 'NetBanking',
+                        [BankAccountId] BIGINT NULL,
+                        [BankName] NVARCHAR(150) NULL,
+                        [TransactionReference] NVARCHAR(150) NULL,
+                        [ChequeDate] DATETIME2 NULL,
                         [IsPipelineProject] BIT NOT NULL DEFAULT 0,
                         [ProjectId] BIGINT NULL,
                         [Purpose] NVARCHAR(MAX) NOT NULL DEFAULT '',
@@ -613,6 +678,29 @@ public class ExpensesController : Controller
                         [SettlementNotes] NVARCHAR(MAX) NULL,
                         [JournalEntryId] BIGINT NULL
                     );
+                END
+                ELSE
+                BEGIN
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[DirectExpenses]') OR object_id = OBJECT_ID('[dbo].[DirectExpenses]')) AND name = 'PaymentMode')
+                    BEGIN
+                        ALTER TABLE [DirectExpenses] ADD [PaymentMode] NVARCHAR(100) NOT NULL DEFAULT 'NetBanking';
+                    END
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[DirectExpenses]') OR object_id = OBJECT_ID('[dbo].[DirectExpenses]')) AND name = 'BankAccountId')
+                    BEGIN
+                        ALTER TABLE [DirectExpenses] ADD [BankAccountId] BIGINT NULL;
+                    END
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[DirectExpenses]') OR object_id = OBJECT_ID('[dbo].[DirectExpenses]')) AND name = 'BankName')
+                    BEGIN
+                        ALTER TABLE [DirectExpenses] ADD [BankName] NVARCHAR(150) NULL;
+                    END
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[DirectExpenses]') OR object_id = OBJECT_ID('[dbo].[DirectExpenses]')) AND name = 'TransactionReference')
+                    BEGIN
+                        ALTER TABLE [DirectExpenses] ADD [TransactionReference] NVARCHAR(150) NULL;
+                    END
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE (object_id = OBJECT_ID('[DirectExpenses]') OR object_id = OBJECT_ID('[dbo].[DirectExpenses]')) AND name = 'ChequeDate')
+                    BEGIN
+                        ALTER TABLE [DirectExpenses] ADD [ChequeDate] DATETIME2 NULL;
+                    END
                 END
             ");
         }
